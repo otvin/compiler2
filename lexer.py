@@ -1,8 +1,5 @@
 from enum import Enum, unique
 
-''' named "tokenize" so that we do not conflict with the package Lib/token '''
-
-
 @unique
 class TokenType(Enum):
 
@@ -176,21 +173,61 @@ class Token:
         if isinstance(t, TokenType):
             self.__tokentype = t
         else:  # pragma: no cover
-            raise ValueError("Invalid Token Type")
+            raise TypeError("Invalid Token Type")
+
+    def __str__(self):
+        return '{0:<18} val:{1:<15} file:{2:<15} l:{3:<5} c:{4:<3}'.format(self.tokentype, self.value,
+                                                                            self.filename, self.line,
+                                                                            self.column)
 
 
-class Tokenizer:
+class TokenStream:
+    def __init__(self):
+        self.tokenlist = []
+        self.pos = 0
+
+    def addtoken(self, token):
+        if not isinstance(token, Token):
+            raise TypeError("Only Tokens may be added to TokenStream")
+        self.tokenlist.append(token)
+
+    def __iter__(self):
+        self.pos = 0
+        return self
+
+    def peektoken(self):
+        # returns the next token in the token list, but does not advance the position.  Used
+        # when interpretation of a token varies based on the token that follows.
+        # returns None if we are past the end of the token list.
+        try:
+            ret = self.tokenlist[self.pos]
+        except IndexError:
+            ret = None
+        return ret
+
+    def __next__(self):
+        # consumes the next token off the token list, by moving the position to the next step.
+        # if we are past the end of the token list, return None
+        try:
+            ret = self.tokenlist[self.pos]
+            self.pos += 1
+        except IndexError:
+            raise StopIteration
+        return ret
+
+
+class Lexer:
     def __init__(self, filename):
         self.filename = filename
         self.reset()
 
     def reset(self):
-        self.tokenlist = []
+        self.tokenstream = TokenStream()
         self.text = ""
         self.line = 0
         self.column = 0
 
-    def tokenize(self):
+    def lex(self):
         # re-initialize member variables
         self.reset()
         if self.filename == "":
@@ -206,6 +243,4 @@ class Tokenizer:
             return
 
         # TODO: Finish the tokenization
-
-
 
