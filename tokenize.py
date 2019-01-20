@@ -1,6 +1,6 @@
 from enum import Enum, unique
 
-''' named tokenize so that we do not conflict with the package Lib/token '''
+''' named "tokenize" so that we do not conflict with the package Lib/token '''
 
 
 @unique
@@ -95,7 +95,8 @@ class TokenType(Enum):
     REAL = 'real'
     BOOLEAN = 'Boolean'
     CHAR = 'char'
-    # String Type is defined TODO: Where
+    # TODO: Find where string type is defined
+    # String Type is defined WHERE?
     STRING = 'string'
 
     # Most of the required procedures in 6.6.5 of the ISO standard are going to need to be handled by the compiler.
@@ -158,13 +159,14 @@ class TokenType(Enum):
 
 
 class Token:
-    def __init__(self, tokentype, line, column, filename):
+    def __init__(self, tokentype, line, column, filename, value):
         self.tokentype = tokentype
         self.line = line
         self.column = column
         self.filename = filename
+        self.value = value
 
-    # Make the tokentype a property TO-DO finish comment
+    # Use a property for tokentype so we can enforce that it is always a valid TokenType
     @property
     def tokentype(self):
         return self.__tokentype
@@ -175,3 +177,35 @@ class Token:
             self.__tokentype = t
         else:  # pragma: no cover
             raise ValueError("Invalid Token Type")
+
+
+class Tokenizer:
+    def __init__(self, filename):
+        self.filename = filename
+        self.reset()
+
+    def reset(self):
+        self.tokenlist = []
+        self.text = ""
+        self.line = 0
+        self.column = 0
+
+    def tokenize(self):
+        # re-initialize member variables
+        self.reset()
+        if self.filename == "":
+            print("Filename not set, cannot Tokenize")
+            return
+
+        try:
+            f = open(self.filename,"r")
+            self.text = f.read()
+            f.close()
+        except FileNotFoundError:
+            print("Invalid filename: {}".format(self.filename))
+            return
+
+        # TODO: Finish the tokenization
+
+
+
