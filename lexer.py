@@ -1,9 +1,15 @@
 from enum import Enum, unique
 
 
+class LexerException(Exception):
+    pass
+
+
 @unique
 class TokenType(Enum):
-    # Special Symbols come from 6.1.2 in the ISO standard
+    # Special Symbols come from 6.1.2 in the ISO standard.  Section 6.1.9 of the
+    # standard specifies some alternate representations for symnbols.  We will
+    # handle those via a lookup mapping later.
     PLUS = '+'
     MINUS = "-"
     MULTIPLY = '*'
@@ -66,7 +72,8 @@ class TokenType(Enum):
     # Identifiers are defined in 6.1.3 of the ISO Standard
     IDENTIFIER = 'ident'
 
-    # Directives are defined in 6.1.4. of the ISO standard.  "forward" is the only directive defined.
+    # Directives are defined in 6.1.4. of the ISO standard.
+    # "forward" is the only directive defined.
     FORWARD = 'forward'
 
     # Numbers are defined in 6.1.5 of the ISO Standard
@@ -80,12 +87,6 @@ class TokenType(Enum):
 
     # Character Strings are defined in 6.1.7 of the ISO Standard
     CHARSTRING = 'character string'
-
-    # Commentary (comments) defined in 6.1.8 of the ISO Standard.  TO-DO: Describe why we are defining
-    # a comment token but not { or } as tokens.
-    COMMENT = 'comment'
-
-    # TODO: Alternative Representations in 6.1.9 - we will do later
 
     # Ordinal Types are defined in section 6.4.2.2 in the ISO Standard
     INTEGER = 'integer'
@@ -162,12 +163,58 @@ class TokenType(Enum):
     INPUT = 'input'
     OUTPUT = 'output'
 
-    # Invalid Tokens may be seen during lexing, but we do not want to stop lexing at the first invalid
-    # token.  So, we would store the invalid token and raise an error during parsing.
-    INVALID_TOKEN = 'invalid token'
-
     def __str__(self):
         return self.value
+
+
+# To make it easy to lex various tokens, we can use a lookup from the reserved words back to the
+# TokenTypes we just defined to eliminate the need for a long if/elif block testing for each word.
+# Note, not all TokenTypes map to reserved words.  Example: TokenType.IDENTIFIER or TokenType.SIGNED_REAL.
+
+TOKENTYPE_LOOKUP = {
+    'abs': TokenType.ABS, 'and': TokenType.AND,
+    'arctan': TokenType.ARCTAN, 'array': TokenType.ARRAY, 'begin': TokenType.BEGIN,
+    'boolean': TokenType.BOOLEAN, 'case': TokenType.CASE, 'char': TokenType.CHAR,
+    'const': TokenType.CONST, 'cos': TokenType.COS,
+    'dispose': TokenType.DISPOSE, 'div': TokenType.IDIV, 'do': TokenType.DO, 'downto': TokenType.DOWNTO,
+    'else': TokenType.ELSE, 'end': TokenType.END, 'eof': TokenType.EOF, 'eoln': TokenType.EOLN,
+    'exp': TokenType.EXP, 'false': TokenType.FALSE, 'file': TokenType.FILE, 'for': TokenType.FOR,
+    'forward': TokenType.FORWARD, 'function': TokenType.FUNCTION,
+    'get': TokenType.GET, 'goto': TokenType.GOTO, 'if': TokenType.IF, 'in': TokenType.IN,
+    'input': TokenType.INPUT, 'integer': TokenType.INTEGER,
+    'label': TokenType.LABEL, 'ln': TokenType.LN, 'maxint': TokenType.MAXINT, 'mod': TokenType.MOD,
+    'new': TokenType.NEW, 'nil': TokenType.NIL, 'odd': TokenType.ODD, 'of': TokenType.OF,
+    'or': TokenType.OR, 'ord': TokenType.ORD, 'output': TokenType.OUTPUT,
+    'pack': TokenType.PACK, 'packed': TokenType.PACKED,
+    'page': TokenType.PAGE, 'procedure': TokenType.PROCEDURE,
+    'program': TokenType.PROGRAM, 'put': TokenType.PUT, 'read': TokenType.READ, 'readln': TokenType.READLN,
+    'real': TokenType.REAL, 'record': TokenType.RECORD, 'repeat': TokenType.REPEAT,
+    'reset': TokenType.RESET, 'rewrite': TokenType.REWRITE, 'round': TokenType.ROUND,
+    'sin': TokenType.SIN, 'set': TokenType.SET, 'sqr': TokenType.SQR, 'sqrt': TokenType.SQRT,
+    'string': TokenType.STRING,
+    'text': TokenType.TEXT, 'then': TokenType.THEN, 'to': TokenType.TO, 'trunc': TokenType.TRUNC,
+    'true': TokenType.TRUE, 'type': TokenType.TYPE, 'unpack': TokenType.UNPACK,
+    'until': TokenType.UNTIL, 'var': TokenType.VAR, 'while': TokenType.WHILE, 'with': TokenType.WITH,
+    'write': TokenType.WRITE, 'writeln': TokenType.WRITELN
+}
+
+
+# Similar lookup for symbols.  Note that there are alternate representations for brackets and
+# the pointer symbol defined in section 6.1.9 of the ISO Standard.
+SYMBOL_LOOKUP = {
+    ':=': TokenType.ASSIGNMENT, ':': TokenType.COLON,
+    ',': TokenType.COMMA, '/': TokenType.DIVIDE,
+    '=': TokenType.EQUALS, '>': TokenType.GREATER,
+    '>=': TokenType.GREATEREQ, '[': TokenType.LBRACKET,
+    '(.': TokenType.LBRACKET, '<': TokenType.LESS,
+    '<=': TokenType.LESSEQ, '(': TokenType.LPAREN,
+    '-': TokenType.MINUS, '*': TokenType.MULTIPLY,
+    '<>': TokenType.NOTEQUAL, '.': TokenType.PERIOD,
+    '+': TokenType.PLUS, '^': TokenType.POINTER,
+    '@': TokenType.POINTER, ']': TokenType.RBRACKET,
+    '.)': TokenType.RBRACKET, ')': TokenType.RPAREN,
+    ';': TokenType.SEMICOLON, '..': TokenType.SUBRANGE
+}
 
 
 class Token:
@@ -276,6 +323,12 @@ class Lexer:
                 self.column += 1
             return ret
 
+    def eatmulti(self, num):
+        ret = ""
+        for i in range(num):
+            ret += self.eat()
+        return ret
+
     def eatwhitespace(self):
         while self.peek().isspace():
             self.eat()
@@ -283,13 +336,34 @@ class Lexer:
     def eatidentifier(self):
         # Definition of identifier in section 6.1.3 of ISO Standard is letter { letter | digit } .
         # This function validates that the next character in the input string is a letter, and if so,
-        # returns the identifier.  Returns empty string if the next character in the input string
+        # returns the identifier.  Returns empty string if the next character in the input stream
         # is not alphabetic.
         ret = ""
         if self.peek().isalpha():
             ret = self.eat()
             while self.peek().isalnum():
                 ret += self.eat()
+        return ret
+
+    def eatcomment(self):
+        # Definition of commentary in section 6.1.8 of the ISO standard is
+        # ( '{' | '(*' ) commentary ( '}' | '*)' ).  The actual commentary itself can be any arbitrary string of
+        # characters, on multiple lines.  Comments do not nest, so the string "{ (* a comment *) }" is invalid, as the
+        # comment ends on the *), so the } would be flagged as an invalid token.
+        # Returns empty string if the next character(s) in the input stream is not a comment opening.
+        ret = ""
+        if self.peek() == '{':
+            self.eat()
+        elif self.peekmulti(2) == '(*':
+            self.eatmulti(2)
+        else:
+            return ""
+        while self.peek() != '}' and self.peekmulti(2) != '*)':
+            ret += self.eat()
+        if self.peek() == '}':
+            self.eat()
+        else:  # eat the *)
+            self.eatmulti(2)
         return ret
 
     def eatrealnumber(self):
@@ -307,7 +381,7 @@ class Lexer:
         #
         # As a note, the 'e' in the unsigned-real can be lower or upper case.
         #
-        # Returns empty string if the next character in the input string is not numeric.
+        # Returns empty string if the next character in the input stream is not numeric.
         ret = ""
         while self.peek().isnumeric():
             ret += self.eat()
@@ -322,8 +396,7 @@ class Lexer:
                     raise ValueError("Invalid character '.'")
             if self.peek().lower() == 'e':
                 if self.peekahead(1) in ['+', '-'] and self.peekahead(2).isnumeric():
-                    ret += self.eat()  # grab the 'e'
-                    ret += self.eat()  # grab the sign
+                    ret += self.eatmulti(2)  # grab the 'e' and the sign
                     while self.peek().isnumeric():
                         ret += self.eat()
                 elif self.peekahead(1).isnumeric():
@@ -355,8 +428,7 @@ class Lexer:
             while not done:
                 if self.peekmulti(2) == "''":
                     ret += "'"  # add the single apostrophe
-                    self.eat()
-                    self.eat()  # eat both apostrophes
+                    self.eatmulti(2)  # eat both apostrophes
                 elif self.peek() == "'":
                     self.eat()  # eat the closing apostrophe
                     done = True
@@ -370,8 +442,7 @@ class Lexer:
 
     def lex(self):
         if self.filename == "":
-            print("Filename not set, cannot Tokenize")
-            return
+            raise LexerException("Filename not set, cannot Tokenize")
         try:
             f = open(self.filename, "r")
             self.text = f.read()
@@ -379,21 +450,25 @@ class Lexer:
             f.close()
         except FileNotFoundError:
             print("Invalid filename: {}".format(self.filename))
-            return
+            raise
 
-        # TODO: Finish the tokenization
+        self.eatwhitespace()
+
         while not self.at_eof():
-            self.eatwhitespace()
-            # remember where this next token starts, since that is the position a user would want to see
+            # remember where this next token starts, since that is the position a user would want to see in an error
             startline = self.line
-            startcolumn = self.column
+            startcol = self.column
             try:
                 if self.peek() == "'":
                     val = self.eatcharacterstring()
-                    self.tokenstream.addtoken(Token(TokenType.CHARSTRING, startline, startcolumn, self.filename, val))
+                    self.tokenstream.addtoken(Token(TokenType.CHARSTRING, startline, startcol, self.filename, val))
                 elif self.peek().isalpha():
                     val = self.eatidentifier()
-                    self.tokenstream.addtoken(Token(TokenType.IDENTIFIER, startline, startcolumn, self.filename, val))
+                    if val.lower() in TOKENTYPE_LOOKUP.keys():
+                        toktype = TOKENTYPE_LOOKUP[val.lower()]
+                    else:
+                        toktype = TokenType.IDENTIFIER
+                    self.tokenstream.addtoken(Token(toktype, startline, startcol, self.filename, val))
                 elif self.peek().isnumeric():
                     # could be a real or an integer.  Read until the next non-numeric character.  If that character
                     # is an e, E, or . then it is a real, else it is an integer.
@@ -402,17 +477,31 @@ class Lexer:
                         lookahead += 1
                     if self.peekahead(lookahead) == '.' or self.peekahead(lookahead).lower() == 'e':
                         val = self.eatrealnumber()
-                        self.tokenstream.addtoken(Token(TokenType.UNSIGNED_REAL, startline, startcolumn,
+                        self.tokenstream.addtoken(Token(TokenType.UNSIGNED_REAL, startline, startcol,
                                                         self.filename, val))
                     else:
                         val = ""
                         while self.peek().isnumeric():
                             val += self.eat()
-                        self.tokenstream.addtoken(Token(TokenType.UNSIGNED_INT, startline, startcolumn,
+                        self.tokenstream.addtoken(Token(TokenType.UNSIGNED_INT, startline, startcol,
                                                         self.filename, val))
+                elif self.peek() == '{' or self.peekmulti(2) == '(*':
+                    self.eatcomment()
+                    # Comments are totally ignored from here forward, so we do not add those to the tokenstream.
+                elif self.peek() in ['+', '-', '*', '/', '=', '<', '>', '[', ']', '.', ',', ':', ';',
+                                     '^', '(', ')', '@']:
+                    # Test first for the 2-character symbols, and if none of those match, we know
+                    # we have a single-character symbol.
+                    if self.peekmulti(2) in [':=', '>=', '<=', '<>', '(.', '.)', '..']:
+                        val = self.eatmulti(2)
+                    else:
+                        val = self.eat()
+                    toktype = SYMBOL_LOOKUP[val]
+                    self.tokenstream.addtoken(Token(toktype, startline, startcol, self.filename, val))
+                else:
+                    errstr = 'Unexpected character: {}'.format(self.peek())
+                    raise LexerException(errstr)
             except Exception:
-                print("Parse error in {} at line: {}, column: {}".format(self.filename, startline, startcolumn))
+                print("Parse error in {} at line: {}, column: {}".format(self.filename, startline, startcol))
                 raise
-
-        for i in self.tokenstream:
-            print(i)
+            self.eatwhitespace()
