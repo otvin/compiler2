@@ -1,4 +1,6 @@
 from enum import Enum, unique
+from copy import copy
+from filelocation import FileLocation
 
 
 class LexerException(Exception):
@@ -38,7 +40,7 @@ class TokenType(Enum):
     BEGIN = 'begin'
     CASE = 'case'
     CONST = 'const'
-    IDIV = 'div'  # named to avoid confusion with DIVIDE
+    IDIV = 'div'  # named IDIV to avoid confusion with DIVIDE
     DO = 'do'
     DOWNTO = 'downto'
     ELSE = 'else'
@@ -218,11 +220,9 @@ SYMBOL_LOOKUP = {
 
 
 class Token:
-    def __init__(self, tokentype, line, column, filename, value):
+    def __init__(self, tokentype, location, value):
         self.tokentype = tokentype
-        self.line = line
-        self.column = column
-        self.filename = filename
+        self.location = location
         self.value = value
 
     # Use a property for tokentype so we can enforce that it is always a valid TokenType
@@ -238,9 +238,7 @@ class Token:
             raise TypeError("Invalid Token Type")
 
     def __str__(self):
-        return '{0:<18} val:{1:<15} file:{2:<15} l:{3:<5} c:{4:<3}\n'.format(self.tokentype, self.value,
-                                                                             self.filename, self.line,
-                                                                             self.column)
+        return '{0:<18} val:{1:<15} file:{2:<35}\n'.format(self.tokentype, self.value, str(self.location))
 
 
 class TokenStream:
@@ -280,13 +278,11 @@ class TokenStream:
 
 class Lexer:
     def __init__(self, filename):
-        self.filename = filename
+        self.location = FileLocation(filename, 1, 1)
         self.tokenstream = TokenStream()
         self.text = ""
         self.length = 0
         self.curpos = 0
-        self.line = 1
-        self.column = 1
 
     def at_eof(self):
         return self.curpos >= self.length
@@ -317,10 +313,10 @@ class Lexer:
             ret = self.text[self.curpos]
             self.curpos += 1
             if ret == '\n':
-                self.line += 1
-                self.column = 1
+                self.location.line += 1
+                self.location.column = 1
             else:
-                self.column += 1
+                self.location.column += 1
             return ret
 
     def eatmulti(self, num):
@@ -404,7 +400,7 @@ class Lexer:
                     while self.peek().isnumeric():
                         ret += self.eat()
                 else:
-                    errstr = "Invalid character '{}'".format(self.peek())
+                    errstr = "Invalid real number format: {}".format(ret + self.peek())
                     raise ValueError(errstr)
         return ret
 
@@ -441,34 +437,37 @@ class Lexer:
         return ret
 
     def lex(self):
-        if self.filename == "":
+        if self.location.filename == "":
             raise LexerException("Filename not set, cannot Tokenize")
         try:
-            f = open(self.filename, "r")
+            f = open(self.location.filename, "r")
             self.text = f.read()
             self.length = len(self.text)
             f.close()
         except FileNotFoundError:
-            print("Invalid filename: {}".format(self.filename))
+            print("Invalid filename: {}".format(self.location.filename))
             raise
 
         self.eatwhitespace()
 
+
+
         while not self.at_eof():
-            # remember where this next token starts, since that is the position a user would want to see in an error
-            startline = self.line
-            startcol = self.column
+            # Remember where this next token starts, since that is the position a user would want to see in an error
+            # It needs to be a copy, else every token we create in every iteration would share the same location
+            # object.
+            curlocation = copy(self.location)
             try:
                 if self.peek() == "'":
                     val = self.eatcharacterstring()
-                    self.tokenstream.addtoken(Token(TokenType.CHARSTRING, startline, startcol, self.filename, val))
+                    self.tokenstream.addtoken(Token(TokenType.CHARSTRING, curlocation, val))
                 elif self.peek().isalpha():
                     val = self.eatidentifier()
                     if val.lower() in TOKENTYPE_LOOKUP.keys():
                         toktype = TOKENTYPE_LOOKUP[val.lower()]
                     else:
                         toktype = TokenType.IDENTIFIER
-                    self.tokenstream.addtoken(Token(toktype, startline, startcol, self.filename, val))
+                    self.tokenstream.addtoken(Token(toktype, curlocation, val))
                 elif self.peek().isnumeric():
                     # could be a real or an integer.  Read until the next non-numeric character.  If that character
                     # is an e, E, or . then it is a real, else it is an integer.
@@ -477,14 +476,12 @@ class Lexer:
                         lookahead += 1
                     if self.peekahead(lookahead) == '.' or self.peekahead(lookahead).lower() == 'e':
                         val = self.eatrealnumber()
-                        self.tokenstream.addtoken(Token(TokenType.UNSIGNED_REAL, startline, startcol,
-                                                        self.filename, val))
+                        self.tokenstream.addtoken(Token(TokenType.UNSIGNED_REAL, curlocation, val))
                     else:
                         val = ""
                         while self.peek().isnumeric():
                             val += self.eat()
-                        self.tokenstream.addtoken(Token(TokenType.UNSIGNED_INT, startline, startcol,
-                                                        self.filename, val))
+                        self.tokenstream.addtoken(Token(TokenType.UNSIGNED_INT, curlocation, val))
                 elif self.peek() == '{' or self.peekmulti(2) == '(*':
                     self.eatcomment()
                     # Comments are totally ignored from here forward, so we do not add those to the tokenstream.
@@ -497,11 +494,11 @@ class Lexer:
                     else:
                         val = self.eat()
                     toktype = SYMBOL_LOOKUP[val]
-                    self.tokenstream.addtoken(Token(toktype, startline, startcol, self.filename, val))
+                    self.tokenstream.addtoken(Token(toktype, curlocation, val))
                 else:
                     errstr = 'Unexpected character: {}'.format(self.peek())
                     raise LexerException(errstr)
             except Exception:
-                print("Parse error in {} at line: {}, column: {}".format(self.filename, startline, startcol))
+                print("Parse error in {} ".format(curlocation))
                 raise
             self.eatwhitespace()
