@@ -448,9 +448,6 @@ class Lexer:
             raise
 
         self.eatwhitespace()
-
-
-
         while not self.at_eof():
             # Remember where this next token starts, since that is the position a user would want to see in an error
             # It needs to be a copy, else every token we create in every iteration would share the same location
