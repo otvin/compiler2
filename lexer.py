@@ -238,7 +238,7 @@ class Token:
             raise TypeError("Invalid Token Type")
 
     def __str__(self):
-        return '{0:<18} val:{1:<15} file:{2:<35}\n'.format(self.tokentype, self.value, str(self.location))
+        return '{0:<18} val: {1:<15} {2:<35}\n'.format(self.tokentype, self.value, str(self.location))
 
 
 class TokenStream:
@@ -387,8 +387,7 @@ class Lexer:
                     while self.peek().isnumeric():
                         ret += self.eat()
                 else:
-                    # Cannot end a number with a period and no digits following.  Nor is there any other valid
-                    # token that could start with a period and follow a number.
+                    # Cannot end a real with a period and no digits following.
                     raise ValueError("Invalid character '.'")
             if self.peek().lower() == 'e':
                 if self.peekahead(1) in ['+', '-'] and self.peekahead(2).isnumeric():
@@ -470,11 +469,12 @@ class Lexer:
                     self.tokenstream.addtoken(Token(toktype, curlocation, val))
                 elif self.peek().isnumeric():
                     # could be a real or an integer.  Read until the next non-numeric character.  If that character
-                    # is an e, E, or . then it is a real, else it is an integer.
+                    # is an e, E, or a . followed by a digit then it is a real, else it is an integer.
                     lookahead = 1
                     while self.peekahead(lookahead).isnumeric():
                         lookahead += 1
-                    if self.peekahead(lookahead) == '.' or self.peekahead(lookahead).lower() == 'e':
+                    if ((self.peekahead(lookahead) == '.' and self.peekahead(lookahead+1).isnumeric()) or
+                            self.peekahead(lookahead).lower() == 'e'):
                         val = self.eatrealnumber()
                         self.tokenstream.addtoken(Token(TokenType.UNSIGNED_REAL, curlocation, val))
                     else:
