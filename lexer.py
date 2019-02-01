@@ -251,28 +251,39 @@ class TokenStream:
             raise TypeError("Only Tokens may be added to TokenStream")
         self.tokenlist.append(token)
 
+    # One can iterate over a TokenStream if desired, primarily for debugging purposes
+    # (e.g. printing out all the tokens in the stream)
     def __iter__(self):
         self.pos = 0
         return self
 
-    def peektoken(self):
-        # returns the next token in the token list, but does not advance the position.  Used
-        # when interpretation of a token varies based on the token that follows.
-        # returns None if we are past the end of the token list.
-        try:
-            ret = self.tokenlist[self.pos]
-        except IndexError:
-            ret = None
-        return ret
-
     def __next__(self):
-        # consumes the next token off the token list, by moving the position to the next step.
-        # if we are past the end of the token list, return None
         try:
             ret = self.tokenlist[self.pos]
             self.pos += 1
         except IndexError:
             raise StopIteration
+        return ret
+
+    def resetpos(self):
+        self.pos = 0
+
+    def eattoken(self):
+        try:
+            ret = self.tokenlist[self.pos]
+        except IndexError:
+            ret = None
+        self.pos += 1
+        return ret
+
+    def peektokentype(self):
+        # returns the type of the next token in the token list, but does not advance the position.  Used
+        # when interpretation of a token varies based on the token that follows.
+        # returns None if we are past the end of the token list.
+        try:
+            ret = self.tokenlist[self.pos].tokentype
+        except IndexError:
+            ret = None
         return ret
 
 
