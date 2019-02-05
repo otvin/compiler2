@@ -93,7 +93,7 @@ class Parser:
             minus = self.getexpectedtoken(TokenType.MINUS)
             isneg = True
             uinttok = self.getexpectedtoken(TokenType.UNSIGNED_INT)
-            numtok = Token(TokenType.INTEGER, minus.location, "-" + uinttok.value)
+            numtok = Token(TokenType.SIGNED_INT, minus.location, "-" + uinttok.value)
         else:
             numtok = self.getexpectedtoken(TokenType.UNSIGNED_INT)
         child = AST(numtok, ret)
