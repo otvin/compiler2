@@ -1,6 +1,7 @@
 import sys
 
 from lexer import Lexer
+from parser import Parser
 
 def main():
     if len(sys.argv) < 2:
@@ -18,13 +19,27 @@ def main():
             print(str(err))
         sys.exit()
 
-    f = open(infilename, "r")
-    print(f.read())
-    f.close()
+    p = Parser(l.tokenstream)
+    try:
+        p.parse()
+    except Exception as err:
+        if False:  # set to True to debug
+            print(err)
+        else:
+            print(str(err))
+        sys.exit()
 
-    for i in l.tokenstream:
-        print(i)
+    p.AST.rpn_print(0)
 
+    # f = open(infilename, "r")
+    # print(f.read())
+    # f.close()
+
+    # for i in l.tokenstream:
+    #    print(i)
+    # g = open('test.lex','w')
+    # for i in l.tokenstream:
+    #    g.write(str(i))
 
 if __name__ == '__main__':
     main()
