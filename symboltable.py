@@ -124,7 +124,7 @@ class Label:
         will only need to be compiled to an assembly language label and the goto itself will be
         compiled to an unconditional jump.  If a goto inside a nested procedure or function transfers
         control to a label, then the label statement will need to store the machine state, and the effect
-        of the goto will eb to restore that saved state.
+        of the goto will be to restore that saved state.
     """
     def __init__(self, name):
         self.name = name
@@ -134,7 +134,7 @@ class Label:
 
     def __str__(self):
         return self.name
-    
+
 
 class ParameterList:
     def __init__(self):
