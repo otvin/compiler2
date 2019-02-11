@@ -2,6 +2,7 @@ import sys
 
 from lexer import Lexer
 from parser import Parser
+from tac_ir import TACGenerator
 
 def main():
     if len(sys.argv) < 2:
@@ -30,6 +31,10 @@ def main():
         sys.exit()
 
     p.AST.rpn_print(0)
+
+    g = TACGenerator(p.literaltable)
+    g.generate(p.AST)
+    g.printblocks()
 
     # f = open(infilename, "r")
     # print(f.read())
