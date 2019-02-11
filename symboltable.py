@@ -132,6 +132,9 @@ class Label:
         self.remotetransfer = False
         self.insidestructuredstatement = False
 
+    def __str__(self):
+        return self.name
+    
 
 class ParameterList:
     def __init__(self):
