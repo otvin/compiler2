@@ -32,13 +32,14 @@
     TAC also supports:
         Labels - similar to assembly, just an identifier followed by a colon
         Goto - transfers control to statement named by a label
-        IfZ {value} Goto {label} - if the value is zero, then goto the statement named by the label
+        If {boolean expression} Goto {label} - if the expression is true, then goto the statement named by the label
 
     Functions / Procedures
         If a Procedure or Function takes parameters, then before the call to the function or procedure, one or more
         "param" calls will be made.  After the parameters are
-        indicated, then a "Call" statement is executed with its parameter being the label corresponding to the
-        function or procedure.  At the end of a procedure, the statement "return" occurs; if a function then
+        indicated, then a "Call" statement is executed with two parameters: first being the label corresponding to the
+        function or procedure, second being the number of parameters being passed.  Most recent N parameters will
+        get passed to that func/proc.  At the end of a procedure, the statement "return" occurs; if a function then
         it would be "return" followed by the value being returned.  At the start of a procedure or function,
         a "BeginFunc" statement followed by a number of bytes.  This sums up the number of bytes needed for all
         local variables and all temporaries.
@@ -112,13 +113,22 @@ class TACParamNode(TACNode):
         return "{} {}".format(str(self.operator), str(self.paramval))
 
 
-class TACSystemFunctionNode(TACNode):
-    def __init__(self, strlabel):
+class TACCallFunctionNode(TACNode):
+    def __init__(self, label, numparams):
+        assert isinstance(label, Label)
+        assert isinstance(numparams, int)
+        assert numparams >= 0
         super().__init__(TACOperator.CALL)
-        self.strlabel = strlabel  # TODO this is ugly
+        self.label = label
+        self.numparams = numparams
 
     def __str__(self):
-        return "{} {}".format(str(self.operator), self.strlabel)
+        return "{} {} {}".format(str(self.operator), self.label, str(self.numparams))
+
+
+class TACCallSystemFunctionNode(TACCallFunctionNode):
+    def __init__(self, label, numparams):
+        super().__init__(label, numparams)
 
 
 class TACUnaryNode(TACNode):
@@ -203,7 +213,7 @@ class TACBlock:
             for child in ast.children:
                 tmp = self.processast(child, generator)
                 self.addnode(TACParamNode(tmp))
-                self.addnode(TACSystemFunctionNode("_WRITEI"))
+                self.addnode(TACCallSystemFunctionNode(Label("_WRITEI"), 1))
             return None
         elif tok.tokentype in [TokenType.UNSIGNED_INT, TokenType.SIGNED_INT]:
             ret = Symbol(generator.gettemporary(), tok.location, pascaltypes.IntegerType())
@@ -227,17 +237,26 @@ class TACGenerator:
     def addblock(self, block):
         assert isinstance(block, TACBlock)
         self.tacblocks.append(block)
-    
+
     def generateblock(self, ast):
         assert isinstance(ast, AST)
         # process the main begin
         if ast.token.tokentype == TokenType.BEGIN:
             main = TACBlock()
             main.symboltable.parent = self.globalsymboltable
+            # TODO - do I need to do anything with the return value of addnode (a Symbol)
             main.addnode(TACLabelNode(Label("main")))
             for child in ast.children:
                 main.processast(child, self)
             return main
+        # when we get to if the token type is function or procedure call, then what I think
+        # we need to do is something like:
+        # paramlist = []
+        # for each child in ast.children:
+        #   paramlist.add(tacblock.processast(child, self)
+        # for each symbol in paramlist
+        #   tacblock.addnode(a node with TACOpearator.PARAM and symbol)
+        # tacblock.addnode(a node with TACOperator.CALL, the label for the proc/func, and the len of paramlist)
         else:
             raise ValueError("Oops!")
 

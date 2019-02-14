@@ -3,6 +3,7 @@ import sys
 from lexer import Lexer
 from parser import Parser
 from tac_ir import TACGenerator
+from asmgenerator import AssemblyGenerator
 
 def main():
     if len(sys.argv) < 2:
@@ -32,9 +33,16 @@ def main():
 
     p.AST.rpn_print(0)
 
+    if len(p.parseerrorlist) > 0:
+        raise("I need to display the compiler errors")
+
     g = TACGenerator(p.literaltable)
     g.generate(p.AST)
     g.printblocks()
+
+    asmfilename = infilename[:-4] + ".asm"
+    ag = AssemblyGenerator(asmfilename, g.tacblocks)
+    ag.generate()
 
     # f = open(infilename, "r")
     # print(f.read())

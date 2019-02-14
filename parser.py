@@ -21,6 +21,7 @@ class ASTAttributes(Enum):
     PROGRAM_OUTPUT = auto()  # was the program-parameter OUTPUT provided
 
 
+# TODO - should an AST be a container with AST Nodes inside?
 class AST:
     def __init__(self, token, parent, comment=None):
         assert(isinstance(token, Token))
@@ -47,12 +48,14 @@ class AST:
         return ptr.symboltable
 
 
+# TODO - add a class for a parsewarning/parseerror - likely the same thing, a string, a location, maybe a level?
 class Parser:
     def __init__(self, tokenstream):
         assert(isinstance(tokenstream, TokenStream))
         self.tokenstream = tokenstream
         self.AST = None
         self.parseerrorlist = []
+        self.parsewarninglist = []
         self.literaltable = LiteralTable()
 
     def getexpectedtoken(self, tokentype):
@@ -90,6 +93,8 @@ class Parser:
             self.getexpectedtoken(TokenType.COMMA)
         isneg = False
         if self.tokenstream.peektokentype() == TokenType.MINUS:
+            # TODO - this won't work in general because ---3 is still legal, but this only accepts one minus
+            # will get fixed when we do factors/expressions
             minus = self.getexpectedtoken(TokenType.MINUS)
             isneg = True
             uinttok = self.getexpectedtoken(TokenType.UNSIGNED_INT)
@@ -99,7 +104,8 @@ class Parser:
         child = AST(numtok, ret)
         numval = int(numtok.value)
         if isneg:
-            numval *= -1
+            numval *= -1  # this may be a bug
+        # TODO - do int / real / character literals need to be put in the literal table or just strings?
         self.literaltable.add(Literal(numval, numtok.location, IntegerType()))
         ret.children.append(child)
         self.getexpectedtoken(TokenType.RPAREN)
