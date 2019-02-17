@@ -1,6 +1,7 @@
 import os
 from tac_ir import TACBlock, TACLabelNode, TACParamNode, TACCallSystemFunctionNode, TACUnaryLiteralNode, \
-    TACOperator
+    TACOperator, TACGenerator
+from symboltable import StringLiteral
 
 
 class ASMGeneratorError(Exception):
@@ -8,11 +9,11 @@ class ASMGeneratorError(Exception):
 
 
 class AssemblyGenerator:
-    def __init__(self, asmfilename, tacblocks):
-        # tacblocks is a list of TACBlock objects
+    def __init__(self, asmfilename, tacgenerator):
+        assert isinstance(tacgenerator, TACGenerator)
         self.asmfilename = asmfilename
         self.asmfile = open(asmfilename, 'w')
-        self.tacblocks = tacblocks
+        self.tacgenerator = tacgenerator
 
     def emit(self, s):
         self.asmfile.write(s)
@@ -39,16 +40,27 @@ class AssemblyGenerator:
         self.emitcode("extern printf")
 
     def generate_datasection(self):
-        # this is static for now
         self.emitsection("data")
         self.emitcomment("support for write() commands")
         self.emitcode('printf_intfmt db "%d",0')
+        self.emitcode('printf_strfmt db "%s",0')
         self.emitcode('printf_newln db 10,0')
+        if len(self.tacgenerator.globalliteraltable) > 0:
+            nextid = 0
+            for lit in self.tacgenerator.globalliteraltable:
+                assert isinstance(lit, StringLiteral)
+                litname = 'stringlit_{}'.format(nextid)
+                nextid += 1
+                if len(lit.value) > 255:
+                    raise ASMGeneratorError("String literal {} exceeds 255 char max length.".format(lit.value))
+                self.emitcode("{} db {} ,`{}`, 0".format(litname, str(len(lit.value) + 1),
+                                                         lit.value.replace('`', '\\`')))
+                lit.setaddress(litname)
 
     def generate_code(self):
         params = []  # this is a stack of parameters
 
-        for block in self.tacblocks:
+        for block in self.tacgenerator.tacblocks:
             assert isinstance(block, TACBlock)
             self.emitlabel(block.label.name)
 
@@ -59,8 +71,11 @@ class AssemblyGenerator:
             for node in block.tacnodes:
                 if isinstance(node, TACUnaryLiteralNode):
                     if node.operator == TACOperator.ASSIGN:
-                        totalstorageneeded += node.lval.pascaltype.size
-                        node.lval.memoryaddress = "RBP-{}".format(str(totalstorageneeded))
+                        if isinstance(node.literal1, StringLiteral):
+                            totalstorageneeded += 8
+                        else:
+                            totalstorageneeded += node.lval.pascaltype.size
+                        node.lval.setaddress("RBP-{}".format(str(totalstorageneeded)))
 
             if totalstorageneeded > 0:
                 self.emitcode("PUSH RBP")  # ABI requires callee to preserve RBP
@@ -73,19 +88,24 @@ class AssemblyGenerator:
                 elif isinstance(node, TACParamNode):
                     params.append(node)
                 elif isinstance(node, TACUnaryLiteralNode):
-                    if node.operator == TACOperator.ASSIGN:
-                        if node.lval.pascaltype.size == 1:
-                            sizedirective = "BYTE"
-                        elif node.lval.pascaltype.size == 2:
-                            sizedirective = "WORD"
-                        elif node.lval.pascaltype.size == 4:
-                            sizedirective = "DWORD"
-                        elif node.lval.pascaltype.size == 8:
-                            sizedirective = "QWORD"
-                        else:
-                            raise ASMGeneratorError("Invalid Size for assignment")
-                        self.emitcode("mov [{}], {} {}".format(node.lval.memoryaddress, sizedirective,
-                                                               node.literal1.value))
+                    if isinstance(node.literal1, StringLiteral):
+                        litaddress = self.tacgenerator.globalliteraltable.fetch(node.literal1.value).memoryaddress
+                        self.emitcode("lea rax, [rel {}]".format(litaddress))
+                        self.emitcode("mov [{}], rax".format(node.lval.memoryaddress))
+                    else:
+                        if node.operator == TACOperator.ASSIGN:
+                            if node.lval.pascaltype.size == 1:
+                                sizedirective = "BYTE"
+                            elif node.lval.pascaltype.size == 2:
+                                sizedirective = "WORD"
+                            elif node.lval.pascaltype.size == 4:
+                                sizedirective = "DWORD"
+                            elif node.lval.pascaltype.size == 8:
+                                sizedirective = "QWORD"
+                            else:
+                                raise ASMGeneratorError("Invalid Size for assignment")
+                            self.emitcode("mov [{}], {} {}".format(node.lval.memoryaddress, sizedirective,
+                                                                   node.literal1.value))
                 elif isinstance(node, TACCallSystemFunctionNode):
                     if node.label.name == "_WRITEI":
                         if node.numparams != 1:
@@ -105,6 +125,14 @@ class AssemblyGenerator:
                         self.emitcode("mov rax, 0")
                         self.emitcode("call printf wrt ..plt")
                         del params[-1]
+                    elif node.label.name == "_WRITES":
+                        self.emitcode("mov rdi, printf_strfmt")
+                        self.emitcode("mov rsi, [{}]".format(params[0].paramval.memoryaddress))
+                        self.emitcode("mov rax, 0")
+                        self.emitcode("call printf wrt ..plt")
+                        del params[-1]
+                    else:
+                        raise ASMGeneratorError("Invalid System Function: {}".format(node.label.name))
                 else:
                     raise Exception("Some better exception")
 

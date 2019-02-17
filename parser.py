@@ -1,7 +1,6 @@
 from enum import Enum, unique, auto
 from lexer import TokenType, Token, TokenStream, LexerException
-from pascaltypes import IntegerType
-from symboltable import Literal, LiteralTable, SymbolTable
+from symboltable import StringLiteral, LiteralTable, SymbolTable
 
 
 # Helper Function
@@ -82,7 +81,7 @@ class Parser:
         return None
 
     def parse_statement(self, parent_ast):
-        # for now, we are only going to parse the WRITE() statement and an integer literal.
+        # for now, we are only going to parse the WRITE() statement and an integer or string literal.
         ret = AST(self.getexpectedtoken(TokenType.WRITE), parent_ast)
         self.getexpectedtoken(TokenType.LPAREN)
         # TODO: When we support other Output types, we need to actually parse the first parameter
@@ -92,22 +91,27 @@ class Parser:
             ret.children.append(AST(self.getexpectedtoken(TokenType.OUTPUT), parent_ast))
             self.getexpectedtoken(TokenType.COMMA)
         isneg = False
-        if self.tokenstream.peektokentype() == TokenType.MINUS:
-            # TODO - this won't work in general because ---3 is still legal, but this only accepts one minus
-            # will get fixed when we do factors/expressions
-            minus = self.getexpectedtoken(TokenType.MINUS)
-            isneg = True
-            uinttok = self.getexpectedtoken(TokenType.UNSIGNED_INT)
-            numtok = Token(TokenType.SIGNED_INT, minus.location, "-" + uinttok.value)
+        if self.tokenstream.peektokentype() == TokenType.CHARSTRING:
+            # LiteralTable.add() allows adding duplicates
+            charstrtok = self.getexpectedtoken(TokenType.CHARSTRING)
+            assert isinstance(charstrtok, Token)
+            self.literaltable.add(StringLiteral(charstrtok.value, charstrtok.location))
+            ret.children.append(AST(charstrtok, ret))
         else:
-            numtok = self.getexpectedtoken(TokenType.UNSIGNED_INT)
-        child = AST(numtok, ret)
-        numval = int(numtok.value)
-        if isneg:
-            numval *= -1  # this may be a bug
-        # TODO - do int / real / character literals need to be put in the literal table or just strings?
-        self.literaltable.add(Literal(numval, numtok.location, IntegerType()))
-        ret.children.append(child)
+            if self.tokenstream.peektokentype() == TokenType.MINUS:
+                # TODO - this won't work in general because ---3 is still legal, but this only accepts one minus
+                # will get fixed when we do factors/expressions
+                minus = self.getexpectedtoken(TokenType.MINUS)
+                isneg = True
+                uinttok = self.getexpectedtoken(TokenType.UNSIGNED_INT)
+                numtok = Token(TokenType.SIGNED_INT, minus.location, "-" + uinttok.value)
+            else:
+                numtok = self.getexpectedtoken(TokenType.UNSIGNED_INT)
+            child = AST(numtok, ret)
+            numval = int(numtok.value)
+            if isneg:
+                numval *= -1  # this may be a bug
+            ret.children.append(child)
         self.getexpectedtoken(TokenType.RPAREN)
         return ret
 

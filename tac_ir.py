@@ -70,7 +70,7 @@
 from enum import Enum, unique
 from copy import deepcopy
 from parser import AST
-from symboltable import Symbol, Label, Literal, SymbolTable, LiteralTable
+from symboltable import Symbol, Label, Literal, NumericLiteral, StringLiteral, SymbolTable, LiteralTable
 from lexer import TokenType
 import pascaltypes
 
@@ -152,7 +152,12 @@ class TACUnaryLiteralNode(TACNode):
         self.literal1 = literal1
 
     def __str__(self):
-        return "{} {} {}".format(str(self.lval), str(self.operator), str(self.literal1))
+        litval = ""
+        if isinstance(self.literal1, NumericLiteral):
+            litval = str(self.literal1)
+        elif isinstance(self.literal1, StringLiteral):
+            litval = '"{}"'.format(str(self.literal1).replace('"', '\"'))
+        return "{} {} {}".format(str(self.lval), str(self.operator), litval)
 
 
 """
@@ -199,6 +204,7 @@ class TACBlock:
         self.label = label
         self.tacnodes = []
         self.symboltable = SymbolTable()
+        # TODO - we need to add some representation of the expected parameters
 
     def addnode(self, node):
         assert isinstance(node, TACNode)
@@ -218,13 +224,21 @@ class TACBlock:
             for child in ast.children:
                 tmp = self.processast(child, generator)
                 self.addnode(TACParamNode(tmp))
-                self.addnode(TACCallSystemFunctionNode(Label("_WRITEI"), 1))
+                if isinstance(tmp.pascaltype, pascaltypes.StringLiteralType):
+                    self.addnode(TACCallSystemFunctionNode(Label("_WRITES"), 1))
+                else:
+                    self.addnode(TACCallSystemFunctionNode(Label("_WRITEI"), 1))
             return None
         elif tok.tokentype in [TokenType.UNSIGNED_INT, TokenType.SIGNED_INT]:
             ret = Symbol(generator.gettemporary(), tok.location, pascaltypes.IntegerType())
             self.symboltable.add(ret)
-            self.addnode(TACUnaryLiteralNode(ret, TACOperator.ASSIGN, Literal(int(tok.value), tok.location,
-                                                                              pascaltypes.IntegerType())))
+            self.addnode(TACUnaryLiteralNode(ret, TACOperator.ASSIGN,
+                                             NumericLiteral(int(tok.value), tok.location, pascaltypes.IntegerType())))
+            return ret
+        elif tok.tokentype == TokenType.CHARSTRING:
+            ret = Symbol(generator.gettemporary(), tok.location, pascaltypes.StringLiteralType())
+            self.symboltable.add(ret)
+            self.addnode(TACUnaryLiteralNode(ret, TACOperator.ASSIGN, StringLiteral(tok.value, tok.location)))
             return ret
         else:
             raise ValueError("Oops!")

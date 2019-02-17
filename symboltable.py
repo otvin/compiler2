@@ -1,4 +1,5 @@
 import pascaltypes
+from filelocation import FileLocation
 
 
 class SymbolException(Exception):
@@ -12,15 +13,31 @@ class SymbolRedefinedException(SymbolException):
 class Literal:
     # Literals are similar to symbols, but do not have names, and are always going to be
     # declared in global scope, regardless of where in the program they are found.
-    def __init__(self, value, location, pascaltype):
-        assert(isinstance(pascaltype, pascaltypes.BaseType))
+    def __init__(self, value, location):
+        assert isinstance(location, FileLocation)
         self.value = value
         self.location = location
-        self.pascaltype = pascaltype
         self.memoryaddress = None
+
+    # TODO: Should be a setter?
+    def setaddress(self, addr):
+        self.memoryaddress = addr
 
     def __str__(self):
         return str(self.value)
+
+
+class StringLiteral(Literal):
+    def __init__(self, value, location):
+        assert isinstance(value, str)
+        super().__init__(value, location)
+
+
+class NumericLiteral(Literal):
+    def __init__(self, value, location, pascaltype):
+        assert isinstance(pascaltype, pascaltypes.BaseType)
+        super().__init__(value, location)
+        self.pascaltype = pascaltype
 
 
 class LiteralTable:
@@ -40,6 +57,13 @@ class LiteralTable:
             errstr = "Literal not found: {}".format(str(value))
             raise SymbolException(errstr)
         return ret
+
+    def __len__(self):
+        return len(self.literals.keys())
+
+    def __iter__(self):
+        for key in self.literals.keys():
+            yield self.literals[key]
 
 
 class Symbol:

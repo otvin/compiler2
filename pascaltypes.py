@@ -4,6 +4,13 @@ class BaseType:
         self.typename = ""
 
 
+class StringLiteralType(BaseType):
+    # this is a bit hacky, but allows us to pass around string literals in places that require pascal types
+    def __init__(self):
+        super().__init__()
+        self.typename = "string literal"
+
+
 class SimpleType(BaseType):
     pass
 
@@ -66,7 +73,6 @@ class ArrayType(StructuredType):
 class StringType(ArrayType):
     def __init__(self, maxindex):
         super().__init__(CharacterType(), 1, maxindex)
-
 
 
 class ActivationType(BaseType):
