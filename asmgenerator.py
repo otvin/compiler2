@@ -42,7 +42,7 @@ class AssemblyGenerator:
         # this is static for now
         self.emitsection("data")
         self.emitcomment("support for write() commands")
-        self.emitcode('printf_intfmt db "%ld",0')
+        self.emitcode('printf_intfmt db "%d",0')
         self.emitcode('printf_newln db 10,0')
 
     def generate_code(self):
