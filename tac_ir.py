@@ -191,7 +191,12 @@ class TACBinaryNodeLiteralRight(TACNode):
 
 
 class TACBlock:
-    def __init__(self):
+    """ For now, assume a TACBlock represents a Pascal Block.  Not entirely language-independent but
+    will work.
+    """
+    def __init__(self, label):
+        assert isinstance(label, Label)
+        self.label = label
         self.tacnodes = []
         self.symboltable = SymbolTable()
 
@@ -242,10 +247,8 @@ class TACGenerator:
         assert isinstance(ast, AST)
         # process the main begin
         if ast.token.tokentype == TokenType.BEGIN:
-            main = TACBlock()
+            main = TACBlock(Label("main"))
             main.symboltable.parent = self.globalsymboltable
-            # TODO - do I need to do anything with the return value of addnode (a Symbol)
-            main.addnode(TACLabelNode(Label("main")))
             for child in ast.children:
                 main.processast(child, self)
             return main

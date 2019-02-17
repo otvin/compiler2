@@ -82,6 +82,8 @@ class ActivationSymbol(Symbol):
 
 
 class Label:
+    # TODO - is a label a standalone thing or is a label something that modifies another statement?
+
     """ Labels are declared, like variables.  If a label never has a goto transfer control to it, then that is a
         compiler warning.  Similarly, the label statement cannot appear inside structured statements like 'for,'
         'repeat,' or 'while.'
