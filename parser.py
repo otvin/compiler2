@@ -22,7 +22,7 @@ class ASTAttributes(Enum):
 
 # TODO - should an AST be a container with AST Nodes inside?
 class AST:
-    def __init__(self, token, parent, comment=None):
+    def __init__(self, token, parent, comment=""):
         assert(isinstance(token, Token))
         self.token = token
         self.comment = comment  # will get put on the line emitted in the assembly code if populated.
@@ -36,7 +36,11 @@ class AST:
     def rpn_print(self, level=0):
         for x in self.children:
             x.rpn_print(level + 1)
-        print((level * " ") + str(self.token))
+        if self.comment == "":
+            ret = "{}{}".format((level * " "), str(self.token))
+        else:
+            ret = "{}{}\t\t;{}".format((level * " "), str(self.token), self.comment)
+        print(ret)
 
     def nearest_symboltable(self):
         ptr = self
@@ -82,6 +86,11 @@ class Parser:
 
     def parse_statement(self, parent_ast):
         # for now, we are only going to parse the WRITE() statement and an integer or string literal.
+
+        # TODO - figure out how to go from tokenstream back to the source text to get the comment.  Likely
+        #        need to add the source text to the tokens somehow?
+        self.tokenstream.setstartpos()
+
         ret = AST(self.getexpectedtoken(TokenType.WRITE), parent_ast)
         self.getexpectedtoken(TokenType.LPAREN)
         # TODO: When we support other Output types, we need to actually parse the first parameter
@@ -113,6 +122,8 @@ class Parser:
                 numval *= -1  # this may be a bug
             ret.children.append(child)
         self.getexpectedtoken(TokenType.RPAREN)
+        self.tokenstream.setendpos()
+        ret.comment = self.tokenstream.printstarttoend()
         return ret
 
     def parse_statementpart(self, parent_ast):

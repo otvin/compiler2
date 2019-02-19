@@ -82,6 +82,7 @@ class TACOperator(Enum):
     ADD = "+"
     PARAM = "param"
     CALL = "call"
+    COMMENT = "comment"
 
     def __str__(self):
         return self.value
@@ -91,6 +92,16 @@ class TACNode:
     def __init__(self, operator):
         assert isinstance(operator, TACOperator)
         self.operator = operator
+
+
+class TACCommentNode(TACNode):
+    def __init__(self, comment):
+        assert isinstance(comment, str)
+        super().__init__(TACOperator.COMMENT)
+        self.comment = comment
+
+    def __str__(self):
+        return "\t\t;{}".format(self.comment)
 
 
 class TACLabelNode(TACNode):
@@ -219,6 +230,8 @@ class TACBlock:
         """ returns the Symbol of a temporary that holds the result of this computation """
         assert isinstance(ast, AST)
         assert isinstance(generator, TACGenerator)
+        if ast.comment != "":
+            self.addnode(TACCommentNode(ast.comment))
         tok = ast.token
         if tok.tokentype == TokenType.WRITE:
             for child in ast.children:

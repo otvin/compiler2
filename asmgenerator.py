@@ -1,6 +1,6 @@
 import os
 from tac_ir import TACBlock, TACLabelNode, TACParamNode, TACCallSystemFunctionNode, TACUnaryLiteralNode, \
-    TACOperator, TACGenerator
+    TACOperator, TACGenerator, TACCommentNode
 from symboltable import StringLiteral
 
 
@@ -83,7 +83,9 @@ class AssemblyGenerator:
                 self.emitcode("SUB RSP, " + str(totalstorageneeded), "allocate local storage")
 
             for node in block.tacnodes:
-                if isinstance(node, TACLabelNode):
+                if isinstance(node, TACCommentNode):
+                    self.emitcomment(node.comment)
+                elif isinstance(node, TACLabelNode):
                     self.emitlabel(node.label.name)
                 elif isinstance(node, TACParamNode):
                     params.append(node)
