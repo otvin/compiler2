@@ -111,15 +111,11 @@ class Parser:
                 # TODO - this won't work in general because ---3 is still legal, but this only accepts one minus
                 # will get fixed when we do factors/expressions
                 minus = self.getexpectedtoken(TokenType.MINUS)
-                isneg = True
                 uinttok = self.getexpectedtoken(TokenType.UNSIGNED_INT)
                 numtok = Token(TokenType.SIGNED_INT, minus.location, "-" + uinttok.value)
             else:
                 numtok = self.getexpectedtoken(TokenType.UNSIGNED_INT)
             child = AST(numtok, ret)
-            numval = int(numtok.value)
-            if isneg:
-                numval *= -1  # this may be a bug
             ret.children.append(child)
         self.getexpectedtoken(TokenType.RPAREN)
         self.tokenstream.setendpos()
