@@ -84,6 +84,59 @@ class Parser:
     def parse_procedureandfunctiondeclarationpart(self, parent_ast):
         return None
 
+    def parse_factor(self, parent_ast):
+        # 6.7.1 <factor> ::= <variable-access> | <unsigned-constant> | <function-designator> |
+        #                    <set-constructor> | "(" <expression> ")" | "not" <factor>
+        # TODO - add more than unsigned-constant and ( expression )
+        if self.tokenstream.peektokentype() == TokenType.LPAREN:
+            self.getexpectedtoken(TokenType.LPAREN)
+            ret = self.parse_expression(parent_ast)
+            self.getexpectedtoken(TokenType.RPAREN)
+        else:
+            ret = AST(self.getexpectedtoken(TokenType.UNSIGNED_INT), parent_ast)
+        return ret
+
+
+    def parse_term(self, parent_ast):
+        # 6.7.1 <term> ::= <factor> { <multiplying-operator> <factor> }
+        # 6.7.2.1 <multiplying-operator> ::= "*" | "/" | "div" | "mod" | "and"
+        ret = self.parse_factor(parent_ast)
+        while self.tokenstream.peektokentype() in (TokenType.MULTIPLY, TokenType.DIVIDE, TokenType.IDIV,
+                                                   TokenType.MOD, TokenType.AND):
+            multop = AST(self.tokenstream.eattoken(), parent_ast)
+            ret.parent = multop
+            multop.children.append(ret)
+            multop.children.append(self.parse_factor(multop))
+            ret = multop
+        return ret
+
+    def parse_simpleexpression(self, parent_ast):
+        # 6.7.1 <simple-expression> ::= [sign] <term> { <adding-operator> <term> }
+        # 6.1.5 <sign> ::= "+" | "-"
+        # 6.7.2.1 <adding-operator> ::= "+" | "-" | "or"
+
+        if self.tokenstream.peektokentype() == TokenType.MINUS:
+            # a minus here is identical to multiplying by -1.
+            minus = self.getexpectedtoken(TokenType.MINUS)
+            ret = AST(Token(TokenType.MULTIPLY, minus.location, ""), parent_ast)
+            ret.children.append(AST(Token(TokenType.SIGNED_INT, minus.location, "-1"), ret))
+            ret.children.append(self.parse_term(ret))
+        else:
+            ret = self.parse_term(parent_ast)
+
+        while self.tokenstream.peektokentype() in (TokenType.PLUS, TokenType.MINUS):
+            addingop = AST(self.tokenstream.eattoken(), parent_ast)
+            ret.parent = addingop
+            addingop.children.append(ret)
+            addingop.children.append(self.parse_term(addingop))
+            ret = addingop
+
+        return ret
+
+    def parse_expression(self, parent_ast):
+        # 6.7.1 - <expression> ::= <simple-expression> [<relational-operator> <simple-expression>]
+        return self.parse_simpleexpression(parent_ast)
+
     def parse_statement(self, parent_ast):
         # for now, we are only going to parse the WRITE() statement and an integer or string literal.
 
@@ -107,16 +160,7 @@ class Parser:
             self.literaltable.add(StringLiteral(charstrtok.value, charstrtok.location))
             ret.children.append(AST(charstrtok, ret))
         else:
-            if self.tokenstream.peektokentype() == TokenType.MINUS:
-                # TODO - this won't work in general because ---3 is still legal, but this only accepts one minus
-                # will get fixed when we do factors/expressions
-                minus = self.getexpectedtoken(TokenType.MINUS)
-                uinttok = self.getexpectedtoken(TokenType.UNSIGNED_INT)
-                numtok = Token(TokenType.SIGNED_INT, minus.location, "-" + uinttok.value)
-            else:
-                numtok = self.getexpectedtoken(TokenType.UNSIGNED_INT)
-            child = AST(numtok, ret)
-            ret.children.append(child)
+            ret.children.append(self.parse_expression(ret))
         self.getexpectedtoken(TokenType.RPAREN)
         self.tokenstream.setendpos()
         ret.comment = self.tokenstream.printstarttoend()
