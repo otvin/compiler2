@@ -1,6 +1,6 @@
 import os
 from tac_ir import TACBlock, TACLabelNode, TACParamNode, TACCallSystemFunctionNode, TACUnaryLiteralNode, \
-    TACOperator, TACGenerator, TACCommentNode
+    TACOperator, TACGenerator, TACCommentNode, TACBinaryNode
 from symboltable import StringLiteral
 
 
@@ -70,12 +70,16 @@ class AssemblyGenerator:
             totalstorageneeded = 0  # measured in bytes
             for node in block.tacnodes:
                 if isinstance(node, TACUnaryLiteralNode):
+                    # TODO - another spot where the operator may always be assign
                     if node.operator == TACOperator.ASSIGN:
                         if isinstance(node.literal1, StringLiteral):
                             totalstorageneeded += 8
                         else:
                             totalstorageneeded += node.lval.pascaltype.size
                         node.lval.setaddress("RBP-{}".format(str(totalstorageneeded)))
+                elif isinstance(node, TACBinaryNode):
+                    totalstorageneeded += node.result.pascaltype.size
+                    node.result.setaddress("RBP-{}".format(str(totalstorageneeded)))
 
             if totalstorageneeded > 0:
                 self.emitcode("PUSH RBP")  # ABI requires callee to preserve RBP
@@ -95,6 +99,7 @@ class AssemblyGenerator:
                         self.emitcode("lea rax, [rel {}]".format(litaddress))
                         self.emitcode("mov [{}], rax".format(node.lval.memoryaddress))
                     else:
+                        # TODO is node.operator ever anything other than ASSIGN?
                         if node.operator == TACOperator.ASSIGN:
                             if node.lval.pascaltype.size == 1:
                                 sizedirective = "BYTE"
@@ -112,6 +117,7 @@ class AssemblyGenerator:
                     if node.label.name == "_WRITEI":
                         if node.numparams != 1:
                             raise ASMGeneratorError("Invalid numparams to _WRITEI")
+                        # TODO - see if we need to push rdi/rsi then pop them off after the printf call
                         self.emitcode("mov rdi, printf_intfmt")
                         if params[0].paramval.pascaltype.size == 1:
                             destregister = "sil"
@@ -135,6 +141,15 @@ class AssemblyGenerator:
                         del params[-1]
                     else:
                         raise ASMGeneratorError("Invalid System Function: {}".format(node.label.name))
+                elif isinstance(node, TACBinaryNode):
+                    if node.operator == TACOperator.MULTIPLY:
+                        # TODO - handle something other than integers which are 4 bytes
+                        self.emitcode("mov eax, [{}]".format(node.arg1.memoryaddress))
+                        self.emitcode("mov r11d, [{}]".format(node.arg2.memoryaddress))
+                        self.emitcode("imul eax, r11d")
+                        self.emitcode("mov [{}], eax".format(node.result.memoryaddress))
+                    else:
+                        raise Exception("I need an exception")
                 else:
                     raise Exception("Some better exception")
 

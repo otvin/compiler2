@@ -80,6 +80,7 @@ class TACOperator(Enum):
     LABEL = "label"
     ASSIGN = ":="
     ADD = "+"
+    MULTIPLY = "*"
     PARAM = "param"
     CALL = "call"
     COMMENT = "comment"
@@ -142,6 +143,7 @@ class TACCallSystemFunctionNode(TACCallFunctionNode):
         super().__init__(label, numparams)
 
 
+# TODO should this be lval := arg1?  What other unary nodes are there?
 class TACUnaryNode(TACNode):
     def __init__(self, lval, operator, arg1):
         assert isinstance(arg1, Symbol)
@@ -171,7 +173,7 @@ class TACUnaryLiteralNode(TACNode):
         return "{} {} {}".format(str(self.lval), str(self.operator), litval)
 
 
-"""
+# TODO if there is something other than T0 := T1 <oper> T2 then need to take the first operator
 class TACBinaryNode(TACNode):
     def __init__(self, result, operator, arg1, arg2):
         assert isinstance(result, Symbol)
@@ -182,7 +184,11 @@ class TACBinaryNode(TACNode):
         self.arg1 = arg1
         self.arg2 = arg2
 
+    def __str__(self):
+        return "{} := {} {} {}".format(str(self.result), str(self.arg1), str(self.operator), str(self.arg2))
 
+
+"""
 class TACBinaryNodeLiteralLeft(TACNode):
     def __init__(self, result, operator, literal1, arg2):
         assert isinstance(result, Symbol)
@@ -252,6 +258,13 @@ class TACBlock:
             ret = Symbol(generator.gettemporary(), tok.location, pascaltypes.StringLiteralType())
             self.symboltable.add(ret)
             self.addnode(TACUnaryLiteralNode(ret, TACOperator.ASSIGN, StringLiteral(tok.value, tok.location)))
+            return ret
+        elif tok.tokentype == TokenType.MULTIPLY:
+            child1 = self.processast(ast.children[0], generator)
+            child2 = self.processast(ast.children[1], generator)
+            ret = Symbol(generator.gettemporary(), tok.location, pascaltypes.IntegerType())
+            self.symboltable.add(ret)
+            self.addnode(TACBinaryNode(ret, TACOperator.MULTIPLY, child1, child2))
             return ret
         else:
             raise ValueError("Oops!")
