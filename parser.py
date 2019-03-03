@@ -144,27 +144,30 @@ class Parser:
         #        need to add the source text to the tokens somehow?
         self.tokenstream.setstartpos()
 
-        ret = AST(self.getexpectedtoken(TokenType.WRITE), parent_ast)
-        self.getexpectedtoken(TokenType.LPAREN)
-        # TODO: When we support other Output types, we need to actually parse the first parameter
-        # to see if it is a file-variable.
-        # TODO: The file-variable, or implied file-variable OUTPUT should be a symbol.
-        if self.tokenstream.peektokentype() == TokenType.OUTPUT:
-            ret.children.append(AST(self.getexpectedtoken(TokenType.OUTPUT), parent_ast))
-            self.getexpectedtoken(TokenType.COMMA)
-        isneg = False
-        if self.tokenstream.peektokentype() == TokenType.CHARSTRING:
-            # LiteralTable.add() allows adding duplicates
-            charstrtok = self.getexpectedtoken(TokenType.CHARSTRING)
-            assert isinstance(charstrtok, Token)
-            self.literaltable.add(StringLiteral(charstrtok.value, charstrtok.location))
-            ret.children.append(AST(charstrtok, ret))
+        if self.tokenstream.peektokentype() in (TokenType.WRITE, TokenType.WRITELN):
+            ret = AST(self.tokenstream.eattoken(), parent_ast)
+            self.getexpectedtoken(TokenType.LPAREN)
+            # TODO: When we support other Output types, we need to actually parse the first parameter
+            # to see if it is a file-variable.
+            # TODO: The file-variable, or implied file-variable OUTPUT should be a symbol.
+            if self.tokenstream.peektokentype() == TokenType.OUTPUT:
+                ret.children.append(AST(self.getexpectedtoken(TokenType.OUTPUT), parent_ast))
+                self.getexpectedtoken(TokenType.COMMA)
+            isneg = False
+            if self.tokenstream.peektokentype() == TokenType.CHARSTRING:
+                # LiteralTable.add() allows adding duplicates
+                charstrtok = self.getexpectedtoken(TokenType.CHARSTRING)
+                assert isinstance(charstrtok, Token)
+                self.literaltable.add(StringLiteral(charstrtok.value, charstrtok.location))
+                ret.children.append(AST(charstrtok, ret))
+            else:
+                ret.children.append(self.parse_expression(ret))
+            self.getexpectedtoken(TokenType.RPAREN)
+            self.tokenstream.setendpos()
+            ret.comment = self.tokenstream.printstarttoend()
+            return ret
         else:
-            ret.children.append(self.parse_expression(ret))
-        self.getexpectedtoken(TokenType.RPAREN)
-        self.tokenstream.setendpos()
-        ret.comment = self.tokenstream.printstarttoend()
-        return ret
+            raise Exception("Some Useless Exception")
 
     def parse_statementpart(self, parent_ast):
         # 6.2.1 defines statement-part simply as <statement-part> ::= <compound-statement>

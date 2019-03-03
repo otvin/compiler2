@@ -239,7 +239,7 @@ class TACBlock:
         if ast.comment != "":
             self.addnode(TACCommentNode(ast.comment))
         tok = ast.token
-        if tok.tokentype == TokenType.WRITE:
+        if tok.tokentype in (TokenType.WRITE, TokenType.WRITELN):
             for child in ast.children:
                 tmp = self.processast(child, generator)
                 self.addnode(TACParamNode(tmp))
@@ -247,6 +247,8 @@ class TACBlock:
                     self.addnode(TACCallSystemFunctionNode(Label("_WRITES"), 1))
                 else:
                     self.addnode(TACCallSystemFunctionNode(Label("_WRITEI"), 1))
+            if tok.tokentype == TokenType.WRITELN:
+                self.addnode(TACCallSystemFunctionNode(Label("_WRITECRLF"), 0))
             return None
         elif tok.tokentype in [TokenType.UNSIGNED_INT, TokenType.SIGNED_INT]:
             ret = Symbol(generator.gettemporary(), tok.location, pascaltypes.IntegerType())

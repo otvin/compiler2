@@ -147,6 +147,13 @@ class AssemblyGenerator:
                         self.emitcode("pop rsi")
                         self.emitcode("pop rdi")
                         del params[-1]
+                    elif node.label.name == "_WRITECRLF":
+                        self.emitcode("push rdi")
+                        self.emitcode("mov rdi, printf_newln")
+                        self.emitcode("mov rax, 0")
+                        self.emitcode("call printf wrt ..plt")
+                        self.emitcode("pop rdi")
+                        self.emitcode("")
                     else:
                         raise ASMGeneratorError("Invalid System Function: {}".format(node.label.name))
                 elif isinstance(node, TACBinaryNode):
