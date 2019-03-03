@@ -163,6 +163,18 @@ class AssemblyGenerator:
                         self.emitcode("mov r11d, [{}]".format(node.arg2.memoryaddress))
                         self.emitcode("imul eax, r11d")
                         self.emitcode("mov [{}], eax".format(node.result.memoryaddress))
+                    elif node.operator == TACOperator.ADD:
+                        # TODO - handle something other than integers which are 4 bytes
+                        self.emitcode("mov eax, [{}]".format(node.arg1.memoryaddress))
+                        self.emitcode("mov r11d, [{}]".format(node.arg2.memoryaddress))
+                        self.emitcode("add eax, r11d")
+                        self.emitcode("mov [{}], eax".format(node.result.memoryaddress))
+                    elif node.operator == TACOperator.SUBTRACT:
+                        # TODO - handle something other than integers which are 4 bytes
+                        self.emitcode("mov eax, [{}]".format(node.arg1.memoryaddress))
+                        self.emitcode("mov r11d, [{}]".format(node.arg2.memoryaddress))
+                        self.emitcode("sub eax, r11d")
+                        self.emitcode("mov [{}], eax".format(node.result.memoryaddress))
                     else:
                         raise Exception("I need an exception")
                 else:

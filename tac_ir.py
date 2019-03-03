@@ -80,6 +80,7 @@ class TACOperator(Enum):
     LABEL = "label"
     ASSIGN = ":="
     ADD = "+"
+    SUBTRACT = "-"
     MULTIPLY = "*"
     PARAM = "param"
     CALL = "call"
@@ -261,12 +262,21 @@ class TACBlock:
             self.symboltable.add(ret)
             self.addnode(TACUnaryLiteralNode(ret, TACOperator.ASSIGN, StringLiteral(tok.value, tok.location)))
             return ret
-        elif tok.tokentype == TokenType.MULTIPLY:
+        elif tok.tokentype in (TokenType.MULTIPLY, TokenType.PLUS, TokenType.MINUS):
+            if tok.tokentype == TokenType.MULTIPLY:
+                op = TACOperator.MULTIPLY
+            elif tok.tokentype == TokenType.PLUS:
+                op = TACOperator.ADD
+            elif tok.tokentype == TokenType.MINUS:
+                op = TACOperator.SUBTRACT
+            else:
+                raise Exception("Do I need an exception here?")
+
             child1 = self.processast(ast.children[0], generator)
             child2 = self.processast(ast.children[1], generator)
             ret = Symbol(generator.gettemporary(), tok.location, pascaltypes.IntegerType())
             self.symboltable.add(ret)
-            self.addnode(TACBinaryNode(ret, TACOperator.MULTIPLY, child1, child2))
+            self.addnode(TACBinaryNode(ret, op, child1, child2))
             return ret
         else:
             raise ValueError("Oops!")
