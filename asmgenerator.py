@@ -118,6 +118,8 @@ class AssemblyGenerator:
                         if node.numparams != 1:
                             raise ASMGeneratorError("Invalid numparams to _WRITEI")
                         # TODO - see if we need to push rdi/rsi then pop them off after the printf call
+                        self.emitcode("push rdi")
+                        self.emitcode("push rsi")
                         self.emitcode("mov rdi, printf_intfmt")
                         if params[0].paramval.pascaltype.size == 1:
                             destregister = "sil"
@@ -132,12 +134,18 @@ class AssemblyGenerator:
                         self.emitcode("mov {}, [{}]".format(destregister, params[0].paramval.memoryaddress))
                         self.emitcode("mov rax, 0")
                         self.emitcode("call printf wrt ..plt")
+                        self.emitcode("pop rsi")
+                        self.emitcode("pop rdi")
                         del params[-1]
                     elif node.label.name == "_WRITES":
+                        self.emitcode("push rdi")
+                        self.emitcode("push rsi")
                         self.emitcode("mov rdi, printf_strfmt")
                         self.emitcode("mov rsi, [{}]".format(params[0].paramval.memoryaddress))
                         self.emitcode("mov rax, 0")
                         self.emitcode("call printf wrt ..plt")
+                        self.emitcode("pop rsi")
+                        self.emitcode("pop rdi")
                         del params[-1]
                     else:
                         raise ASMGeneratorError("Invalid System Function: {}".format(node.label.name))
