@@ -38,9 +38,12 @@ class AssemblyGenerator:
 
     def generate_externs(self):
         self.emitcode("extern printf")
+        self.emitcode("extern fflush")
 
     def generate_datasection(self):
         self.emitsection("data")
+        self.emitcomment("error handling strings")
+        self.emitcode('stringerr_0 db `Overflow error`, 0')
         self.emitcomment("support for write() commands")
         self.emitcode('printf_intfmt db "%d",0')
         self.emitcode('printf_strfmt db "%s",0')
@@ -53,8 +56,7 @@ class AssemblyGenerator:
                 nextid += 1
                 if len(lit.value) > 255:
                     raise ASMGeneratorError("String literal {} exceeds 255 char max length.".format(lit.value))
-                self.emitcode("{} db {} ,`{}`, 0".format(litname, str(len(lit.value) + 1),
-                                                         lit.value.replace('`', '\\`')))
+                self.emitcode("{} db `{}`, 0".format(litname, lit.value.replace('`', '\\`')))
                 lit.setaddress(litname)
 
     def generate_code(self):
@@ -177,24 +179,37 @@ class AssemblyGenerator:
                         self.emitcode("mov [{}], eax".format(node.result.memoryaddress))
                     else:
                         raise Exception("I need an exception")
+                    self.emitcode("jo _PASCAL_OVERFLOW_ERROR")
                 else:
                     raise Exception("Some better exception")
 
             if totalstorageneeded > 0:
                 self.emitcode("POP RBP")
 
+    def generate_errorhandlingcode(self):
+        # overflow
+        self.emitcomment("overflow error")
+        self.emitlabel("_PASCAL_OVERFLOW_ERROR")
+        self.emitcode("push rdi")
+        self.emitcode("mov rdi, stringerr_0")
+        self.emitcode("mov rax, 0")
+        self.emitcode("call printf wrt ..plt")
+        self.emitcode("pop rdi")
+        self.emitcode("jmp _PASCAL_EXIT")
+        self.emitcomment("exit program")
+        self.emitlabel("_PASCAL_EXIT")
+        self.emitcomment("Need to flush the stdout buffer, as exiting does not do it..")
+        self.emitcode("XOR RDI, RDI")
+        self.emitcode("CALL fflush wrt ..plt")
+        self.emitcode("MOV EAX, 60")
+        self.emitcode("SYSCALL")
+
     def generate_textsection(self):
         self.emitsection("text")
         self.emitcode("global main")
         self.generate_code()
-        self.emitcomment("hack: need to flush the buffer.  A CRLF does it, but there should be a better way")
-        self.emitcode("MOV RDI, printf_newln")
-        self.emitcode("MOV RAX, 0")
-        self.emitcode("CALL printf wrt ..plt")
-        self.emitcode("XOR EDI, EDI", "Exit Program")
-        self.emitcode("MOV EAX, 60")
-        self.emitcode("SYSCALL")
-        self.emitcode("ret")
+        self.emitcode("JMP _PASCAL_EXIT")
+        self.generate_errorhandlingcode()
 
     def generate(self):
         self.generate_externs()
