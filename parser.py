@@ -153,15 +153,21 @@ class Parser:
             if self.tokenstream.peektokentype() == TokenType.OUTPUT:
                 ret.children.append(AST(self.getexpectedtoken(TokenType.OUTPUT), parent_ast))
                 self.getexpectedtoken(TokenType.COMMA)
-            isneg = False
-            if self.tokenstream.peektokentype() == TokenType.CHARSTRING:
-                # LiteralTable.add() allows adding duplicates
-                charstrtok = self.getexpectedtoken(TokenType.CHARSTRING)
-                assert isinstance(charstrtok, Token)
-                self.literaltable.add(StringLiteral(charstrtok.value, charstrtok.location))
-                ret.children.append(AST(charstrtok, ret))
-            else:
-                ret.children.append(self.parse_expression(ret))
+
+            done = False
+            while not done:
+                if self.tokenstream.peektokentype() == TokenType.CHARSTRING:
+                    # LiteralTable.add() allows adding duplicates
+                    charstrtok = self.getexpectedtoken(TokenType.CHARSTRING)
+                    assert isinstance(charstrtok, Token)
+                    self.literaltable.add(StringLiteral(charstrtok.value, charstrtok.location))
+                    ret.children.append(AST(charstrtok, ret))
+                else:
+                    ret.children.append(self.parse_expression(ret))
+                if self.tokenstream.peektokentype() == TokenType.COMMA:
+                    self.getexpectedtoken(TokenType.COMMA)
+                else:
+                    done = True
             self.getexpectedtoken(TokenType.RPAREN)
             self.tokenstream.setendpos()
             ret.comment = self.tokenstream.printstarttoend()
