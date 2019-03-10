@@ -4,7 +4,7 @@ Goal is to eventually build a Pascal compiler.  Compiler is written in python3 i
 
 ### Current Status
 
-Supports a series of write() calls, each with one parameter, which must be either an integer or string literal.
+Supports a series of write() or writeln() calls, each with one or more comma-separated parameters, which must be either an integer, a math expression with addition, multiplication, or subtraction of integers, or string literal.
 
 ### To run it:
 
