@@ -44,7 +44,7 @@ class RealType(SimpleType):
     def __init__(self):
         super().__init__()
         self.typename = "real"
-        self.size = 4
+        self.size = 8
 
 
 class PointerType(BaseType):

@@ -42,9 +42,17 @@ def main():
     p.AST.rpn_print(0)
 
     if len(p.parseerrorlist) > 0:
-        raise("I need to display the compiler errors")
+        raise Exception("I need to display the compiler errors")
+
+    print("LITERALS:")
+    for q in p.literaltable:
+        print(q)
 
     g = TACGenerator(p.literaltable)
+
+    print("Literals again:")
+    for q in g.globalliteraltable:
+        print(q)
     g.generate(p.AST)
     print("\n\nTHREE-ADDRESS CODE")
     g.printblocks()
@@ -62,6 +70,7 @@ def main():
     # g = open('test.lex','w')
     # for i in l.tokenstream:
     #    g.write(str(i))
+
 
 if __name__ == '__main__':
     main()

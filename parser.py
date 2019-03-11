@@ -1,6 +1,7 @@
 from enum import Enum, unique, auto
 from lexer import TokenType, Token, TokenStream, LexerException
-from symboltable import StringLiteral, LiteralTable, SymbolTable
+from symboltable import StringLiteral, NumericLiteral, LiteralTable, SymbolTable
+import pascaltypes
 
 
 # Helper Function
@@ -93,9 +94,16 @@ class Parser:
             ret = self.parse_expression(parent_ast)
             self.getexpectedtoken(TokenType.RPAREN)
         else:
-            ret = AST(self.getexpectedtoken(TokenType.UNSIGNED_INT), parent_ast)
+            if self.tokenstream.peektokentype() == TokenType.UNSIGNED_REAL:
+                realtok = self.getexpectedtoken(TokenType.UNSIGNED_REAL)
+                self.literaltable.add(NumericLiteral(realtok.value, realtok.location, pascaltypes.RealType()))
+                ret = AST(realtok, parent_ast)
+            elif self.tokenstream.peektokentype() == TokenType.UNSIGNED_INT:
+                ret = AST(self.tokenstream.eattoken(), parent_ast)
+            else:
+                errtok = self.tokenstream.eattoken()
+                raise ParseException(token_errstr(errtok, "Invalid <unsigned-constant>"))
         return ret
-
 
     def parse_term(self, parent_ast):
         # 6.7.1 <term> ::= <factor> { <multiplying-operator> <factor> }

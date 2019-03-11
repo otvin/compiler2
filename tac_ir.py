@@ -246,6 +246,8 @@ class TACBlock:
                 self.addnode(TACParamNode(tmp))
                 if isinstance(tmp.pascaltype, pascaltypes.StringLiteralType):
                     self.addnode(TACCallSystemFunctionNode(Label("_WRITES"), 1))
+                elif isinstance(tmp.pascaltype, pascaltypes.RealType):
+                    self.addnode(TACCallSystemFunctionNode(Label("_WRITER"), 1))
                 else:
                     self.addnode(TACCallSystemFunctionNode(Label("_WRITEI"), 1))
             if tok.tokentype == TokenType.WRITELN:
@@ -256,6 +258,12 @@ class TACBlock:
             self.symboltable.add(ret)
             self.addnode(TACUnaryLiteralNode(ret, TACOperator.ASSIGN,
                                              NumericLiteral(int(tok.value), tok.location, pascaltypes.IntegerType())))
+            return ret
+        elif tok.tokentype in [TokenType.UNSIGNED_REAL, TokenType.SIGNED_REAL]:
+            ret = Symbol(generator.gettemporary(), tok.location, pascaltypes.RealType())
+            self.symboltable.add(ret)
+            self.addnode(TACUnaryLiteralNode(ret, TACOperator.ASSIGN,
+                                             NumericLiteral(float(tok.value), tok.location, pascaltypes.RealType())))
             return ret
         elif tok.tokentype == TokenType.CHARSTRING:
             ret = Symbol(generator.gettemporary(), tok.location, pascaltypes.StringLiteralType())
