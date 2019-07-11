@@ -76,6 +76,11 @@ class AssemblyGenerator:
             assert isinstance(block, TACBlock)
             self.emitlabel(block.label.name)
 
+            # align stack pointer
+            # todo - make main an attribute of the block instead of testing for label name
+            if block.label.name == 'main':
+                self.emitcode("AND RSP, -16")
+
             # TODO - if this is a procedure or function block we need to allocate temp space for parameters
             # pass #1 - compute local storage needs
 
@@ -96,6 +101,8 @@ class AssemblyGenerator:
             if totalstorageneeded > 0:
                 self.emitcode("PUSH RBP")  # ABI requires callee to preserve RBP
                 self.emitcode("MOV RBP, RSP", "save stack pointer")
+                # X86-64 ABI requires stack to stay aligned to 16-byte boundary.
+                totalstorageneeded += 16 - (totalstorageneeded % 16)
                 self.emitcode("SUB RSP, " + str(totalstorageneeded), "allocate local storage")
 
             for node in block.tacnodes:
@@ -146,8 +153,9 @@ class AssemblyGenerator:
                         elif params[0].paramval.pascaltype.size == 8:
                             destregister = "rsi"
                         else:
-                            raise ASMGeneratorError("Invalid Size for _WRITEI/_WRITER")
+                            raise ASMGeneratorError("Invalid Size for _WRITEI")
                         self.emitcode("mov {}, [{}]".format(destregister, params[0].paramval.memoryaddress))
+                        # must pass 0 (in rax) as number of floating point args since printf is variadic
                         self.emitcode("mov rax, 0")
                         self.emitcode("call printf wrt ..plt")
                         self.emitcode("pop rsi")
@@ -156,18 +164,12 @@ class AssemblyGenerator:
                     elif node.label.name == "_WRITER":
                         if node.numparams != 1:
                             raise ASMGeneratorError("Invalid numparams to _WRITER")
-                        # Todo - see why using printf for reals was causing core dumps.
-                        # self.emitcode("push rdi")
-                        # self.emitcode("mov rdi, printf_realfmt")
                         self.emitcode("push rdi")
-                        self.emitcode("XOR RDI, RDI")
-                        self.emitcode("CALL fflush wrt ..plt", "flush printf buffer to keep printed items in order")
-                        self.emitcode("pop rdi")
+                        self.emitcode("mov rdi, printf_realfmt")
                         self.emitcode("movsd xmm0, [{}]".format(params[0].paramval.memoryaddress))
-                        # self.emitcode("mov rax, 1", "1 floating point param")
-                        # self.emitcode("call printf wrt ..plt")
-                        # self.emitcode("pop rdi")
-                        self.emitcode("call prtdbl")
+                        self.emitcode("mov rax, 1", "1 floating point param")
+                        self.emitcode("call printf wrt ..plt")
+                        self.emitcode("pop rdi")
                         del params[-1]
                     elif node.label.name == "_WRITES":
                         self.emitcode("push rdi")
@@ -250,7 +252,6 @@ class AssemblyGenerator:
         # break this out into better functions
         objectfilename = self.asmfilename[:-4] + ".o"
         exefilename = self.asmfilename[:-4]
-        os.system("nasm -f elf64 -F dwarf -g -o nsm64.o nsm64.asm")
         os.system("nasm -f elf64 -F dwarf -g -o {} {}".format(objectfilename, self.asmfilename))
-        # os.system("gcc {} -o {}".format(objectfilename, exefilename))
-        os.system("gcc nsm64.o {} -o {}".format(objectfilename, exefilename))
+        os.system("gcc {} -o {}".format(objectfilename, exefilename))
+
