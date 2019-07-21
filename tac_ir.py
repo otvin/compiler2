@@ -85,6 +85,7 @@ class TACOperator(Enum):
     PARAM = "param"
     CALL = "call"
     COMMENT = "comment"
+    INTTOREAL = "is int_to_real"
 
     def __str__(self):
         return self.value
@@ -144,7 +145,6 @@ class TACCallSystemFunctionNode(TACCallFunctionNode):
         super().__init__(label, numparams)
 
 
-# TODO should this be lval := arg1?  What other unary nodes are there?
 class TACUnaryNode(TACNode):
     def __init__(self, lval, operator, arg1):
         assert isinstance(arg1, Symbol)
@@ -282,9 +282,28 @@ class TACBlock:
 
             child1 = self.processast(ast.children[0], generator)
             child2 = self.processast(ast.children[1], generator)
-            ret = Symbol(generator.gettemporary(), tok.location, pascaltypes.IntegerType())
-            self.symboltable.add(ret)
-            self.addnode(TACBinaryNode(ret, op, child1, child2))
+            if isinstance(child1.pascaltype, pascaltypes.RealType) or isinstance(child2.pascaltype,pascaltypes.RealType):
+                if isinstance(child1.pascaltype, pascaltypes.IntegerType):
+                    newchild1 = Symbol(generator.gettemporary(), tok.location, pascaltypes.RealType())
+                    self.symboltable.add(newchild1)
+                    self.addnode(TACUnaryNode(newchild1, TACOperator.INTTOREAL, child1))
+                else:
+                    newchild1 = child1
+
+                if isinstance(child2.pascaltype, pascaltypes.IntegerType):
+                    newchild2 = Symbol(generator.gettemporary(), tok.location, pascaltypes.RealType())
+                    self.symboltable.add(newchild2)
+                    self.addnode(TACUnaryNode(newchild2, TACOperator.INTTOREAL, child2))
+                else:
+                    newchild2 = child2
+
+                ret = Symbol(generator.gettemporary(), tok.location, pascaltypes.RealType())
+                self.symboltable.add(ret)
+                self.addnode(TACBinaryNode(ret, op, newchild1, newchild2))
+            else:
+                ret = Symbol(generator.gettemporary(), tok.location, pascaltypes.IntegerType())
+                self.symboltable.add(ret)
+                self.addnode(TACBinaryNode(ret, op, child1, child2))
             return ret
         else:
             raise ValueError("Oops!")

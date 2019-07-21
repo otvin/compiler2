@@ -1,6 +1,6 @@
 import os
 from tac_ir import TACBlock, TACLabelNode, TACParamNode, TACCallSystemFunctionNode, TACUnaryLiteralNode, \
-    TACOperator, TACGenerator, TACCommentNode, TACBinaryNode
+    TACOperator, TACGenerator, TACCommentNode, TACBinaryNode, TACUnaryNode
 from symboltable import StringLiteral, NumericLiteral
 import pascaltypes
 
@@ -40,7 +40,6 @@ class AssemblyGenerator:
     def generate_externs(self):
         self.emitcode("extern printf")
         self.emitcode("extern fflush")
-        self.emitcode("extern prtdbl", "imported from nsm64")
 
     def generate_datasection(self):
         self.emitsection("data")
@@ -101,7 +100,7 @@ class AssemblyGenerator:
             if totalstorageneeded > 0:
                 self.emitcode("PUSH RBP")  # ABI requires callee to preserve RBP
                 self.emitcode("MOV RBP, RSP", "save stack pointer")
-                # X86-64 ABI requires stack to stay aligned to 16-byte boundary.
+                # X86-64 ABI requires stack to stay aligned to 16-byte boundary.  Make sure we subtract in chunks of 16.
                 totalstorageneeded += 16 - (totalstorageneeded % 16)
                 self.emitcode("SUB RSP, " + str(totalstorageneeded), "allocate local storage")
 
@@ -112,6 +111,24 @@ class AssemblyGenerator:
                     self.emitlabel(node.label.name)
                 elif isinstance(node, TACParamNode):
                     params.append(node)
+                elif isinstance(node, TACUnaryNode):
+                    if node.operator == TACOperator.INTTOREAL:
+                        if node.arg1.pascaltype.size in (1,2):
+                            raise ASMGeneratorError("Cannot handle 8- or 16-bit int convert to real")
+                        elif node.arg1.pascaltype.size == 4:
+                            # extend to 8 bytes
+                            self.emitcode("mov eax, [{}]".format(node.arg1.memoryaddress))
+                            self.emitcode("cdqe")
+                        elif node.arg1.pascaltype.size == 8:
+                            self.emitcode("mov rax, [{}]".format(node.arg1.memoryaddress))
+                        else:
+                            raise ASMGeneratorError("Invalid size for integer")
+                        # rax now has the value we need to convert to the float
+                        self.emitcode("cvtsi2ssq xmm0, rax")
+                        # now save the float into its location
+                        self.emitcode("movsd [{}], xmm0".format(node.lval.memoryaddress))
+                    else:
+                        raise ASMGeneratorError("Invalid operator: {}".format(node.operator))
                 elif isinstance(node, TACUnaryLiteralNode):
                     if isinstance(node.literal1, StringLiteral):
                         litaddress = self.tacgenerator.globalliteraltable.fetch(str(node.literal1.value)).memoryaddress
@@ -191,28 +208,47 @@ class AssemblyGenerator:
                     else:
                         raise ASMGeneratorError("Invalid System Function: {}".format(node.label.name))
                 elif isinstance(node, TACBinaryNode):
-                    # TODO - need to validate that this is an integer equivalent
-                    if node.operator == TACOperator.MULTIPLY:
-                        # TODO - handle something other than integers which are 4 bytes
-                        self.emitcode("mov eax, [{}]".format(node.arg1.memoryaddress))
-                        self.emitcode("mov r11d, [{}]".format(node.arg2.memoryaddress))
-                        self.emitcode("imul eax, r11d")
+                    if isinstance(node.result.pascaltype, pascaltypes.IntegerType):
+                        if node.operator == TACOperator.MULTIPLY:
+                            # TODO - handle something other than integers which are 4 bytes
+                            self.emitcode("mov eax, [{}]".format(node.arg1.memoryaddress))
+                            self.emitcode("mov r11d, [{}]".format(node.arg2.memoryaddress))
+                            self.emitcode("imul eax, r11d")
+                        elif node.operator == TACOperator.ADD:
+                            # TODO - handle something other than integers which are 4 bytes
+                            self.emitcode("mov eax, [{}]".format(node.arg1.memoryaddress))
+                            self.emitcode("mov r11d, [{}]".format(node.arg2.memoryaddress))
+                            self.emitcode("add eax, r11d")
+                        elif node.operator == TACOperator.SUBTRACT:
+                            # TODO - handle something other than integers which are 4 bytes
+                            self.emitcode("mov eax, [{}]".format(node.arg1.memoryaddress))
+                            self.emitcode("mov r11d, [{}]".format(node.arg2.memoryaddress))
+                            self.emitcode("sub eax, r11d")
+                        else:
+                            raise Exception("I need an exception")
+                        self.emitcode("jo _PASCAL_OVERFLOW_ERROR")
                         self.emitcode("mov [{}], eax".format(node.result.memoryaddress))
-                    elif node.operator == TACOperator.ADD:
-                        # TODO - handle something other than integers which are 4 bytes
-                        self.emitcode("mov eax, [{}]".format(node.arg1.memoryaddress))
-                        self.emitcode("mov r11d, [{}]".format(node.arg2.memoryaddress))
-                        self.emitcode("add eax, r11d")
-                        self.emitcode("mov [{}], eax".format(node.result.memoryaddress))
-                    elif node.operator == TACOperator.SUBTRACT:
-                        # TODO - handle something other than integers which are 4 bytes
-                        self.emitcode("mov eax, [{}]".format(node.arg1.memoryaddress))
-                        self.emitcode("mov r11d, [{}]".format(node.arg2.memoryaddress))
-                        self.emitcode("sub eax, r11d")
-                        self.emitcode("mov [{}], eax".format(node.result.memoryaddress))
+                    elif isinstance(node.result.pascaltype, pascaltypes.RealType):
+                        if node.operator == TACOperator.MULTIPLY:
+                            self.emitcode("movsd xmm0, [{}]".format(node.arg1.memoryaddress))
+                            self.emitcode("movsd xmm8, [{}]".format(node.arg2.memoryaddress))
+                            self.emitcode("mulsd xmm0, xmm8")
+                        elif node.operator == TACOperator.ADD:
+                            self.emitcode("movsd xmm0, [{}]".format(node.arg1.memoryaddress))
+                            self.emitcode("movsd xmm8, [{}]".format(node.arg2.memoryaddress))
+                            self.emitcode("addsd xmm0, xmm8")
+                        elif node.operator == TACOperator.SUBTRACT:
+                            self.emitcode("movsd xmm0, [{}]".format(node.arg1.memoryaddress))
+                            self.emitcode("movsd xmm8, [{}]".format(node.arg2.memoryaddress))
+                            self.emitcode("subsd xmm0, xmm8")
+                        else:
+                            raise ASMGeneratorError("I need an exception {}".format(node.operator))
+
+                        self.emitcode("jo _PASCAL_OVERFLOW_ERROR")
+                        self.emitcode("movsd [{}], xmm0".format(node.result.memoryaddress))
+
                     else:
-                        raise Exception("I need an exception")
-                    self.emitcode("jo _PASCAL_OVERFLOW_ERROR")
+                        raise ASMGeneratorError("Invalid Type {}".format(node.result.pascaltype))
                 else:
                     raise Exception("Some better exception")
 
