@@ -282,7 +282,8 @@ class TACBlock:
 
             child1 = self.processast(ast.children[0], generator)
             child2 = self.processast(ast.children[1], generator)
-            if isinstance(child1.pascaltype, pascaltypes.RealType) or isinstance(child2.pascaltype,pascaltypes.RealType):
+            if isinstance(child1.pascaltype, pascaltypes.RealType) or\
+                    isinstance(child2.pascaltype, pascaltypes.RealType):
                 if isinstance(child1.pascaltype, pascaltypes.IntegerType):
                     newchild1 = Symbol(generator.gettemporary(), tok.location, pascaltypes.RealType())
                     self.symboltable.add(newchild1)

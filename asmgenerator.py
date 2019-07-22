@@ -93,9 +93,17 @@ class AssemblyGenerator:
                         else:
                             totalstorageneeded += node.lval.pascaltype.size
                         node.lval.setaddress("RBP-{}".format(str(totalstorageneeded)))
+                    else:
+                        raise ASMGeneratorError("Unexpected TAC Operator: {}".format(node.operator))
                 elif isinstance(node, TACBinaryNode):
                     totalstorageneeded += node.result.pascaltype.size
                     node.result.setaddress("RBP-{}".format(str(totalstorageneeded)))
+                elif isinstance(node, TACUnaryNode):
+                    if node.operator == TACOperator.INTTOREAL:
+                        totalstorageneeded += node.lval.pascaltype.size
+                        node.lval.setaddress("RBP-{}".format(str(totalstorageneeded)))
+                    else:
+                        raise ASMGeneratorError("Unexpected TAC Operator: {}".format(node.operator))
 
             if totalstorageneeded > 0:
                 self.emitcode("PUSH RBP")  # ABI requires callee to preserve RBP
@@ -124,7 +132,7 @@ class AssemblyGenerator:
                         else:
                             raise ASMGeneratorError("Invalid size for integer")
                         # rax now has the value we need to convert to the float
-                        self.emitcode("cvtsi2ssq xmm0, rax")
+                        self.emitcode("cvtsi2sd xmm0, rax")
                         # now save the float into its location
                         self.emitcode("movsd [{}], xmm0".format(node.lval.memoryaddress))
                     else:
