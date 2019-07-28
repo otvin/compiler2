@@ -1,5 +1,5 @@
 program helloworld(output);
 begin
-	write('hello world!')
+	writeln('hello world!')
 end.
 

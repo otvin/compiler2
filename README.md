@@ -22,6 +22,11 @@ will make it easier to surpass the functionality of my previous attempt.
 
 ```python3 compiler.py helloworld.pas```
 
+### Unit tests
 
+Compiler2 currently passes 10 of the 60 unit tests created for Compiler.  You can execute the working
+bits of the unit test suite by running:
+
+```python3 compiler_test.py```
 
 Full README coming soon.  

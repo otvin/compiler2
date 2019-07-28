@@ -266,7 +266,6 @@ class TokenStream:
                 ret += self.tokenlist[i].value
             ret += " "
             i += 1
-            print(ret)
         self.printstartpos = 0
         self.printendpos = 0
         return ret

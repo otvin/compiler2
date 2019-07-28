@@ -6,71 +6,74 @@ from tac_ir import TACGenerator
 from asmgenerator import AssemblyGenerator
 
 
-def main():
-    debugmode = False
+def compile(infilename, asmfilename=None, objfilename=None, exefilename=None,
+            verbose=False):
 
-    if len(sys.argv) < 2:
-        print("Usage: python3 compiler.py [filename]")
-        sys.exit()
+    if asmfilename is None:
+        asmfilename = infilename[:-4] + ".asm"
+    if objfilename is None:
+        objfilename = asmfilename[:-4] + ".o"
+    if exefilename is None:
+        exefilename = asmfilename[:-4]
 
-    infilename = sys.argv[1]
     lexer = Lexer(infilename)
     try:
         lexer.lex()
     except Exception as err:
-        if debugmode:  # set to True to debug
+        if verbose:  # set to True to debug
             print(err)
         else:
             print(str(err))
         sys.exit()
 
-    print("LEXER OUTPUT")
-    for i in lexer.tokenstream:
-        print(str(i))
+    if verbose:
+        print("LEXER OUTPUT")
+        for i in lexer.tokenstream:
+            print(str(i))
 
     p = Parser(lexer.tokenstream)
     try:
         p.parse()
     except Exception as err:
-        if debugmode:  # set to True to debug
+        if verbose:  # set to True to debug
             print(err)
         else:
             print(str(err))
         sys.exit()
 
-    print("\n\nPARSER OUTPUT")
-    p.AST.rpn_print(0)
+    if verbose:
+        print("\n\nPARSER OUTPUT")
+        p.AST.rpn_print(0)
 
     if len(p.parseerrorlist) > 0:
         raise Exception("I need to display the compiler errors")
 
-    print("LITERALS:")
-    for q in p.literaltable:
-        print(q)
+    if verbose:
+        print("LITERALS:")
+        for q in p.literaltable:
+            print(q)
 
     g = TACGenerator(p.literaltable)
 
-    print("Literals again:")
-    for q in g.globalliteraltable:
-        print(q)
+    if verbose:
+        print("Literals again:")
+        for q in g.globalliteraltable:
+            print(q)
+
     g.generate(p.AST)
-    print("\n\nTHREE-ADDRESS CODE")
-    g.printblocks()
 
-    asmfilename = infilename[:-4] + ".asm"
+    if verbose:
+        print("\n\nTHREE-ADDRESS CODE")
+        g.printblocks()
+
     ag = AssemblyGenerator(asmfilename, g)
-    ag.generate()
-
-    # f = open(infilename, "r")
-    # print(f.read())
-    # f.close()
-
-    # for i in l.tokenstream:
-    #    print(i)
-    # g = open('test.lex','w')
-    # for i in l.tokenstream:
-    #    g.write(str(i))
+    ag.generate(objfilename, exefilename)
 
 
 if __name__ == '__main__':
-    main()
+    if len(sys.argv) < 2:
+        print("Usage: python3 compiler.py [filename]")
+        sys.exit()
+
+    infilename = sys.argv[1]
+    compile(infilename, verbose=True)

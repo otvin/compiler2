@@ -48,7 +48,9 @@ class AssemblyGenerator:
         self.emitcomment("support for write() commands")
         self.emitcode('printf_intfmt db "%d",0')
         self.emitcode('printf_strfmt db "%s",0')
-        self.emitcode('printf_realfmt db "%f",0')
+        # TODO - this is not pascal-compliant, as should be fixed characters right-justified
+        # but is better than the C default of 6 digits to the right of the decimal.
+        self.emitcode('printf_realfmt db "%.12f",0')
         self.emitcode('printf_newln db 10,0')
         if len(self.tacgenerator.globalliteraltable) > 0:
             nextid = 0
@@ -288,14 +290,11 @@ class AssemblyGenerator:
         self.emitcode("JMP _PASCAL_EXIT")
         self.generate_errorhandlingcode()
 
-    def generate(self):
+    def generate(self, objfilename, exefilename):
         self.generate_externs()
         self.generate_datasection()
         self.generate_textsection()
         self.asmfile.close()
-        # break this out into better functions
-        objectfilename = self.asmfilename[:-4] + ".o"
-        exefilename = self.asmfilename[:-4]
-        os.system("nasm -f elf64 -F dwarf -g -o {} {}".format(objectfilename, self.asmfilename))
-        os.system("gcc {} -o {}".format(objectfilename, exefilename))
+        os.system("nasm -f elf64 -F dwarf -g -o {} {}".format(objfilename, self.asmfilename))
+        os.system("gcc {} -o {}".format(objfilename, exefilename))
 
