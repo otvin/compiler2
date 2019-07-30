@@ -311,7 +311,8 @@ class TACBlock:
         elif tok.tokentype == TokenType.IDIV:
             child1 = self.processast(ast.children[0], generator)
             child2 = self.processast(ast.children[1], generator)
-            if isinstance(child1.pascaltype, pascaltypes.RealType) or isinstance(child2.pascaltype, pascaltypes.RealType):
+            if isinstance(child1.pascaltype, pascaltypes.RealType) or\
+                    isinstance(child2.pascaltype, pascaltypes.RealType):
                 raise ValueError("Cannot use integer division with Real values.")
             ret = Symbol(generator.gettemporary(), tok.location, pascaltypes.IntegerType())
             self.symboltable.add(ret)
