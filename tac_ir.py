@@ -84,6 +84,7 @@ class TACOperator(Enum):
     MULTIPLY = "*"
     DIVIDE = "/"
     IDIV = "div"
+    MOD = "mod"
     PARAM = "param"
     CALL = "call"
     COMMENT = "comment"
@@ -308,7 +309,11 @@ class TACBlock:
                 self.symboltable.add(ret)
                 self.addnode(TACBinaryNode(ret, op, child1, child2))
             return ret
-        elif tok.tokentype == TokenType.IDIV:
+        elif tok.tokentype in (TokenType.IDIV, TokenType.MOD):
+            if tok.tokentype == TokenType.IDIV:
+                op = TACOperator.IDIV
+            else:
+                op = TACOperator.MOD
             child1 = self.processast(ast.children[0], generator)
             child2 = self.processast(ast.children[1], generator)
             if isinstance(child1.pascaltype, pascaltypes.RealType) or\
@@ -316,7 +321,7 @@ class TACBlock:
                 raise ValueError("Cannot use integer division with Real values.")
             ret = Symbol(generator.gettemporary(), tok.location, pascaltypes.IntegerType())
             self.symboltable.add(ret)
-            self.addnode(TACBinaryNode(ret, TACOperator.IDIV, child1, child2))
+            self.addnode(TACBinaryNode(ret, op, child1, child2))
             return ret
         else:
             raise ValueError("Oops!")

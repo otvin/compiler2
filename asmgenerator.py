@@ -46,6 +46,7 @@ class AssemblyGenerator:
         self.emitcomment("error handling strings")
         self.emitcode('stringerr_0 db `Overflow error`, 0')
         self.emitcode('stringerr_1 db `Division by zero error`, 0')
+        self.emitcode('stringerr_2 db `Error: Divisor in Mod must be positive`, 0')
         self.emitcomment("support for write() commands")
         self.emitcode('printf_intfmt db "%d",0')
         self.emitcode('printf_strfmt db "%s",0')
@@ -233,14 +234,20 @@ class AssemblyGenerator:
                             self.emitcode("mov eax, [{}]".format(node.arg1.memoryaddress))
                             self.emitcode("mov r11d, [{}]".format(node.arg2.memoryaddress))
                             self.emitcode("sub eax, r11d")
-                        elif node.operator == TACOperator.IDIV:
+                        elif node.operator in (TACOperator.IDIV, TACOperator.MOD):
                             self.emitcode("mov eax, [{}]".format(node.arg1.memoryaddress))
                             self.emitcode("mov r11d, [{}]".format(node.arg2.memoryaddress))
                             # Error D.45: 6.7.2.2 of ISO Standard requires testing for division by zero at runtime
+                            # Error D.46: 6.7.2.2 also says it is an error if the second term is not positive
                             self.emitcode("test r11d, r11d", "check for division by zero")
-                            self.emitcode("je _PASCAL_DIVZERO_ERROR")
+                            if node.operator == TACOperator.IDIV:
+                                self.emitcode("je _PASCAL_DIVZERO_ERROR")
+                            else:
+                                self.emitcode("jle _PASCAL_MOD_ERROR")
                             self.emitcode("cdq", "sign extend eax -> edx:eax")
                             self.emitcode("idiv r11d")
+                            if node.operator == TACOperator.MOD:
+                                self.emitcode("MOV EAX, EDX", "Remainder of IDIV is in EDX")
                         else:
                             raise ASMGeneratorError("Unrecognized operator: {}".format(node.operator))
                         self.emitcode("jo _PASCAL_OVERFLOW_ERROR")
@@ -282,6 +289,10 @@ class AssemblyGenerator:
         self.emitlabel("_PASCAL_DIVZERO_ERROR")
         self.emitcode("push rdi")
         self.emitcode("mov rdi, stringerr_1")
+        self.emitcode("jmp _PASCAL_PRINT_ERROR")
+        self.emitlabel("_PASCAL_MOD_ERROR")
+        self.emitcode("push rdi")
+        self.emitcode("mov rdi, stringerr_2")
         self.emitcode("jmp _PASCAL_PRINT_ERROR")
 
         self.emitlabel("_PASCAL_PRINT_ERROR")
