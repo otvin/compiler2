@@ -125,7 +125,7 @@ class AssemblyGenerator:
                     params.append(node)
                 elif isinstance(node, TACUnaryNode):
                     if node.operator == TACOperator.INTTOREAL:
-                        if node.arg1.pascaltype.size in (1,2):
+                        if node.arg1.pascaltype.size in (1, 2):
                             raise ASMGeneratorError("Cannot handle 8- or 16-bit int convert to real")
                         elif node.arg1.pascaltype.size == 4:
                             # extend to 8 bytes
@@ -215,6 +215,9 @@ class AssemblyGenerator:
                         self.emitcode("mov rdi, printf_newln")
                         self.emitcode("mov rax, 0")
                         self.emitcode("call printf wrt ..plt")
+                        self.emitcomment("Flush standard output when we do a writeln")
+                        self.emitcode("XOR RDI, RDI")
+                        self.emitcode("CALL fflush wrt ..plt")
                         self.emitcode("pop rdi")
                         self.emitcode("")
                     else:
@@ -303,7 +306,7 @@ class AssemblyGenerator:
         self.emitcode("jmp _PASCAL_EXIT")
         self.emitcomment("exit program")
         self.emitlabel("_PASCAL_EXIT")
-        self.emitcomment("Need to flush the stdout buffer, as exiting does not do it..")
+        self.emitcomment("Need to flush the stdout buffer, as exiting does not do it.")
         self.emitcode("XOR RDI, RDI")
         self.emitcode("CALL fflush wrt ..plt")
         self.emitcode("MOV EAX, 60")
@@ -323,4 +326,3 @@ class AssemblyGenerator:
         self.asmfile.close()
         os.system("nasm -f elf64 -F dwarf -g -o {} {}".format(objfilename, self.asmfilename))
         os.system("gcc {} -o {}".format(objfilename, exefilename))
-
