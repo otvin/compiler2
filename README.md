@@ -5,7 +5,7 @@ Goal is to eventually build a Pascal compiler.  Compiler is written in python3 i
 ### Current Status
 
 Supports a series of write() or writeln() calls, each with one or more comma-separated parameters.  Each parameter must be a math expression or a string literal.
- The math expressions can be integer or real or a combination - for example, the compiler can add an integer to a real.  Addition, subraction, multiplication, and parentheses are supported.  
+ The math expressions can be integer or real or a combination - for example, the compiler can add an integer to a real.  Addition, subraction, multiplication, and parentheses are supported.  Division is supported only for integers.
  
 ### Commentary
 
@@ -24,7 +24,7 @@ will make it easier to surpass the functionality of my previous attempt.
 
 ### Unit tests
 
-Compiler2 currently passes 10 of the 60 unit tests created for Compiler.  You can execute the working
+Compiler2 currently passes 10 of the 60 unit tests created for Compiler, plus an additional 2 tests unique to Compiler2.  You can execute the working
 bits of the unit test suite by running:
 
 ```python3 compiler_test.py```

@@ -220,31 +220,29 @@ class AssemblyGenerator:
                         raise ASMGeneratorError("Invalid System Function: {}".format(node.label.name))
                 elif isinstance(node, TACBinaryNode):
                     if isinstance(node.result.pascaltype, pascaltypes.IntegerType):
+                        # TODO - handle something other than integers which are 4 bytes
                         if node.operator == TACOperator.MULTIPLY:
-                            # TODO - handle something other than integers which are 4 bytes
                             self.emitcode("mov eax, [{}]".format(node.arg1.memoryaddress))
                             self.emitcode("mov r11d, [{}]".format(node.arg2.memoryaddress))
                             self.emitcode("imul eax, r11d")
                         elif node.operator == TACOperator.ADD:
-                            # TODO - handle something other than integers which are 4 bytes
                             self.emitcode("mov eax, [{}]".format(node.arg1.memoryaddress))
                             self.emitcode("mov r11d, [{}]".format(node.arg2.memoryaddress))
                             self.emitcode("add eax, r11d")
                         elif node.operator == TACOperator.SUBTRACT:
-                            # TODO - handle something other than integers which are 4 bytes
                             self.emitcode("mov eax, [{}]".format(node.arg1.memoryaddress))
                             self.emitcode("mov r11d, [{}]".format(node.arg2.memoryaddress))
                             self.emitcode("sub eax, r11d")
                         elif node.operator == TACOperator.IDIV:
-                            # TODO - handle something other than integers which are 4 bytes
                             self.emitcode("mov eax, [{}]".format(node.arg1.memoryaddress))
                             self.emitcode("mov r11d, [{}]".format(node.arg2.memoryaddress))
+                            # Error D.45: 6.7.2.2 of ISO Standard requires testing for division by zero at runtime
                             self.emitcode("test r11d, r11d", "check for division by zero")
                             self.emitcode("je _PASCAL_DIVZERO_ERROR")
                             self.emitcode("cdq", "sign extend eax -> edx:eax")
                             self.emitcode("idiv r11d")
                         else:
-                            raise Exception("I need an exception")
+                            raise ASMGeneratorError("Unrecognized operator: {}".format(node.operator))
                         self.emitcode("jo _PASCAL_OVERFLOW_ERROR")
                         self.emitcode("mov [{}], eax".format(node.result.memoryaddress))
                     elif isinstance(node.result.pascaltype, pascaltypes.RealType):
@@ -261,7 +259,7 @@ class AssemblyGenerator:
                             self.emitcode("movsd xmm8, [{}]".format(node.arg2.memoryaddress))
                             self.emitcode("subsd xmm0, xmm8")
                         else:
-                            raise ASMGeneratorError("I need an exception {}".format(node.operator))
+                            raise ASMGeneratorError("Unrecognized operator: {}".format(node.operator))
 
                         self.emitcode("jo _PASCAL_OVERFLOW_ERROR")
                         self.emitcode("movsd [{}], xmm0".format(node.result.memoryaddress))

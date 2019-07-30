@@ -81,6 +81,8 @@ def main():
 	# dotest("tests/testfunc11.pas", "tests/testfunc11.out")
 	# dotest("tests/testglobalvar01.pas", "tests/testglobalvar01.out")
 	# dotest("tests/testglobalvar02.pas", "tests/testglobalvar02.out")
+	dotest("tests/testidiv01.pas", "tests/testidiv01.out")
+	dotest("tests/testidiv02.pas", "tests/testidiv02.out")
 	# dotest("tests/testif01.pas", "tests/testif01.out")
 	# dotest("tests/testif02.pas", "tests/testif02.out")
 	# dotest("tests/testif03.pas", "tests/testif03.out")
