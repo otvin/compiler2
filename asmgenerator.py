@@ -45,6 +45,7 @@ class AssemblyGenerator:
         self.emitsection("data")
         self.emitcomment("error handling strings")
         self.emitcode('stringerr_0 db `Overflow error`, 0')
+        self.emitcode('stringerr_1 db `Division by zero error`, 0')
         self.emitcomment("support for write() commands")
         self.emitcode('printf_intfmt db "%d",0')
         self.emitcode('printf_strfmt db "%s",0')
@@ -234,6 +235,14 @@ class AssemblyGenerator:
                             self.emitcode("mov eax, [{}]".format(node.arg1.memoryaddress))
                             self.emitcode("mov r11d, [{}]".format(node.arg2.memoryaddress))
                             self.emitcode("sub eax, r11d")
+                        elif node.operator == TACOperator.IDIV:
+                            # TODO - handle something other than integers which are 4 bytes
+                            self.emitcode("mov eax, [{}]".format(node.arg1.memoryaddress))
+                            self.emitcode("mov r11d, [{}]".format(node.arg2.memoryaddress))
+                            self.emitcode("test r11d, r11d", "check for division by zero")
+                            self.emitcode("je _PASCAL_DIVZERO_ERROR")
+                            self.emitcode("cdq", "sign extend eax -> edx:eax")
+                            self.emitcode("idiv r11d")
                         else:
                             raise Exception("I need an exception")
                         self.emitcode("jo _PASCAL_OVERFLOW_ERROR")
@@ -271,6 +280,14 @@ class AssemblyGenerator:
         self.emitlabel("_PASCAL_OVERFLOW_ERROR")
         self.emitcode("push rdi")
         self.emitcode("mov rdi, stringerr_0")
+        self.emitcode("jmp _PASCAL_PRINT_ERROR")
+        self.emitlabel("_PASCAL_DIVZERO_ERROR")
+        self.emitcode("push rdi")
+        self.emitcode("mov rdi, stringerr_1")
+        self.emitcode("jmp _PASCAL_PRINT_ERROR")
+
+        self.emitlabel("_PASCAL_PRINT_ERROR")
+        self.emitcomment("required: pointer to error message in rdi")
         self.emitcode("mov rax, 0")
         self.emitcode("call printf wrt ..plt")
         self.emitcode("pop rdi")
