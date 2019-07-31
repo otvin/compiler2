@@ -68,6 +68,7 @@ def main():
     # dotest("tests/testconcat03.pas", "tests/testconcat03.out")
     # dotest("tests/testconcat04.pas", "tests/testconcat04.out")
     # dotest("tests/testconcat05.pas", "tests/testconcat05.out")
+    dotest("tests/testdivide01.pas", "tests/testdivide01.out")
     # dotest("tests/testfunc01.pas", "tests/testfunc01.out")
     # dotest("tests/testfunc02.pas", "tests/testfunc02.out")
     # dotest("tests/testfunc03.pas", "tests/testfunc03.out")

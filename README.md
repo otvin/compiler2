@@ -1,4 +1,4 @@
-# compiler2
+# Compiler2
 
 Goal is to eventually build a Pascal compiler.  Compiler is written in python3 in Ubuntu.  The assembly files are written in NASM format.  You must install NASM via e.g. ```sudo apt-get install nasm``` in order for the program to compile the assembly.
 
@@ -25,7 +25,7 @@ will make it easier to surpass the functionality of my previous attempt.
 
 ### Unit tests
 
-Compiler2 currently passes 10 of the 60 unit tests created for Compiler, plus an additional 4 tests unique to Compiler2.  You can execute the working
+Compiler2 currently passes 10 of the 60 unit tests created for Compiler, plus an additional 5 tests unique to Compiler2.  You can execute the working
 bits of the unit test suite by running:
 
 ```python3 compiler_test.py```

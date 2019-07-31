@@ -273,20 +273,28 @@ class TACBlock:
             self.symboltable.add(ret)
             self.addnode(TACUnaryLiteralNode(ret, TACOperator.ASSIGN, StringLiteral(tok.value, tok.location)))
             return ret
-        elif tok.tokentype in (TokenType.MULTIPLY, TokenType.PLUS, TokenType.MINUS):
+        elif tok.tokentype in (TokenType.MULTIPLY, TokenType.PLUS, TokenType.MINUS, TokenType.DIVIDE):
             if tok.tokentype == TokenType.MULTIPLY:
                 op = TACOperator.MULTIPLY
             elif tok.tokentype == TokenType.PLUS:
                 op = TACOperator.ADD
             elif tok.tokentype == TokenType.MINUS:
                 op = TACOperator.SUBTRACT
+            elif tok.tokentype == TokenType.DIVIDE:
+                op = TACOperator.DIVIDE
             else:
                 raise Exception("Do I need an exception here?")
 
             child1 = self.processast(ast.children[0], generator)
             child2 = self.processast(ast.children[1], generator)
             if isinstance(child1.pascaltype, pascaltypes.RealType) or\
-                    isinstance(child2.pascaltype, pascaltypes.RealType):
+                    isinstance(child2.pascaltype, pascaltypes.RealType) or\
+                    op == TACOperator.DIVIDE:
+                # 6.7.2.1 of the ISO Standard states that if either operand of addition, subtraction, or multiplication
+                # are real-type, then the result will also be real-type.  Similarly, if the "/" operator is used,
+                # even if both operands are integer-type, the result is real-type.  Cooper states on p.31 that
+                # "[t]his means that integer operands are sometimes coerced into being reals; i.e. they are temporarily
+                # treated as values of type real."
                 if isinstance(child1.pascaltype, pascaltypes.IntegerType):
                     newchild1 = Symbol(generator.gettemporary(), tok.location, pascaltypes.RealType())
                     self.symboltable.add(newchild1)

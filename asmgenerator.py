@@ -229,14 +229,17 @@ class AssemblyGenerator:
                             self.emitcode("mov eax, [{}]".format(node.arg1.memoryaddress))
                             self.emitcode("mov r11d, [{}]".format(node.arg2.memoryaddress))
                             self.emitcode("imul eax, r11d")
+                            self.emitcode("jo _PASCAL_OVERFLOW_ERROR")
                         elif node.operator == TACOperator.ADD:
                             self.emitcode("mov eax, [{}]".format(node.arg1.memoryaddress))
                             self.emitcode("mov r11d, [{}]".format(node.arg2.memoryaddress))
                             self.emitcode("add eax, r11d")
+                            self.emitcode("jo _PASCAL_OVERFLOW_ERROR")
                         elif node.operator == TACOperator.SUBTRACT:
                             self.emitcode("mov eax, [{}]".format(node.arg1.memoryaddress))
                             self.emitcode("mov r11d, [{}]".format(node.arg2.memoryaddress))
                             self.emitcode("sub eax, r11d")
+                            self.emitcode("jo _PASCAL_OVERFLOW_ERROR")
                         elif node.operator in (TACOperator.IDIV, TACOperator.MOD):
                             self.emitcode("mov eax, [{}]".format(node.arg1.memoryaddress))
                             self.emitcode("mov r11d, [{}]".format(node.arg2.memoryaddress))
@@ -253,7 +256,6 @@ class AssemblyGenerator:
                                 self.emitcode("MOV EAX, EDX", "Remainder of IDIV is in EDX")
                         else:
                             raise ASMGeneratorError("Unrecognized operator: {}".format(node.operator))
-                        self.emitcode("jo _PASCAL_OVERFLOW_ERROR")
                         self.emitcode("mov [{}], eax".format(node.result.memoryaddress))
                     elif isinstance(node.result.pascaltype, pascaltypes.RealType):
                         if node.operator == TACOperator.MULTIPLY:
@@ -268,10 +270,12 @@ class AssemblyGenerator:
                             self.emitcode("movsd xmm0, [{}]".format(node.arg1.memoryaddress))
                             self.emitcode("movsd xmm8, [{}]".format(node.arg2.memoryaddress))
                             self.emitcode("subsd xmm0, xmm8")
+                        elif node.operator == TACOperator.DIVIDE:
+                            self.emitcode("movsd xmm0, [{}]".format(node.arg1.memoryaddress))
+                            self.emitcode("movsd xmm8, [{}]".format(node.arg2.memoryaddress))
+                            self.emitcode("divsd xmm0, xmm8")
                         else:
                             raise ASMGeneratorError("Unrecognized operator: {}".format(node.operator))
-
-                        self.emitcode("jo _PASCAL_OVERFLOW_ERROR")
                         self.emitcode("movsd [{}], xmm0".format(node.result.memoryaddress))
 
                     else:
