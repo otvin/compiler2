@@ -30,4 +30,38 @@ bits of the unit test suite by running:
 
 ```python3 compiler_test.py```
 
+### Bibliography
+
+The following works are cited in various comments in the Compiler2 code:
+
+International Organization for Standardization. (1990) Pascal (ISO standard no. 7185:1990) Retrieved from [http://www.pascal-central.com/docs/iso7185.pdf]
+
+Cooper, Doug. Standard Pascal User Reference Manual. W.W. Norton, 1983.
+
+Johnson, M. and Zelenski, J. "Three Address Code Examples" - handout from Stanford CS143 class, Summer 2012.  Retrieved from [https://web.stanford.edu/class/archive/cs/cs143/cs143.1128/handouts/240%20TAC%20Examples.pdf]
+
+"Three Address Code IR" - lecture slides from Stanford CS143 class.  Retrieved from [https://web.stanford.edu/class/archive/cs/cs143/cs143.1128/lectures/13/Slides13.pdf]
+
+
+
+
+
+### Known bugs
+
+1. Floating point literals with a large number of digits will fail to compile, as the compiler currently stores the symbol as a number, and Python loses precision. For example:
+
+    ```writeln(19832792187987.66);```
+    
+    results in the following display at program execution:
+    
+    ```198327921879872.656250000000```
+
+    however:
+    
+    ```writeln(1983279218798723.66);```
+    
+    results in a compilation error:
+    
+    ```symboltable.SymbolException: Literal not found: 1983279218798723.8```
+
 Full README coming soon.  
