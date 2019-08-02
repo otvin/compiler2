@@ -6,7 +6,7 @@ import pascaltypes
 
 # Helper Function
 def token_errstr(tok, msg="Invalid Token"):
-    assert(isinstance(tok, Token))
+    assert(isinstance(tok, Token)), "Non-token generating token error {}".format(msg)
     return msg + " {0} in {1}".format(tok.value, str(tok.location))
 
 
@@ -24,12 +24,12 @@ class ASTAttributes(Enum):
 # TODO - should an AST be a container with AST Nodes inside?
 class AST:
     def __init__(self, token, parent, comment=""):
-        assert(isinstance(token, Token))
+        assert(isinstance(token, Token)), "AST.__init__: AST requires a token"
         self.token = token
         self.comment = comment  # will get put on the line emitted in the assembly code if populated.
         self.children = []
         if parent is not None:
-            assert(isinstance(parent, AST))
+            assert(isinstance(parent, AST)), "AST.__init__:Parent of AST must be an AST"
         self.parent = parent  # pointer back to the parent node in the AST
         self.symboltable = None  # will only be defined for Procedure, Function, and Program tokens
         self.attrs = {}  # different types of tokens require different attributes
@@ -48,14 +48,14 @@ class AST:
         while ptr.symboltable is not None:
             ptr = ptr.parent
             # the root of the AST has a symboltable for globals, so ptr should never get to None
-            assert ptr is not None
+            assert ptr is not None, "AST.nearest_symboltable: No symboltable in AST ancestry"
         return ptr.symboltable
 
 
 # TODO - add a class for a parsewarning/parseerror - likely the same thing, a string, a location, maybe a level?
 class Parser:
     def __init__(self, tokenstream):
-        assert(isinstance(tokenstream, TokenStream))
+        assert(isinstance(tokenstream, TokenStream)), "Parser.__init__: Can only parse TokenStreams"
         self.tokenstream = tokenstream
         self.AST = None
         self.parseerrorlist = []
@@ -63,7 +63,7 @@ class Parser:
         self.literaltable = LiteralTable()
 
     def getexpectedtoken(self, tokentype):
-        assert(isinstance(tokentype, TokenType))
+        assert(isinstance(tokentype, TokenType)), "Parser.getexpectedtoken: Expected Token must be a token"
         ret = self.tokenstream.eattoken()
         if ret.tokentype != tokentype:
             errstr = "Expected {0} but saw '{1}' in {2}".format(str(tokentype), str(ret.value), str(ret.location))
@@ -167,7 +167,7 @@ class Parser:
                 if self.tokenstream.peektokentype() == TokenType.CHARSTRING:
                     # LiteralTable.add() allows adding duplicates
                     charstrtok = self.getexpectedtoken(TokenType.CHARSTRING)
-                    assert isinstance(charstrtok, Token)
+                    assert isinstance(charstrtok, Token), "Parser.parse_statement: non-token pulled from stream"
                     self.literaltable.add(StringLiteral(charstrtok.value, charstrtok.location))
                     ret.children.append(AST(charstrtok, ret))
                 else:

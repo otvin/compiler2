@@ -25,7 +25,7 @@ will make it easier to surpass the functionality of my previous attempt.
 
 ### Unit tests
 
-Compiler2 currently passes 10 of the 60 unit tests created for Compiler, plus an additional 6 tests unique to Compiler2.  You can execute the working
+Compiler2 currently passes 10 of the 60 unit tests created for Compiler, plus an additional 7 tests unique to Compiler2.  You can execute the working
 bits of the unit test suite by running:
 
 ```python3 compiler_test.py```
@@ -48,20 +48,6 @@ Johnson, M. and Zelenski, J. "Three Address Code Examples" - handout from Stanfo
 
 ### Known bugs
 
-1. Floating point literals with a large number of digits will fail to compile, as the compiler currently stores the symbol as a number, and Python loses precision. For example:
-
-    ```writeln(19832792187987.66);```
-    
-    results in the following display at program execution:
-    
-    ```198327921879872.656250000000```
-
-    however:
-    
-    ```writeln(1983279218798723.66);```
-    
-    results in a compilation error:
-    
-    ```symboltable.SymbolException: Literal not found: 1983279218798723.8```
+None.
 
 Full README coming soon.  

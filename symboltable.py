@@ -13,10 +13,12 @@ class SymbolRedefinedException(SymbolException):
 class Literal:
     # Literals are similar to symbols, but do not have names, and are always going to be
     # declared in global scope, regardless of where in the program they are found.
-    def __init__(self, value, location):
+    def __init__(self, value, location, pascaltype):
         assert isinstance(location, FileLocation)
+        assert isinstance(pascaltype, pascaltypes.BaseType)
         self.value = value
         self.location = location
+        self.pascaltype = pascaltype
         self.memoryaddress = None
 
     # TODO: Should be a setter?
@@ -30,41 +32,50 @@ class Literal:
 class StringLiteral(Literal):
     def __init__(self, value, location):
         assert isinstance(value, str)
-        super().__init__(value, location)
-
+        super().__init__(value, location, pascaltypes.StringLiteralType())
 
 class NumericLiteral(Literal):
     def __init__(self, value, location, pascaltype):
-        assert isinstance(pascaltype, pascaltypes.BaseType)
-        super().__init__(value, location)
+        assert (isinstance(pascaltype, pascaltypes.RealType) or isinstance(pascaltype, pascaltypes.IntegerType))
+        super().__init__(value, location, pascaltype)
         self.pascaltype = pascaltype
 
 
 class LiteralTable:
     def __init__(self):
-        self.literals = {}
+        self.stringliterals = {}
+        self.numericliterals = {}
 
     def add(self, lit):
         if not isinstance(lit, Literal):
             raise SymbolException("Can only add Literals to LiteralTables")
-        if lit.value not in self.literals.keys():
-            self.literals[lit.value] = lit
+        if isinstance(lit.pascaltype, pascaltypes.StringLiteralType):
+            if lit.value not in self.stringliterals.keys():
+                self.stringliterals[lit.value] = lit
+        else:
+            if lit.value not in self.numericliterals.keys():
+                self.numericliterals[lit.value] = lit
 
-    def fetch(self, value):
+    def fetch(self, value, pascaltype):
+        assert isinstance(pascaltype, pascaltypes.BaseType)
         try:
-            ret = self.literals[value]
+            if isinstance(pascaltype, pascaltypes.StringLiteralType):
+                ret = self.stringliterals[value]
+            else:
+                ret = self.numericliterals[value]
         except KeyError:
-            errstr = "Literal not found: {}".format(str(value))
+            errstr = "Literal not found: {}.{}".format(str(value), pascaltype)
             raise SymbolException(errstr)
         return ret
 
     def __len__(self):
-        return len(self.literals.keys())
+        return len(self.stringliterals.keys()) + len(self.numericliterals.keys())
 
     def __iter__(self):
-        for key in self.literals.keys():
-            yield self.literals[key]
-
+        for key in self.stringliterals.keys():
+            yield self.stringliterals[key]
+        for key in self.numericliterals.keys():
+            yield self.numericliterals[key]
 
 class Symbol:
     def __init__(self, name, location, pascaltype):

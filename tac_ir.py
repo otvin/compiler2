@@ -260,13 +260,13 @@ class TACBlock:
             ret = Symbol(generator.gettemporary(), tok.location, pascaltypes.IntegerType())
             self.symboltable.add(ret)
             self.addnode(TACUnaryLiteralNode(ret, TACOperator.ASSIGN,
-                                             NumericLiteral(int(tok.value), tok.location, pascaltypes.IntegerType())))
+                                             NumericLiteral(tok.value, tok.location, pascaltypes.IntegerType())))
             return ret
         elif tok.tokentype in [TokenType.UNSIGNED_REAL, TokenType.SIGNED_REAL]:
             ret = Symbol(generator.gettemporary(), tok.location, pascaltypes.RealType())
             self.symboltable.add(ret)
             self.addnode(TACUnaryLiteralNode(ret, TACOperator.ASSIGN,
-                                             NumericLiteral(float(tok.value), tok.location, pascaltypes.RealType())))
+                                             NumericLiteral(tok.value, tok.location, pascaltypes.RealType())))
             return ret
         elif tok.tokentype == TokenType.CHARSTRING:
             ret = Symbol(generator.gettemporary(), tok.location, pascaltypes.StringLiteralType())

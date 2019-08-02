@@ -143,12 +143,12 @@ class AssemblyGenerator:
                         raise ASMGeneratorError("Invalid operator: {}".format(node.operator))
                 elif isinstance(node, TACUnaryLiteralNode):
                     if isinstance(node.literal1, StringLiteral):
-                        litaddress = self.tacgenerator.globalliteraltable.fetch(str(node.literal1.value)).memoryaddress
+                        litaddress = self.tacgenerator.globalliteraltable.fetch(node.literal1.value, pascaltypes.StringLiteralType()).memoryaddress
                         self.emitcode("lea rax, [rel {}]".format(litaddress))
                         self.emitcode("mov [{}], rax".format(node.lval.memoryaddress))
                     elif isinstance(node.literal1, NumericLiteral) and isinstance(node.literal1.pascaltype,
                                                                                   pascaltypes.RealType):
-                        litaddress = self.tacgenerator.globalliteraltable.fetch(str(node.literal1.value)).memoryaddress
+                        litaddress = self.tacgenerator.globalliteraltable.fetch(node.literal1.value, pascaltypes.RealType()).memoryaddress
                         self.emitcode("movsd xmm0, [rel {}]".format(litaddress))
                         self.emitcode("movsd [{}], xmm0".format(node.lval.memoryaddress))
                     else:
