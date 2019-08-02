@@ -93,6 +93,7 @@ def main():
     dotest("tests/testmath02.pas", "tests/testmath02.out")
     # dotest("tests/testmath03.pas", "tests/testmath03.out")
     # dotest("tests/testmath04.pas", "tests/testmath04.out")
+    dotest("tests/testmisc01.pas", "tests/testmisc01.out")
     dotest("tests/testmod01.pas", "tests/testmod01.out")
     dotest("tests/testmod02.pas", "tests/testmod02.out")
     # dotest("tests/testproc01.pas", "tests/testproc01.out")
