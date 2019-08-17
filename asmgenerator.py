@@ -63,12 +63,12 @@ class AssemblyGenerator:
                     if len(lit.value) > 255:
                         raise ASMGeneratorError("String literal {} exceeds 255 char max length.".format(lit.value))
                     self.emitcode("{} db `{}`, 0".format(litname, lit.value.replace('`', '\\`')))
-                    lit.setaddress(litname)
+                    lit.memoryaddress = litname
                 elif isinstance(lit, NumericLiteral) and isinstance(lit.pascaltype, pascaltypes.RealType):
                     litname = 'reallit_{}'.format(nextid)
                     nextid += 1
                     self.emitcode("{} dq {}".format(litname, lit.value))
-                    lit.setaddress(litname)
+                    lit.memoryaddress = litname
                 else:
                     raise ASMGeneratorError("Invalid literal type")
 
@@ -96,16 +96,16 @@ class AssemblyGenerator:
                             totalstorageneeded += 8
                         else:
                             totalstorageneeded += node.lval.pascaltype.size
-                        node.lval.setaddress("RBP-{}".format(str(totalstorageneeded)))
+                        node.lval.memoryaddress = "RBP-{}".format(str(totalstorageneeded))
                     else:
                         raise ASMGeneratorError("Unexpected TAC Operator: {}".format(node.operator))
                 elif isinstance(node, TACBinaryNode):
                     totalstorageneeded += node.result.pascaltype.size
-                    node.result.setaddress("RBP-{}".format(str(totalstorageneeded)))
+                    node.result.memoryaddress = "RBP-{}".format(str(totalstorageneeded))
                 elif isinstance(node, TACUnaryNode):
                     if node.operator == TACOperator.INTTOREAL:
                         totalstorageneeded += node.lval.pascaltype.size
-                        node.lval.setaddress("RBP-{}".format(str(totalstorageneeded)))
+                        node.lval.memoryaddress = "RBP-{}".format(str(totalstorageneeded))
                     else:
                         raise ASMGeneratorError("Unexpected TAC Operator: {}".format(node.operator))
 

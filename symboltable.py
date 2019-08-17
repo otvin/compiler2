@@ -21,9 +21,13 @@ class Literal:
         self.pascaltype = pascaltype
         self.memoryaddress = None
 
-    # TODO: Should be a setter?
-    def setaddress(self, addr):
-        self.memoryaddress = addr
+    @property
+    def memoryaddress(self):
+        return self.__memoryaddress
+
+    @memoryaddress.setter
+    def memoryaddress(self, addr):
+        self.__memoryaddress = addr
 
     def __str__(self):
         return str(self.value)
@@ -85,9 +89,13 @@ class Symbol:
         self.pascaltype = pascaltype
         self.memoryaddress = None
 
-    # TODO: Should be a setter?
-    def setaddress(self, addr):
-        self.memoryaddress = addr
+    @property
+    def memoryaddress(self):
+        return self.__memoryaddress
+
+    @memoryaddress.setter
+    def memoryaddress(self, addr):
+        self.__memoryaddress = addr
 
     def __str__(self):
         return self.name
@@ -193,6 +201,8 @@ class SymbolTable:
         if sym.name in self.symbols.keys():
             errstr = "Symbol Redefined: {}".format(sym.name)
             raise SymbolRedefinedException(errstr)
+        # Unlike literals, where case matters ('abc' is different from 'aBc'), symbols in Pascal are
+        # case-insensitive.  So, store them in our symbol table as lower-case.
         self.symbols[sym.name.lower()] = sym
 
     def fetch(self, name):
