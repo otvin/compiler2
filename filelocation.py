@@ -5,4 +5,4 @@ class FileLocation:
         self.column = column
 
     def __str__(self):
-        return 'file:{0:<15} line:{1:<5} column:{2:<3}\n'.format(self.filename, self.line, self.column)
+        return 'file:{0:<15} line:{1:<5} column:{2:<3}'.format(self.filename, self.line, self.column)
