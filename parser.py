@@ -1,7 +1,21 @@
 from enum import Enum, unique, auto
 from lexer import TokenType, Token, TokenStream, LexerException
-from symboltable import StringLiteral, NumericLiteral, LiteralTable, SymbolTable
+from symboltable import StringLiteral, NumericLiteral, LiteralTable, SymbolTable, Symbol
 import pascaltypes
+
+'''
+BNF syntax notes - as defined in Section 3 of the ISO standard, modified by me to 
+resemble more common BNF terminology.
+
+::=         - shall be defined to  be
+[ x ]       - x is optional; there shall be exactly 0 or 1 instances of x.
+{ x }       - there shall be 0 or more instances of x
+|           - alternatively
+( x | y)    - either of x or y
+"xyz"       - the terminal symbol xyz
+<xyz>       - the non-terminal symbol xyz, which shall be defined elsewhere in the BNF
+'''
+
 
 
 # Helper Function
@@ -80,7 +94,39 @@ class Parser:
         return None
 
     def parse_variabledeclarationpart(self, parent_ast):
-        return None
+        # 6.2.1 <variable-declaration-part> ::= [ "var" <variable-declaration> ";" {<variable-declaration> ";"} ]
+        # 6.5.1 <variable-declaration> ::= <identifier-list> ":" <type-denoter>
+        # 6.4.2.3 <identifier-list> ::= <identifier> { "," <identifier> }
+        # 6.1.3 <identifier> ::= <letter> {<letter> | <digit>}
+        # type-denoter is technically very flexible because of user-defined types, which are not yet supported,
+        # so for right now we will use:
+        # <type-denoter> ::= "integer" | "real"
+        if self.tokenstream.peektokentype() == TokenType.VAR:
+            assert isinstance(parent_ast.symboltable, SymbolTable),\
+                "Parser.parsevariabledeclarationpart: missing symboltable"
+            self.getexpectedtoken(TokenType.VAR)
+            done = False
+            while not done:
+                identifier_list = []
+                identifier_list.append(self.getexpectedtoken(TokenType.IDENTIFIER))
+                while self.tokenstream.peektokentype() == TokenType.COMMA:
+                    self.getexpectedtoken(TokenType.COMMA)
+                    identifier_list.append(self.getexpectedtoken(TokenType.IDENTIFIER))
+                self.getexpectedtoken(TokenType.COLON)
+                type_token = self.tokenstream.eattoken()
+                if type_token.tokentype == TokenType.INTEGER:
+                    symboltype = pascaltypes.IntegerType()
+                elif type_token.tokentype == TokenType.REAL:
+                    symboltype = pascaltypes.RealType()
+                else:
+                    raise ParseException("Expected INTEGER or REAL, got: {}".format(str(type_token)))
+                self.getexpectedtoken(TokenType.SEMICOLON)
+                for identifier_token in identifier_list:
+                    parent_ast.symboltable.add(Symbol(identifier_token.value, identifier_token.location, symboltype))
+                if self.tokenstream.peektokentype() != TokenType.IDENTIFIER:
+                    done = True
+        else:
+            return None
 
     def parse_procedureandfunctiondeclarationpart(self, parent_ast):
         return None

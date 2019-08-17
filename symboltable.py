@@ -100,6 +100,9 @@ class Symbol:
     def __str__(self):
         return self.name
 
+    def __repr__(self):
+        return "{} ({}): {} @{}".format(self.name, self.location, self.pascaltype.typename, self.memoryaddress)
+
 
 class ConstantSymbol(Symbol):
     def __init__(self, name, location, pascaltype, value):
@@ -229,3 +232,7 @@ class SymbolTable:
             ret = ptr.exists(name)
             ptr = ptr.parent
         return ret
+
+    def dump(self):
+        for key in self.symbols.keys():
+            print(repr(self.symbols[key]))
