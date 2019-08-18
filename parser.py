@@ -17,7 +17,6 @@ resemble more common BNF terminology.
 '''
 
 
-
 # Helper Function
 def token_errstr(tok, msg="Invalid Token"):
     assert(isinstance(tok, Token)), "Non-token generating token error {}".format(msg)
@@ -107,8 +106,7 @@ class Parser:
             self.getexpectedtoken(TokenType.VAR)
             done = False
             while not done:
-                identifier_list = []
-                identifier_list.append(self.getexpectedtoken(TokenType.IDENTIFIER))
+                identifier_list = [self.getexpectedtoken(TokenType.IDENTIFIER)]
                 while self.tokenstream.peektokentype() == TokenType.COMMA:
                     self.getexpectedtoken(TokenType.COMMA)
                     identifier_list.append(self.getexpectedtoken(TokenType.IDENTIFIER))
@@ -145,6 +143,8 @@ class Parser:
                 self.literaltable.add(NumericLiteral(realtok.value, realtok.location, pascaltypes.RealType()))
                 ret = AST(realtok, parent_ast)
             elif self.tokenstream.peektokentype() == TokenType.UNSIGNED_INT:
+                ret = AST(self.tokenstream.eattoken(), parent_ast)
+            elif self.tokenstream.peektokentype() == TokenType.IDENTIFIER:
                 ret = AST(self.tokenstream.eattoken(), parent_ast)
             else:
                 errtok = self.tokenstream.eattoken()
@@ -191,43 +191,92 @@ class Parser:
         # 6.7.1 - <expression> ::= <simple-expression> [<relational-operator> <simple-expression>]
         return self.parse_simpleexpression(parent_ast)
 
-    def parse_statement(self, parent_ast):
-        # for now, we are only going to parse the WRITE() statement and an integer or string literal.
+    def parse_writeandwriteln(self, parent_ast):
+        # 6.8.2.3 - <procedure-statement> ::= procedure-identifier ([<actual-parameter-list>] | <read-parameter_list>
+        #                                            | <readln-parameter-list> | <write-parameter-list>
+        #                                            | <writeln-parameter-list>)
+        # 6.6.1 - <procedure-identifier> ::= <identifier>
+        # 6.9.3 - <write-parameter-list> ::= "(" [<file-variable> "."] <write-parameter>  {"," <write-parameter>} ")"
+        # 6.9.4 - <writeln-parameter-list> ::= "(" [<file-variable> "."] <write-parameter>  {"," <write-parameter>} ")"
+        # 6.9.3 - <write-parameter> ::= <expression> [":" <expression> [ ":" <expression> ] ]
 
         # TODO - figure out how to go from tokenstream back to the source text to get the comment.  Likely
         #        need to add the source text to the tokens somehow?
+        assert self.tokenstream.peektokentype() in (TokenType.WRITE, TokenType.WRITELN), \
+            "Parser.parse_writeandwriteln called and write/writeln not next token."
+
         self.tokenstream.setstartpos()
 
-        if self.tokenstream.peektokentype() in (TokenType.WRITE, TokenType.WRITELN):
-            ret = AST(self.tokenstream.eattoken(), parent_ast)
-            self.getexpectedtoken(TokenType.LPAREN)
-            # TODO: When we support other Output types, we need to actually parse the first parameter
-            # to see if it is a file-variable.
-            # TODO: The file-variable, or implied file-variable OUTPUT should be a symbol.
-            if self.tokenstream.peektokentype() == TokenType.OUTPUT:
-                ret.children.append(AST(self.getexpectedtoken(TokenType.OUTPUT), parent_ast))
-                self.getexpectedtoken(TokenType.COMMA)
+        ret = AST(self.tokenstream.eattoken(), parent_ast)
+        self.getexpectedtoken(TokenType.LPAREN)
+        # TODO: When we support other Output types, we need to actually parse the first parameter
+        # to see if it is a file-variable.
+        # TODO: The file-variable, or implied file-variable OUTPUT should be a symbol.
+        if self.tokenstream.peektokentype() == TokenType.OUTPUT:
+            ret.children.append(AST(self.getexpectedtoken(TokenType.OUTPUT), parent_ast))
+            self.getexpectedtoken(TokenType.COMMA)
 
-            done = False
-            while not done:
-                if self.tokenstream.peektokentype() == TokenType.CHARSTRING:
-                    # LiteralTable.add() allows adding duplicates
-                    charstrtok = self.getexpectedtoken(TokenType.CHARSTRING)
-                    assert isinstance(charstrtok, Token), "Parser.parse_statement: non-token pulled from stream"
-                    self.literaltable.add(StringLiteral(charstrtok.value, charstrtok.location))
-                    ret.children.append(AST(charstrtok, ret))
-                else:
-                    ret.children.append(self.parse_expression(ret))
-                if self.tokenstream.peektokentype() == TokenType.COMMA:
-                    self.getexpectedtoken(TokenType.COMMA)
-                else:
-                    done = True
-            self.getexpectedtoken(TokenType.RPAREN)
-            self.tokenstream.setendpos()
-            ret.comment = self.tokenstream.printstarttoend()
-            return ret
+        done = False
+        while not done:
+            if self.tokenstream.peektokentype() == TokenType.CHARSTRING:
+                # LiteralTable.add() allows adding duplicates
+                charstrtok = self.getexpectedtoken(TokenType.CHARSTRING)
+                assert isinstance(charstrtok, Token), "Parser.parse_statement: non-token pulled from stream"
+                self.literaltable.add(StringLiteral(charstrtok.value, charstrtok.location))
+                ret.children.append(AST(charstrtok, ret))
+            else:
+                ret.children.append(self.parse_expression(ret))
+            if self.tokenstream.peektokentype() == TokenType.COMMA:
+                self.getexpectedtoken(TokenType.COMMA)
+            else:
+                done = True
+        self.getexpectedtoken(TokenType.RPAREN)
+        self.tokenstream.setendpos()
+        ret.comment = self.tokenstream.printstarttoend()
+        return ret
+
+    def parse_assignmentstatement(self, parent_ast):
+        # 6.8.2.2 - <assignment-statement> ::= (<variable-access>|<function-identifier>) ":=" <expression>
+        # 6.5.1 - <variable-access> ::= <entire-variable> | <component-variable> | <identified-variable>
+        #                               | <buffer-variable>
+        # 6.5.2 - <entire-variable> ::= <variable-identifier>
+        # 6.5.2 - <variable-identifier> ::= <identifier>
+        nexttwo = self.tokenstream.peekmultitokentype(2)
+        assert nexttwo[0] == TokenType.IDENTIFIER, "Parser.parse_assignmentstatement called, identifier not next token."
+        assert nexttwo[1] == TokenType.ASSIGNMENT, "Parser.parse_assignmentstatement called without assignment token."
+        return None
+
+    def parse_simplestatement(self, parent_ast):
+        # 6.8.2.1 - <simple-statement> ::= <empty-statement> | <assignment-statement> | <procedure-statement>
+        #                                   | <goto-statement>
+        # 6.8.2.3 - <procedure-statement> ::= procedure-identifier ([<actual-parameter-list>] | <read-parameter_list>
+        #                                            | <readln-parameter-list> | <write-parameter-list>
+        #                                            | <writeln-parameter-list>)
+        # 6.6.1 - <procedure-identifier> ::= <identifier>
+        # 6.8.2.2 - <assignment-statement> ::= (<variable-access>|<function-identifier>) ":=" <expression>
+        # 6.5.1 - <variable-access> ::= <entire-variable> | <component-variable> | <identified-variable>
+        #                               | <buffer-variable>
+        # 6.5.2 - <entire-variable> ::= <variable-identifier>
+        # 6.5.2 - <variable-identifier> ::= <identifier>
+
+        # Currently we process variable assignment and write()/writeln() statements.
+
+        next_tokentype = self.tokenstream.peektokentype()
+
+        if next_tokentype in (TokenType.WRITE, TokenType.WRITELN):
+            return self.parse_writeandwriteln(parent_ast)
+        elif next_tokentype == TokenType.IDENTIFIER:
+            nexttwo = self.tokenstream.peekmultitokentype(2)
+            if nexttwo[1] == TokenType.ASSIGNMENT:
+                return self.parse_assignmentstatement(parent_ast)
+            else:
+                raise ParseException("Identifier seen, unclear how to parse")
         else:
             raise Exception("Some Useless Exception")
+
+    def parse_statement(self, parent_ast):
+        # 6.8.1 - <statement> ::= [<label>:] (<simple-statement> | <structured-statement>)
+        return self.parse_simplestatement(parent_ast)
 
     def parse_statementpart(self, parent_ast):
         # 6.2.1 defines statement-part simply as <statement-part> ::= <compound-statement>

@@ -310,6 +310,22 @@ class TokenStream:
             ret = None
         return ret
 
+    def peekmultitokentype(self, num):
+        # returns a list of the types of the next num tokens in the token list, but does not advance the position.
+        # Used when interpretation of a token varies based on multiple tokens that follow.  Returns the empty
+        # list if we are past the end of the token list.  If we are not past the end of the token list, but there
+        # are fewer than num tokens left in the list, then will return all remaining tokens in the token list.
+
+        ret = []
+        i = self.pos
+        try:
+            while i < self.pos + num:
+                ret.append(self.tokenlist[i].tokentype)
+                i += 1
+        except IndexError:
+            pass
+        return ret
+
 
 class Lexer:
     def __init__(self, filename):
