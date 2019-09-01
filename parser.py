@@ -1,6 +1,6 @@
 from enum import Enum, unique, auto
 from lexer import TokenType, Token, TokenStream, LexerException
-from symboltable import StringLiteral, NumericLiteral, LiteralTable, SymbolTable, Symbol
+from symboltable import StringLiteral, NumericLiteral, LiteralTable, SymbolTable, Symbol, VariableSymbol
 import pascaltypes
 
 '''
@@ -120,7 +120,8 @@ class Parser:
                     raise ParseException("Expected INTEGER or REAL, got: {}".format(str(type_token)))
                 self.getexpectedtoken(TokenType.SEMICOLON)
                 for identifier_token in identifier_list:
-                    parent_ast.symboltable.add(Symbol(identifier_token.value, identifier_token.location, symboltype))
+                    parent_ast.symboltable.add(VariableSymbol(identifier_token.value,
+                                                              identifier_token.location, symboltype))
                 if self.tokenstream.peektokentype() != TokenType.IDENTIFIER:
                     done = True
         else:
@@ -244,7 +245,28 @@ class Parser:
         nexttwo = self.tokenstream.peekmultitokentype(2)
         assert nexttwo[0] == TokenType.IDENTIFIER, "Parser.parse_assignmentstatement called, identifier not next token."
         assert nexttwo[1] == TokenType.ASSIGNMENT, "Parser.parse_assignmentstatement called without assignment token."
-        return None
+
+        self.tokenstream.setstartpos()
+        ident_token = self.getexpectedtoken(TokenType.IDENTIFIER)
+        if not parent_ast.symboltable.existsanywhere(ident_token.value):
+            raise ParseException("Undefined Identifier: {}".format(ident_token.value))
+        sym = parent_ast.symboltable.fetch(ident_token.value)
+        if isinstance(sym, VariableSymbol):
+            # Two possible designes considered here.  First, having ret have some token that represents
+            # the variable-identifier and that it is being assigned to, and then have one child which
+            # is the expression, or the one that I'm going with here, which is to have ret explicitly
+            # be the assign operation with first child the variable being assigned and second child
+            # being the expression.  I don't know that either is better but this seemed cleaner
+            # because it put all the tokens in the AST and did not require creation of a new tokentype
+            # like I did in first compiler.
+            ret = AST(self.getexpectedtoken(TokenType.ASSIGNMENT), parent_ast)
+            ret.children.append(AST(ident_token, ret))
+            ret.children.append(self.parse_expression(ret))
+        else:
+            raise ParseException("Cannot parse function-identifiers yet.")
+        return ret
+
+
 
     def parse_simplestatement(self, parent_ast):
         # 6.8.2.1 - <simple-statement> ::= <empty-statement> | <assignment-statement> | <procedure-statement>

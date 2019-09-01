@@ -104,6 +104,11 @@ class Symbol:
         return "{} ({}): {} @{}".format(self.name, self.location, self.pascaltype.typename, self.memoryaddress)
 
 
+class VariableSymbol(Symbol):
+    def __init__(self, name, location, pascaltype):
+        super().__init__(name, location, pascaltype)
+
+
 class ConstantSymbol(Symbol):
     def __init__(self, name, location, pascaltype, value):
         # only valid constants are maxint, integers, characters, booleans, and reals per 6.3 of the iso standard
