@@ -1,7 +1,7 @@
 import os
 from tac_ir import TACBlock, TACLabelNode, TACParamNode, TACCallSystemFunctionNode, TACUnaryLiteralNode, \
     TACOperator, TACGenerator, TACCommentNode, TACBinaryNode, TACUnaryNode
-from symboltable import StringLiteral, NumericLiteral
+from symboltable import StringLiteral, NumericLiteral, Symbol
 import pascaltypes
 
 
@@ -88,26 +88,12 @@ class AssemblyGenerator:
             # pass #1 - compute local storage needs
 
             totalstorageneeded = 0  # measured in bytes
-            for node in block.tacnodes:
-                if isinstance(node, TACUnaryLiteralNode):
-                    # TODO - another spot where the operator may always be assign
-                    if node.operator == TACOperator.ASSIGN:
-                        if isinstance(node.literal1, StringLiteral):
-                            totalstorageneeded += 8
-                        else:
-                            totalstorageneeded += node.lval.pascaltype.size
-                        node.lval.memoryaddress = "RBP-{}".format(str(totalstorageneeded))
-                    else:
-                        raise ASMGeneratorError("Unexpected TAC Operator: {}".format(node.operator))
-                elif isinstance(node, TACBinaryNode):
-                    totalstorageneeded += node.result.pascaltype.size
-                    node.result.memoryaddress = "RBP-{}".format(str(totalstorageneeded))
-                elif isinstance(node, TACUnaryNode):
-                    if node.operator == TACOperator.INTTOREAL:
-                        totalstorageneeded += node.lval.pascaltype.size
-                        node.lval.memoryaddress = "RBP-{}".format(str(totalstorageneeded))
-                    else:
-                        raise ASMGeneratorError("Unexpected TAC Operator: {}".format(node.operator))
+
+            for symname in block.symboltable.symbols.keys():
+                sym = block.symboltable.fetch(symname)
+                assert isinstance(sym, Symbol)
+                totalstorageneeded += sym.pascaltype.size
+                sym.memoryaddress = "RBP-{}".format(str(totalstorageneeded))
 
             if totalstorageneeded > 0:
                 self.emitcode("PUSH RBP")  # ABI requires callee to preserve RBP

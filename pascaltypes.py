@@ -9,6 +9,7 @@ class StringLiteralType(BaseType):
     def __init__(self):
         super().__init__()
         self.typename = "string literal"
+        self.size = 8
 
 
 class SimpleType(BaseType):

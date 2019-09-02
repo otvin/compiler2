@@ -64,6 +64,13 @@ class AST:
             assert ptr is not None, "AST.nearest_symboltable: No symboltable in AST ancestry"
         return ptr.symboltable
 
+    def dump_symboltables(self):
+        for child in self.children:
+            child.dump_symboltables()
+        if self.symboltable is not None:
+            self.symboltable.dump()
+            print("*****")
+
 
 # TODO - add a class for a parsewarning/parseerror - likely the same thing, a string, a location, maybe a level?
 class Parser:

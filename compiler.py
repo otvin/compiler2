@@ -52,6 +52,9 @@ def compile(infilename, asmfilename=None, objfilename=None, exefilename=None,
         print("LITERALS:")
         for q in p.literaltable:
             print(q)
+        print("\n\n")
+        print ("symbols")
+        p.AST.dump_symboltables()
 
     g = TACGenerator(p.literaltable)
 
