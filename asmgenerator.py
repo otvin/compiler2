@@ -92,8 +92,9 @@ class AssemblyGenerator:
             for symname in block.symboltable.symbols.keys():
                 sym = block.symboltable.fetch(symname)
                 assert isinstance(sym, Symbol)
-                totalstorageneeded += sym.pascaltype.size
-                sym.memoryaddress = "RBP-{}".format(str(totalstorageneeded))
+                if sym.memoryaddress is None:
+                    totalstorageneeded += sym.pascaltype.size
+                    sym.memoryaddress = "RBP-{}".format(str(totalstorageneeded))
 
             if totalstorageneeded > 0:
                 self.emitcode("PUSH RBP")  # ABI requires callee to preserve RBP
