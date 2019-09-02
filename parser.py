@@ -1,6 +1,6 @@
 from enum import Enum, unique, auto
 from lexer import TokenType, Token, TokenStream, LexerException
-from symboltable import StringLiteral, NumericLiteral, LiteralTable, SymbolTable, Symbol, VariableSymbol
+from symboltable import StringLiteral, NumericLiteral, LiteralTable, SymbolTable, VariableSymbol
 import pascaltypes
 
 '''
@@ -271,9 +271,9 @@ class Parser:
             ret.children.append(self.parse_expression(ret))
         else:
             raise ParseException("Cannot parse function-identifiers yet.")
+        self.tokenstream.setendpos()
+        ret.comment = self.tokenstream.printstarttoend()
         return ret
-
-
 
     def parse_simplestatement(self, parent_ast):
         # 6.8.2.1 - <simple-statement> ::= <empty-statement> | <assignment-statement> | <procedure-statement>

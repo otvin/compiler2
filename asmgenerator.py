@@ -126,16 +126,32 @@ class AssemblyGenerator:
                         self.emitcode("cvtsi2sd xmm0, rax")
                         # now save the float into its location
                         self.emitcode("movsd [{}], xmm0".format(node.lval.memoryaddress))
+                    elif node.operator == TACOperator.ASSIGN:
+                        if node.lval.pascaltype.size == 1:
+                            reg = "al"
+                        elif node.lval.pascaltype.size == 2:
+                            reg = "ax"
+                        elif node.lval.pascaltype.size == 4:
+                            reg = "eax"
+                        elif node.lval.pascaltype.size == 8:
+                            reg = "rax"
+                        else:
+                            raise ASMGeneratorError("Invalid Size for assignment")
+                        self.emitcode("mov {}, [{}]".format(reg, node.arg1.memoryaddress))
+                        self.emitcode("mov [{}], {}".format(node.lval.memoryaddress, reg))
                     else:
                         raise ASMGeneratorError("Invalid operator: {}".format(node.operator))
                 elif isinstance(node, TACUnaryLiteralNode):
                     if isinstance(node.literal1, StringLiteral):
-                        litaddress = self.tacgenerator.globalliteraltable.fetch(node.literal1.value, pascaltypes.StringLiteralType()).memoryaddress
+                        # dealing with PEP8 line length
+                        glt = self.tacgenerator.globalliteraltable
+                        litaddress = glt.fetch(node.literal1.value, pascaltypes.StringLiteralType()).memoryaddress
                         self.emitcode("lea rax, [rel {}]".format(litaddress))
                         self.emitcode("mov [{}], rax".format(node.lval.memoryaddress))
                     elif isinstance(node.literal1, NumericLiteral) and isinstance(node.literal1.pascaltype,
                                                                                   pascaltypes.RealType):
-                        litaddress = self.tacgenerator.globalliteraltable.fetch(node.literal1.value, pascaltypes.RealType()).memoryaddress
+                        glt = self.tacgenerator.globalliteraltable
+                        litaddress = glt.fetch(node.literal1.value, pascaltypes.RealType()).memoryaddress
                         self.emitcode("movsd xmm0, [rel {}]".format(litaddress))
                         self.emitcode("movsd [{}], xmm0".format(node.lval.memoryaddress))
                     else:
@@ -301,8 +317,21 @@ class AssemblyGenerator:
         self.emitcode("JMP _PASCAL_EXIT")
         self.generate_errorhandlingcode()
 
+    def generate_bsssection(self):
+        if len(self.tacgenerator.globalsymboltable.symbols.keys()) > 0:
+            self.emitsection("bss")
+            varseq = 0
+            for symname in self.tacgenerator.globalsymboltable.symbols.keys():
+                sym = self.tacgenerator.globalsymboltable.fetch(symname)
+                assert isinstance(sym, Symbol)
+                label = "globalvar_{}".format(str(varseq))
+                varseq += 1
+                sym.memoryaddress = "rel {}".format(label)
+                self.emitcode("{} resb {}".format(label, sym.pascaltype.size), "global variable {}".format(symname))
+
     def generate(self, objfilename, exefilename):
         self.generate_externs()
+        self.generate_bsssection()
         self.generate_datasection()
         self.generate_textsection()
         self.asmfile.close()

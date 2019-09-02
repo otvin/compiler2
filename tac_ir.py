@@ -177,7 +177,7 @@ class TACUnaryLiteralNode(TACNode):
         return "{} {} {}".format(str(self.lval), str(self.operator), litval)
 
 
-# TODO if there is something other than T0 := T1 <oper> T2 then need to take the first operator
+# TODO if there is something other than T0 := T1 <oper> T2 then need to pass in the first operator too
 class TACBinaryNode(TACNode):
     def __init__(self, result, operator, arg1, arg2):
         assert isinstance(result, Symbol)
@@ -256,6 +256,16 @@ class TACBlock:
             if tok.tokentype == TokenType.WRITELN:
                 self.addnode(TACCallSystemFunctionNode(Label("_WRITECRLF"), 0))
             return None
+        elif tok.tokentype == TokenType.ASSIGNMENT:
+            assert len(ast.children) == 2, "TACBlock.processast - Assignment ASTs must have 2 children."
+            lval = self.symboltable.fetch(ast.children[0].token.value)
+            rval = self.processast(ast.children[1], generator)
+            self.addnode(TACUnaryNode(lval, TACOperator.ASSIGN, rval))
+            return lval
+        elif tok.tokentype == TokenType.IDENTIFIER:
+            # TODO - at some point the identifier can be a procedure or function call but for now it's just a variable
+            ret = self.symboltable.fetch(tok.value)
+            return ret
         elif tok.tokentype in [TokenType.UNSIGNED_INT, TokenType.SIGNED_INT]:
             ret = Symbol(generator.gettemporary(), tok.location, pascaltypes.IntegerType())
             self.symboltable.add(ret)
@@ -332,7 +342,7 @@ class TACBlock:
             self.addnode(TACBinaryNode(ret, op, child1, child2))
             return ret
         else:
-            raise ValueError("Oops!")
+            raise ValueError("TACBlock.processast - cannot process token {}".format(tok))
 
 
 class TACGenerator:
@@ -370,6 +380,7 @@ class TACGenerator:
 
     def generate(self, ast):
         assert isinstance(ast, AST)
+        self.globalsymboltable = deepcopy(ast.symboltable)
         if ast.token.tokentype == TokenType.PROGRAM:
             for child in ast.children:
                 self.addblock(self.generateblock(child))
