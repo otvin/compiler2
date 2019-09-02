@@ -330,7 +330,7 @@ class AssemblyGenerator:
             for symname in self.tacgenerator.globalsymboltable.symbols.keys():
                 sym = self.tacgenerator.globalsymboltable.fetch(symname)
                 assert isinstance(sym, Symbol)
-                label = "globalvar_{}".format(str(varseq))
+                label = "_globalvar_{}".format(str(varseq))
                 varseq += 1
                 sym.memoryaddress = "rel {}".format(label)
                 self.emitcode("{} resb {}".format(label, sym.pascaltype.size), "global variable {}".format(symname))
