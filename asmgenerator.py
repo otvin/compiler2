@@ -8,6 +8,8 @@ import pascaltypes
 class ASMGeneratorError(Exception):
     pass
 
+#TODO - https://stackoverflow.com/questions/41573502/why-doesnt-gcc-use-partial-registers - when we get to types that
+# are 1 or 2 bytes, need to make sure we don't get in trouble.
 
 class AssemblyGenerator:
     def __init__(self, asmfilename, tacgenerator):
@@ -137,8 +139,12 @@ class AssemblyGenerator:
                             reg = "rax"
                         else:
                             raise ASMGeneratorError("Invalid Size for assignment")
+                        # This may be overkill - but at this point I don't know if I will be using rax for anything
+                        # else, so it's safest to preserve since I'm inside a block of code.
+                        self.emitcode("push rax")
                         self.emitcode("mov {}, [{}]".format(reg, node.arg1.memoryaddress))
                         self.emitcode("mov [{}], {}".format(node.lval.memoryaddress, reg))
+                        self.emitcode("pop rax")
                     else:
                         raise ASMGeneratorError("Invalid operator: {}".format(node.operator))
                 elif isinstance(node, TACUnaryLiteralNode):
