@@ -131,8 +131,7 @@ class Parser:
                                                               identifier_token.location, symboltype))
                 if self.tokenstream.peektokentype() != TokenType.IDENTIFIER:
                     done = True
-        else:
-            return None
+        return None
 
     def parse_procedureandfunctiondeclarationpart(self, parent_ast):
         return None
@@ -208,8 +207,6 @@ class Parser:
         # 6.9.4 - <writeln-parameter-list> ::= "(" [<file-variable> "."] <write-parameter>  {"," <write-parameter>} ")"
         # 6.9.3 - <write-parameter> ::= <expression> [":" <expression> [ ":" <expression> ] ]
 
-        # TODO - figure out how to go from tokenstream back to the source text to get the comment.  Likely
-        #        need to add the source text to the tokens somehow?
         assert self.tokenstream.peektokentype() in (TokenType.WRITE, TokenType.WRITELN), \
             "Parser.parse_writeandwriteln called and write/writeln not next token."
 
@@ -356,9 +353,8 @@ class Parser:
         a = self.parse_typedefinitionpart(parent_ast)
         if a is not None:
             ret.append(a)
-        a = self.parse_variabledeclarationpart(parent_ast)
-        if a is not None:
-            ret.append(a)
+        # parse_variabledeclarationpart updates the symbol table, it does not return anything to be added to the AST.
+        self.parse_variabledeclarationpart(parent_ast)
         a = self.parse_procedureandfunctiondeclarationpart(parent_ast)
         if a is not None:
             ret.append(a)
