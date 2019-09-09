@@ -8,7 +8,8 @@ import pascaltypes
 class ASMGeneratorError(Exception):
     pass
 
-#TODO - https://stackoverflow.com/questions/41573502/why-doesnt-gcc-use-partial-registers - when we get to types that
+
+# TODO - https://stackoverflow.com/questions/41573502/why-doesnt-gcc-use-partial-registers - when we get to types that
 # are 1 or 2 bytes, need to make sure we don't get in trouble.
 
 class AssemblyGenerator:
@@ -17,6 +18,7 @@ class AssemblyGenerator:
         self.asmfilename = asmfilename
         self.asmfile = open(asmfilename, 'w')
         self.tacgenerator = tacgenerator
+        self.maxlabelnum = 0
 
     def emit(self, s):
         self.asmfile.write(s)
@@ -39,6 +41,11 @@ class AssemblyGenerator:
     def emitcomment(self, commentstr):
         self.emitln("; {}".format(commentstr))
 
+    def getnextlabel(self):
+        ret = "_L" + str(self.maxlabelnum)
+        self.maxlabelnum += 1
+        return ret
+
     def generate_externs(self):
         self.emitcode("extern printf")
         self.emitcode("extern fflush")
@@ -56,6 +63,8 @@ class AssemblyGenerator:
         # but is better than the C default of 6 digits to the right of the decimal.
         self.emitcode('_printf_realfmt db "%.12f",0')
         self.emitcode('_printf_newln db 10,0')
+        self.emitcode('_printf_true db "TRUE",0')
+        self.emitcode('_printf_false db "FALSE",0')
         if len(self.tacgenerator.globalliteraltable) > 0:
             nextid = 0
             for lit in self.tacgenerator.globalliteraltable:
@@ -214,6 +223,25 @@ class AssemblyGenerator:
                         self.emitcode("push rsi")
                         self.emitcode("mov rdi, _printf_strfmt")
                         self.emitcode("mov rsi, [{}]".format(params[0].paramval.memoryaddress))
+                        self.emitcode("mov rax, 0")
+                        self.emitcode("call printf wrt ..plt")
+                        self.emitcode("pop rsi")
+                        self.emitcode("pop rdi")
+                        del params[-1]
+                    elif node.label.name == "_WRITEB":
+                        self.emitcode("push rdi")
+                        self.emitcode("push rsi")
+                        self.emitcode("mov rdi, _printf_strfmt")
+                        self.emitcode("mov al, [{}]".format(params[0].paramval.memoryaddress))
+                        self.emitcode("test al, al")
+                        labelfalse = self.getnextlabel()
+                        labelprint = self.getnextlabel()
+                        self.emitcode("je {}".format(labelfalse))
+                        self.emitcode("mov rsi, _printf_true")
+                        self.emitcode("jmp {}".format(labelprint))
+                        self.emitlabel(labelfalse)
+                        self.emitcode("mov rsi, _printf_false")
+                        self.emitlabel(labelprint)
                         self.emitcode("mov rax, 0")
                         self.emitcode("call printf wrt ..plt")
                         self.emitcode("pop rsi")

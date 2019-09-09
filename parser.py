@@ -106,7 +106,7 @@ class Parser:
         # 6.1.3 <identifier> ::= <letter> {<letter> | <digit>}
         # type-denoter is technically very flexible because of user-defined types, which are not yet supported,
         # so for right now we will use:
-        # <type-denoter> ::= "integer" | "real"
+        # <type-denoter> ::= "integer" | "real" | "Boolean"
         if self.tokenstream.peektokentype() == TokenType.VAR:
             assert isinstance(parent_ast.symboltable, SymbolTable),\
                 "Parser.parsevariabledeclarationpart: missing symboltable"
@@ -123,8 +123,10 @@ class Parser:
                     symboltype = pascaltypes.IntegerType()
                 elif type_token.tokentype == TokenType.REAL:
                     symboltype = pascaltypes.RealType()
+                elif type_token.tokentype == TokenType.BOOLEAN:
+                    symboltype = pascaltypes.BooleanType()
                 else:
-                    raise ParseException("Expected INTEGER or REAL, got: {}".format(str(type_token)))
+                    raise ParseException("Invalid type denoter: {}".format(str(type_token)))
                 self.getexpectedtoken(TokenType.SEMICOLON)
                 for identifier_token in identifier_list:
                     parent_ast.symboltable.add(VariableSymbol(identifier_token.value,
@@ -149,9 +151,8 @@ class Parser:
                 realtok = self.getexpectedtoken(TokenType.UNSIGNED_REAL)
                 self.literaltable.add(NumericLiteral(realtok.value, realtok.location, pascaltypes.RealType()))
                 ret = AST(realtok, parent_ast)
-            elif self.tokenstream.peektokentype() == TokenType.UNSIGNED_INT:
-                ret = AST(self.tokenstream.eattoken(), parent_ast)
-            elif self.tokenstream.peektokentype() == TokenType.IDENTIFIER:
+            elif self.tokenstream.peektokentype() in (TokenType.UNSIGNED_INT, TokenType.TRUE,
+                                                      TokenType.FALSE, TokenType.IDENTIFIER):
                 ret = AST(self.tokenstream.eattoken(), parent_ast)
             else:
                 errtok = self.tokenstream.eattoken()

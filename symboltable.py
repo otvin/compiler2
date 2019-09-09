@@ -38,11 +38,24 @@ class StringLiteral(Literal):
         assert isinstance(value, str)
         super().__init__(value, location, pascaltypes.StringLiteralType())
 
+
 class NumericLiteral(Literal):
     def __init__(self, value, location, pascaltype):
         assert (isinstance(pascaltype, pascaltypes.RealType) or isinstance(pascaltype, pascaltypes.IntegerType))
         super().__init__(value, location, pascaltype)
         self.pascaltype = pascaltype
+
+
+class BooleanLiteral(Literal):
+    def __init__(self, value, location):
+        assert value == 0 or value == 1
+        super().__init__(value, location, pascaltypes.BooleanType())
+
+    def __str__(self):
+        if self.value == 0:
+            return "FALSE"
+        else:
+            return "TRUE"
 
 
 class LiteralTable:
@@ -80,6 +93,7 @@ class LiteralTable:
             yield self.stringliterals[key]
         for key in self.numericliterals.keys():
             yield self.numericliterals[key]
+
 
 class Symbol:
     def __init__(self, name, location, pascaltype):

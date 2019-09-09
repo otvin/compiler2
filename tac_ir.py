@@ -70,7 +70,7 @@
 from enum import Enum, unique
 from copy import deepcopy
 from parser import AST
-from symboltable import Symbol, Label, Literal, NumericLiteral, StringLiteral, SymbolTable, LiteralTable
+from symboltable import Symbol, Label, Literal, NumericLiteral, StringLiteral, BooleanLiteral, SymbolTable, LiteralTable
 from lexer import TokenType
 import pascaltypes
 
@@ -170,7 +170,7 @@ class TACUnaryLiteralNode(TACNode):
 
     def __str__(self):
         litval = ""
-        if isinstance(self.literal1, NumericLiteral):
+        if isinstance(self.literal1, NumericLiteral) or isinstance(self.literal1, BooleanLiteral):
             litval = str(self.literal1)
         elif isinstance(self.literal1, StringLiteral):
             litval = '"{}"'.format(str(self.literal1).replace('"', '\"'))
@@ -251,6 +251,8 @@ class TACBlock:
                     self.addnode(TACCallSystemFunctionNode(Label("_WRITES"), 1))
                 elif isinstance(tmp.pascaltype, pascaltypes.RealType):
                     self.addnode(TACCallSystemFunctionNode(Label("_WRITER"), 1))
+                elif isinstance(tmp.pascaltype, pascaltypes.BooleanType):
+                    self.addnode(TACCallSystemFunctionNode(Label("_WRITEB"), 1))
                 else:
                     self.addnode(TACCallSystemFunctionNode(Label("_WRITEI"), 1))
             if tok.tokentype == TokenType.WRITELN:
@@ -277,6 +279,15 @@ class TACBlock:
             self.symboltable.add(ret)
             self.addnode(TACUnaryLiteralNode(ret, TACOperator.ASSIGN,
                                              NumericLiteral(tok.value, tok.location, pascaltypes.RealType())))
+            return ret
+        elif tok.tokentype in [TokenType.TRUE, TokenType.FALSE]:
+            ret = Symbol(generator.gettemporary(), tok.location, pascaltypes.BooleanType())
+            self.symboltable.add(ret)
+            if tok.tokentype == TokenType.TRUE:
+                tokval = 1  # 6.4.2.2 of ISO standard - Booleans are stored as 0 or 1 in memory
+            else:
+                tokval = 0
+            self.addnode(TACUnaryLiteralNode(ret, TACOperator.ASSIGN, BooleanLiteral(tokval, tok.location)))
             return ret
         elif tok.tokentype == TokenType.CHARSTRING:
             ret = Symbol(generator.gettemporary(), tok.location, pascaltypes.StringLiteralType())

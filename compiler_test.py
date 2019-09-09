@@ -58,6 +58,7 @@ def main():
     global NUM_ATTEMPTS
     global NUM_SUCCESSES
 
+    dotest("tests/testboolean01.pas", "tests/testboolean01.out")
     dotest("tests/testbugfix01.pas", "tests/testbugfix01.out")
     # dotest("tests/testbyref01.pas", "tests/testbyref01.out")
     # dotest("tests/testbyref02.pas", "tests/testbyref02.out")
