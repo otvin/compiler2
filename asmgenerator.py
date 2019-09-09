@@ -46,16 +46,16 @@ class AssemblyGenerator:
     def generate_datasection(self):
         self.emitsection("data")
         self.emitcomment("error handling strings")
-        self.emitcode('stringerr_0 db `Overflow error`, 0')
-        self.emitcode('stringerr_1 db `Division by zero error`, 0')
-        self.emitcode('stringerr_2 db `Error: Divisor in Mod must be positive`, 0')
+        self.emitcode('_stringerr_0 db `Overflow error`, 0')
+        self.emitcode('_stringerr_1 db `Division by zero error`, 0')
+        self.emitcode('_stringerr_2 db `Error: Divisor in Mod must be positive`, 0')
         self.emitcomment("support for write() commands")
-        self.emitcode('printf_intfmt db "%d",0')
-        self.emitcode('printf_strfmt db "%s",0')
+        self.emitcode('_printf_intfmt db "%d",0')
+        self.emitcode('_printf_strfmt db "%s",0')
         # TODO - this is not pascal-compliant, as should be fixed characters right-justified
         # but is better than the C default of 6 digits to the right of the decimal.
-        self.emitcode('printf_realfmt db "%.12f",0')
-        self.emitcode('printf_newln db 10,0')
+        self.emitcode('_printf_realfmt db "%.12f",0')
+        self.emitcode('_printf_newln db 10,0')
         if len(self.tacgenerator.globalliteraltable) > 0:
             nextid = 0
             for lit in self.tacgenerator.globalliteraltable:
@@ -181,7 +181,7 @@ class AssemblyGenerator:
                             raise ASMGeneratorError("Invalid numparams to _WRITEI")
                         self.emitcode("push rdi")
                         self.emitcode("push rsi")
-                        self.emitcode("mov rdi, printf_intfmt")
+                        self.emitcode("mov rdi, _printf_intfmt")
                         if params[0].paramval.pascaltype.size == 1:
                             destregister = "sil"
                         elif params[0].paramval.pascaltype.size == 2:
@@ -203,7 +203,7 @@ class AssemblyGenerator:
                         if node.numparams != 1:
                             raise ASMGeneratorError("Invalid numparams to _WRITER")
                         self.emitcode("push rdi")
-                        self.emitcode("mov rdi, printf_realfmt")
+                        self.emitcode("mov rdi, _printf_realfmt")
                         self.emitcode("movsd xmm0, [{}]".format(params[0].paramval.memoryaddress))
                         self.emitcode("mov rax, 1", "1 floating point param")
                         self.emitcode("call printf wrt ..plt")
@@ -212,7 +212,7 @@ class AssemblyGenerator:
                     elif node.label.name == "_WRITES":
                         self.emitcode("push rdi")
                         self.emitcode("push rsi")
-                        self.emitcode("mov rdi, printf_strfmt")
+                        self.emitcode("mov rdi, _printf_strfmt")
                         self.emitcode("mov rsi, [{}]".format(params[0].paramval.memoryaddress))
                         self.emitcode("mov rax, 0")
                         self.emitcode("call printf wrt ..plt")
@@ -221,7 +221,7 @@ class AssemblyGenerator:
                         del params[-1]
                     elif node.label.name == "_WRITECRLF":
                         self.emitcode("push rdi")
-                        self.emitcode("mov rdi, printf_newln")
+                        self.emitcode("mov rdi, _printf_newln")
                         self.emitcode("mov rax, 0")
                         self.emitcode("call printf wrt ..plt")
                         self.emitcomment("Flush standard output when we do a writeln")
@@ -291,15 +291,15 @@ class AssemblyGenerator:
         self.emitcomment("overflow error")
         self.emitlabel("_PASCAL_OVERFLOW_ERROR")
         self.emitcode("push rdi")
-        self.emitcode("mov rdi, stringerr_0")
+        self.emitcode("mov rdi, _stringerr_0")
         self.emitcode("jmp _PASCAL_PRINT_ERROR")
         self.emitlabel("_PASCAL_DIVZERO_ERROR")
         self.emitcode("push rdi")
-        self.emitcode("mov rdi, stringerr_1")
+        self.emitcode("mov rdi, _stringerr_1")
         self.emitcode("jmp _PASCAL_PRINT_ERROR")
         self.emitlabel("_PASCAL_MOD_ERROR")
         self.emitcode("push rdi")
-        self.emitcode("mov rdi, stringerr_2")
+        self.emitcode("mov rdi, _stringerr_2")
         self.emitcode("jmp _PASCAL_PRINT_ERROR")
 
         self.emitlabel("_PASCAL_PRINT_ERROR")
