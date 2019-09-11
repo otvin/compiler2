@@ -308,6 +308,11 @@ class TACBlock:
 
             child1 = self.processast(ast.children[0], generator)
             child2 = self.processast(ast.children[1], generator)
+
+            if isinstance(child1.pascaltype, pascaltypes.BooleanType) or\
+                    isinstance(child2.pascaltype, pascaltypes.BooleanType):
+                raise ValueError("Cannot use boolean type with math operators")
+
             if isinstance(child1.pascaltype, pascaltypes.RealType) or\
                     isinstance(child2.pascaltype, pascaltypes.RealType) or\
                     op == TACOperator.DIVIDE:
@@ -348,6 +353,9 @@ class TACBlock:
             if isinstance(child1.pascaltype, pascaltypes.RealType) or\
                     isinstance(child2.pascaltype, pascaltypes.RealType):
                 raise ValueError("Cannot use integer division with Real values.")
+            if isinstance(child1.pascaltype, pascaltypes.BooleanType) or \
+                    isinstance(child2.pascaltype, pascaltypes.BooleanType):
+                raise ValueError("Cannot use integer division with Boolean values.")
             ret = Symbol(generator.gettemporary(), tok.location, pascaltypes.IntegerType())
             self.symboltable.add(ret)
             self.addnode(TACBinaryNode(ret, op, child1, child2))

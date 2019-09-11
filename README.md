@@ -51,6 +51,6 @@ Johnson, M. and Zelenski, J. "Three Address Code Examples" - handout from Stanfo
 
 ### Known bugs
 
-Performing a math operation on a Boolean and a Real or Integer type should be a compile-time error and is not.  In fact, Booleans should not be allowed in math expressions at all.
+None.
 
 Full README coming soon.  
