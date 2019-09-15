@@ -17,10 +17,32 @@ resemble more common BNF terminology.
 '''
 
 
-# Helper Function
+# Helper Functions
 def token_errstr(tok, msg="Invalid Token"):
     assert(isinstance(tok, Token)), "Non-token generating token error {}".format(msg)
     return msg + " {0} in {1}".format(tok.value, str(tok.location))
+
+def isrelationaloperator(tokentype):
+    # 6.7.2.1 <relational-operator> ::= "=" | "<>" | "<" | ">" | "<=" | ">=" | "in"
+    if tokentype in(TokenType.EQUALS, TokenType.NOTEQUAL, TokenType.LESS, TokenType.GREATER,
+                    TokenType.LESSEQ, TokenType.GREATEREQ, TokenType.IN):
+        return True
+    else:
+        return False
+
+def ismultiplyingoperator(tokentype):
+    # 6.7.2.1 <multiplying-operator> ::= "*" | "/" | "div" | "mod" | "and"
+    if tokentype in (TokenType.MULTIPLY, TokenType.DIVIDE, TokenType.IDIV, TokenType.MOD, TokenType.AND):
+        return True
+    else:
+        return False
+
+def isaddingoperator(tokentype):
+    # 6.7.2.1 <adding-operator> ::= "+" | "-" | "or"
+    if tokentype in (TokenType.PLUS, TokenType.MINUS, TokenType.OR):
+        return True
+    else:
+        return False
 
 
 class ParseException(Exception):
@@ -163,8 +185,7 @@ class Parser:
         # 6.7.1 <term> ::= <factor> { <multiplying-operator> <factor> }
         # 6.7.2.1 <multiplying-operator> ::= "*" | "/" | "div" | "mod" | "and"
         ret = self.parse_factor(parent_ast)
-        while self.tokenstream.peektokentype() in (TokenType.MULTIPLY, TokenType.DIVIDE, TokenType.IDIV,
-                                                   TokenType.MOD, TokenType.AND):
+        while ismultiplyingoperator(self.tokenstream.peektokentype()):
             multop = AST(self.tokenstream.eattoken(), parent_ast)
             ret.parent = multop
             multop.children.append(ret)
@@ -186,7 +207,7 @@ class Parser:
         else:
             ret = self.parse_term(parent_ast)
 
-        while self.tokenstream.peektokentype() in (TokenType.PLUS, TokenType.MINUS):
+        while isaddingoperator(self.tokenstream.peektokentype()):
             addingop = AST(self.tokenstream.eattoken(), parent_ast)
             ret.parent = addingop
             addingop.children.append(ret)
@@ -197,7 +218,17 @@ class Parser:
 
     def parse_expression(self, parent_ast):
         # 6.7.1 - <expression> ::= <simple-expression> [<relational-operator> <simple-expression>]
-        return self.parse_simpleexpression(parent_ast)
+
+        simpleexp1 = self.parse_simpleexpression(parent_ast)
+        if isrelationaloperator(self.tokenstream.peektokentype()):
+            relationalop = AST(self.tokenstream.eattoken(), parent_ast)
+            simpleexp1.parent = relationalop
+            relationalop.children.append(simpleexp1)
+            relationalop.children.append(self.parse_simpleexpression(relationalop))
+            ret = relationalop
+        else:
+            ret = simpleexp1
+        return ret
 
     def parse_writeandwriteln(self, parent_ast):
         # 6.8.2.3 - <procedure-statement> ::= procedure-identifier ([<actual-parameter-list>] | <read-parameter_list>

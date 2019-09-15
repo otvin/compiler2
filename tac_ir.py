@@ -69,7 +69,7 @@
 
 from enum import Enum, unique
 from copy import deepcopy
-from parser import AST
+from parser import AST, isrelationaloperator
 from symboltable import Symbol, Label, Literal, NumericLiteral, StringLiteral, BooleanLiteral, SymbolTable, LiteralTable
 from lexer import TokenType
 import pascaltypes
@@ -85,6 +85,12 @@ class TACOperator(Enum):
     DIVIDE = "/"
     IDIV = "div"
     MOD = "mod"
+    EQUALS = "="
+    NOTEQUAL = "<>"
+    LESS = "<"
+    LESSEQ = "<="
+    GREATER = ">"
+    GREATEREQ = ">="
     PARAM = "param"
     CALL = "call"
     COMMENT = "comment"
@@ -92,6 +98,37 @@ class TACOperator(Enum):
 
     def __str__(self):
         return self.value
+
+
+def maptokentype_to_tacoperator(tokentype):
+    # Token Types have equivalent TACOperators, this is a mapping
+    if tokentype == TokenType.EQUALS:
+        ret = TACOperator.EQUALS
+    elif tokentype == TokenType.NOTEQUAL:
+        ret = TACOperator.NOTEQUAL
+    elif tokentype == TokenType.LESS:
+        ret = TACOperator.LESS
+    elif tokentype == TokenType.LESSEQ:
+        ret = TACOperator.LESSEQ
+    elif tokentype == TokenType.GREATER:
+        ret = TACOperator.GREATER
+    elif tokentype == TokenType.GREATEREQ:
+        ret = TACOperator.GREATEREQ
+    elif tokentype == TokenType.IDIV:
+        ret = TACOperator.IDIV
+    elif tokentype == TokenType.MOD:
+        ret = TACOperator.MOD
+    elif tokentype == TokenType.MULTIPLY:
+        ret = TACOperator.MULTIPLY
+    elif tokentype == TokenType.PLUS:
+        ret = TACOperator.ADD
+    elif tokentype == TokenType.MINUS:
+        ret = TACOperator.SUBTRACT
+    elif tokentype == TokenType.DIVIDE:
+        ret = TACOperator.DIVIDE
+    else:
+        raise ValueError("Unable to map tokentype {} to TACOperator.".format(tokentype))
+    return ret
 
 
 class TACNode:
@@ -262,7 +299,18 @@ class TACBlock:
             assert len(ast.children) == 2, "TACBlock.processast - Assignment ASTs must have 2 children."
             lval = self.symboltable.fetch(ast.children[0].token.value)
             rval = self.processast(ast.children[1], generator)
-            self.addnode(TACUnaryNode(lval, TACOperator.ASSIGN, rval))
+            if isinstance(lval.pascaltype, pascaltypes.RealType) and\
+                    isinstance(rval.pascaltype, pascaltypes.IntegerType):
+                newrval = Symbol(generator.gettemporary(), tok.location, pascaltypes.RealType())
+                self.symboltable.add(newrval)
+                self.addnode(TACUnaryNode(newrval, TACOperator.INTTOREAL, rval))
+            elif isinstance(lval.pascaltype, pascaltypes.IntegerType) and\
+                    isinstance(rval.pascaltype, pascaltypes.RealType):
+                # TODO we need a better exception type here, so that we can trap line number and such
+                raise ValueError("Cannot assign real type to integer")
+            else:
+                newrval = rval
+            self.addnode(TACUnaryNode(lval, TACOperator.ASSIGN, newrval))
             return lval
         elif tok.tokentype == TokenType.IDENTIFIER:
             # TODO - at some point the identifier can be a procedure or function call but for now it's just a variable
@@ -295,17 +343,7 @@ class TACBlock:
             self.addnode(TACUnaryLiteralNode(ret, TACOperator.ASSIGN, StringLiteral(tok.value, tok.location)))
             return ret
         elif tok.tokentype in (TokenType.MULTIPLY, TokenType.PLUS, TokenType.MINUS, TokenType.DIVIDE):
-            if tok.tokentype == TokenType.MULTIPLY:
-                op = TACOperator.MULTIPLY
-            elif tok.tokentype == TokenType.PLUS:
-                op = TACOperator.ADD
-            elif tok.tokentype == TokenType.MINUS:
-                op = TACOperator.SUBTRACT
-            elif tok.tokentype == TokenType.DIVIDE:
-                op = TACOperator.DIVIDE
-            else:
-                raise Exception("Do I need an exception here?")
-
+            op = maptokentype_to_tacoperator(tok.tokentype)
             child1 = self.processast(ast.children[0], generator)
             child2 = self.processast(ast.children[1], generator)
 
@@ -344,10 +382,7 @@ class TACBlock:
                 self.addnode(TACBinaryNode(ret, op, child1, child2))
             return ret
         elif tok.tokentype in (TokenType.IDIV, TokenType.MOD):
-            if tok.tokentype == TokenType.IDIV:
-                op = TACOperator.IDIV
-            else:
-                op = TACOperator.MOD
+            op = maptokentype_to_tacoperator(tok.tokentype)
             child1 = self.processast(ast.children[0], generator)
             child2 = self.processast(ast.children[1], generator)
             if isinstance(child1.pascaltype, pascaltypes.RealType) or\
@@ -360,6 +395,10 @@ class TACBlock:
             self.symboltable.add(ret)
             self.addnode(TACBinaryNode(ret, op, child1, child2))
             return ret
+        elif isrelationaloperator(tok.tokentype):
+            op = maptokentype_to_tacoperator(tok.tokentype)
+            child1 = self.processast(ast.children[0], generator)
+            child2 = self.processast(ast.children[1], generator)
         else:
             raise ValueError("TACBlock.processast - cannot process token {}".format(tok))
 

@@ -28,7 +28,7 @@ will make it easier to surpass the functionality of my previous attempt.
 
 ### Unit tests
 
-Compiler2 currently passes 11 of the 60 unit tests created for Compiler, plus an additional 9 tests unique to Compiler2.  You can execute the working
+Compiler2 currently passes 11 of the 60 unit tests created for Compiler, plus an additional 10 tests unique to Compiler2.  You can execute the working
 bits of the unit test suite by running:
 
 ```python3 compiler_test.py```
