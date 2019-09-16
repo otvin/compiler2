@@ -71,8 +71,20 @@ from enum import Enum, unique
 from copy import deepcopy
 from parser import AST, isrelationaloperator
 from symboltable import Symbol, Label, Literal, NumericLiteral, StringLiteral, BooleanLiteral, SymbolTable, LiteralTable
-from lexer import TokenType
+from lexer import TokenType, Token
 import pascaltypes
+
+
+class TACException(Exception):
+    pass
+
+
+def tac_errstr(msg, tok=None):
+    errstr = msg
+    if tok is not None:
+        assert(isinstance(tok, Token))
+        errstr += " in {0}".format(str(tok.location))
+    return errstr
 
 
 @unique
@@ -306,8 +318,7 @@ class TACBlock:
                 self.addnode(TACUnaryNode(newrval, TACOperator.INTTOREAL, rval))
             elif isinstance(lval.pascaltype, pascaltypes.IntegerType) and\
                     isinstance(rval.pascaltype, pascaltypes.RealType):
-                # TODO we need a better exception type here, so that we can trap line number and such
-                raise ValueError("Cannot assign real type to integer")
+                raise TACException(tac_errstr("Cannot assign real type to integer", tok))
             else:
                 newrval = rval
             self.addnode(TACUnaryNode(lval, TACOperator.ASSIGN, newrval))
@@ -400,7 +411,7 @@ class TACBlock:
             child1 = self.processast(ast.children[0], generator)
             child2 = self.processast(ast.children[1], generator)
         else:
-            raise ValueError("TACBlock.processast - cannot process token {}".format(tok))
+            raise TACException("TACBlock.processast - cannot process token:", tok)
 
 
 class TACGenerator:

@@ -1,13 +1,15 @@
-import sys
+import sys, traceback
 
 from lexer import Lexer
 from parser import Parser
-from tac_ir import TACGenerator
+from tac_ir import TACGenerator, TACException
 from asmgenerator import AssemblyGenerator
 
 
 def compile(infilename, asmfilename=None, objfilename=None, exefilename=None,
             verbose=False):
+
+    retstr = ""
 
     if asmfilename is None:
         asmfilename = infilename[:-4] + ".asm"
@@ -21,10 +23,9 @@ def compile(infilename, asmfilename=None, objfilename=None, exefilename=None,
         lexer.lex()
     except Exception as err:
         if verbose:  # set to True to debug
-            print(err)
-        else:
-            print(str(err))
-        sys.exit()
+            traceback.print_exc()
+        retstr += str(err)
+        return retstr
 
     if verbose:
         print("LEXER OUTPUT")
@@ -36,10 +37,9 @@ def compile(infilename, asmfilename=None, objfilename=None, exefilename=None,
         p.parse()
     except Exception as err:
         if verbose:  # set to True to debug
-            print(err)
-        else:
-            print(str(err))
-        sys.exit()
+            traceback.print_exc()
+        retstr += str(err)
+        return retstr
 
     if verbose:
         print("\n\nPARSER OUTPUT")
@@ -56,14 +56,22 @@ def compile(infilename, asmfilename=None, objfilename=None, exefilename=None,
         print ("symbols")
         p.AST.dump_symboltables()
 
+
     g = TACGenerator(p.literaltable)
+
 
     if verbose:
         print("Literals again:")
         for q in g.globalliteraltable:
             print(q)
 
-    g.generate(p.AST)
+    try:
+        g.generate(p.AST)
+    except Exception as err:
+        if verbose:  # set to True to debug
+            traceback.print_exc()
+        retstr += str(err)
+        return retstr
 
     if verbose:
         print("\n\nTHREE-ADDRESS CODE")
@@ -71,7 +79,7 @@ def compile(infilename, asmfilename=None, objfilename=None, exefilename=None,
 
     ag = AssemblyGenerator(asmfilename, g)
     ag.generate(objfilename, exefilename)
-
+    return retstr
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
@@ -79,4 +87,5 @@ if __name__ == '__main__':
         sys.exit()
 
     infilename = sys.argv[1]
-    compile(infilename, verbose=True)
+    outstr = compile(infilename, verbose=True)
+    print("*" + outstr + "*")

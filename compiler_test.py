@@ -22,9 +22,9 @@ def dotest(infilename, resultfilename):
         if not TEST_FPC_INSTEAD:
             compiler.compile(infilename, asmfilename=asmfilename, objfilename=objfilename, exefilename=exefilename)
         else:
-            os.system("fpc -v0 -o" + exefilename + " " + infilename)
+            os.system("fpc -v0 -o {0} {1}".format(exefilename,infilename))
 
-        os.system("./" + exefilename + " > " + testoutputfilename)
+        os.system("./{0} > {1}".format(exefilename, testoutputfilename))
 
         testfile = open(testoutputfilename, "r")
         testvalue = testfile.read()
@@ -36,22 +36,53 @@ def dotest(infilename, resultfilename):
 
         if resultvalue == testvalue:
             if not TEST_FPC_INSTEAD:
-                print("PASS: " + infilename)
+                print("PASS: {}".format(infilename))
             else:
-                print("FPC PASS: " + infilename)
+                print("FPC PASS: {}".format(infilename))
             NUM_SUCCESSES += 1
 
             # remove the files from passed tests; we will leave the files from failed tests so we can debug
             if not TEST_FPC_INSTEAD:
-                os.system("rm " + asmfilename)
-                os.system("rm " + objfilename)
-            os.system("rm " + exefilename)
-            os.system("rm " + testoutputfilename)
+                os.system("rm {}".format(asmfilename))
+                os.system("rm {}".format(objfilename))
+            os.system("rm {}".format(exefilename))
+            os.system("rm {}".format(testoutputfilename))
         else:  # pragma: no cover
-            print("FAIL: " + infilename)
+            print("FAIL: {}".format(infilename))
     except Exception as e:  # pragma: no cover
-        print("FAIL: " + infilename)
+        print("FAIL: {}".format(infilename))
         print(e)
+
+
+def do_compilefailtest(infilename, resultfilename):
+    # For testing situations where the file fails to compile
+
+    global NUM_ATTEMPTS
+    global NUM_SUCCESSES
+
+    if not TEST_FPC_INSTEAD:
+        # FPC errors are totally different so don't try to test those
+
+        NUM_ATTEMPTS += 1
+
+        try:
+            # the carriage return is included in the output files to end the line
+            comparestr = compiler.compile(infilename) + "\n"
+
+            resultfile = open(resultfilename, "r")
+            resultvalue = resultfile.read()
+            resultfile.close()
+
+            if resultvalue == comparestr:
+                print("PASS: {0}".format(infilename))
+                NUM_SUCCESSES += 1
+            else:
+                print("*" + comparestr + "*")
+                print("*" + resultvalue + "*")
+                print("FAIL: {0}".format(infilename))
+        except Exception as e:
+            print("FAIL: {0}".format(infilename))
+            print(e)
 
 
 def main():
@@ -59,6 +90,7 @@ def main():
     global NUM_SUCCESSES
 
     dotest("tests/testassign01.pas", "tests/testassign01.out")
+    do_compilefailtest("tests/testassign02.pas", "tests/testassign02.out")
     dotest("tests/testboolean01.pas", "tests/testboolean01.out")
     dotest("tests/testbugfix01.pas", "tests/testbugfix01.out")
     # dotest("tests/testbyref01.pas", "tests/testbyref01.out")
