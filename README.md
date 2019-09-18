@@ -5,8 +5,11 @@ Goal is to eventually build a Pascal compiler.  Compiler is written in python3 i
 ### Current Status
 
 Supports global variables of type Real, Integer or Boolean.  Supports a single main code block in the program.  The code block can be a series of variable assignments, write(), or writeln() calls.
+
 Supports math expressions using addition, subtraction, multiplication, integer division, the modulo function, and floating point division.  The math expressions can be created using variables or numeric literals.  The compiler can mix integers and reals in a single expression - for example, the compiler can add an integer to a real.  Using floating point division with the divisor and dividend both integers will result in a real.  Also supports parentheses.
+
 Supports relational operators equal, not equal, less than, less than or equal to, greater than, and greater than or equal to.  Can compare Booleans to Booleans, Integers to Integers, Reals to Reals, or Integers to Reals.  Currently, only use of relational operators is to assign a value to a boolean variable or print the boolean via write() or writeln().
+
 Write() and writeln() each take a comma-separated list of one or more parameters, with each parameter a variable, a math expression, a numeric literal, a string literal, or the boolean constants 'true' and 'false.'
 
  
@@ -14,10 +17,11 @@ Write() and writeln() each take a comma-separated list of one or more parameters
 
 Compiler2 is less functional than compiler1 at this point.  However, this version has been designed like a more classic compiler.  There is a lexer, which identifies all tokens in the ISO Pascal standard.
 The parser generates an Abstract Syntax Tree (AST).  The compiler then transforms the AST into Three-Address Code (TAC), which is an intermediate language.  
+
 The TAC is then converted into ASM.  Each variable in the TAC gets its own space on the stack.  The resulting code is correct, but obviously not very efficient.  However,
 there are many register-allocation algorithms that can be applied to the TAC in future versions.  With the first compiler I wrote, it got very difficult
 to determine where different symbols lived in memory.  In Compiler2 everything lives on the stack.  GCC does the same thing if optimizations are all turned off; you will
-notice that, for example, after a function is invoked, all parameters to the function are copied to the stack.  My opinion is that this design
+notice that, for example, after a function is invoked, GCC copies all function parameters to the stack.  My opinion is that this design
 will make it easier to surpass the functionality of my previous attempt. 
  
  
