@@ -410,6 +410,32 @@ class TACBlock:
             op = maptokentype_to_tacoperator(tok.tokentype)
             child1 = self.processast(ast.children[0], generator)
             child2 = self.processast(ast.children[1], generator)
+
+            c1type = child1.pascaltype
+            c2type = child2.pascaltype
+
+            if isinstance(c1type, pascaltypes.BooleanType) and not isinstance(c2type, pascaltypes.BooleanType):
+                raise TACException("Cannot compare Boolean to non-Boolean:", tok)
+            if isinstance(c2type, pascaltypes.BooleanType) and not isinstance(c1type, pascaltypes.BooleanType):
+                raise TACException("Cannot compare Boolean to non-Boolean:", tok)
+            if isinstance(c1type, pascaltypes.IntegerType) and isinstance(c2type, pascaltypes.RealType):
+                newchild1 = Symbol(generator.gettemporary(), tok.location, pascaltypes.RealType())
+                self.symboltable.add(newchild1)
+                self.addnode(TACUnaryNode(newchild1, TACOperator.INTTOREAL, child1))
+            else:
+                newchild1 = child1
+            if isinstance(c2type, pascaltypes.IntegerType) and isinstance(c1type, pascaltypes.RealType):
+                #TODO - this newchild pattern is coming up lots of times, should refactor it
+                newchild2 = Symbol(generator.gettemporary(), tok.location, pascaltypes.RealType())
+                self.symboltable.add(newchild2)
+                self.addnode(TACUnaryNode(newchild2, TACOperator.INTTOREAL, child2))
+            else:
+                newchild2 = child2
+
+            ret = Symbol(generator.gettemporary(), tok.location, pascaltypes.BooleanType())
+            self.symboltable.add(ret)
+            self.addnode(TACBinaryNode(ret, op, newchild1, newchild2))
+            return ret
         else:
             raise TACException("TACBlock.processast - cannot process token:", tok)
 
