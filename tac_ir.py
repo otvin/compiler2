@@ -425,7 +425,7 @@ class TACBlock:
             else:
                 newchild1 = child1
             if isinstance(c2type, pascaltypes.IntegerType) and isinstance(c1type, pascaltypes.RealType):
-                #TODO - this newchild pattern is coming up lots of times, should refactor it
+                # TODO - this newchild pattern is coming up lots of times, should refactor it
                 newchild2 = Symbol(generator.gettemporary(), tok.location, pascaltypes.RealType())
                 self.symboltable.add(newchild2)
                 self.addnode(TACUnaryNode(newchild2, TACOperator.INTTOREAL, child2))

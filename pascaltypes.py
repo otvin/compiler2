@@ -3,6 +3,9 @@ class BaseType:
         self.size = 0
         self.typename = ""
 
+    def __str__(self):
+        return self.typename
+
 
 class StringLiteralType(BaseType):
     # this is a bit hacky, but allows us to pass around string literals in places that require pascal types

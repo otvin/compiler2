@@ -22,7 +22,7 @@ def dotest(infilename, resultfilename):
         if not TEST_FPC_INSTEAD:
             compiler.compile(infilename, asmfilename=asmfilename, objfilename=objfilename, exefilename=exefilename)
         else:
-            os.system("fpc -v0 -o {0} {1}".format(exefilename,infilename))
+            os.system("fpc -v0 -o {0} {1}".format(exefilename, infilename))
 
         os.system("./{0} > {1}".format(exefilename, testoutputfilename))
 
@@ -147,6 +147,7 @@ def main():
     # dotest("tests/testrecursion01.pas", "tests/testrecursion01.out")
     # dotest("tests/testrelop01.pas", "tests/testrelop01.out")
     # dotest("tests/testrelop02.pas", "tests/testrelop02.out")
+    dotest("tests/testrelop03.pas", "tests/testrelop03.out")
     # dotest("tests/testscope01.pas", "tests/testscope01.out")
     # dotest("tests/testscope02.pas", "tests/testscope02.out")
     # dotest("tests/testscope03.pas", "tests/testscope03.out")

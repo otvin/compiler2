@@ -306,8 +306,70 @@ class AssemblyGenerator:
                         self.emitcode("movsd xmm8, [{}]".format(node.arg2.memoryaddress))
                         self.emitcode("{} xmm0, xmm8".format(op))
                         self.emitcode("movsd [{}], xmm0".format(node.result.memoryaddress))
+                    elif isinstance(node.result.pascaltype, pascaltypes.BooleanType):
+                        n1type = node.arg1.pascaltype
+                        n2type = node.arg2.pascaltype
+                        if type(n1type) != type(n2type):
+                            raise ASMGeneratorError("Cannot mix {} and {} with relational operator".format(str(n1type),
+                                                                                                           str(n2type)))
+                        if isinstance(n1type, pascaltypes.BooleanType) or isinstance(n1type, pascaltypes.IntegerType):
+                            # Boolean and Integer share same jump instructions
+                            if node.operator == TACOperator.EQUALS:
+                                jumpinstr = "JE"
+                            elif node.operator == TACOperator.NOTEQUAL:
+                                jumpinstr = "JNE"
+                            elif node.operator == TACOperator.GREATER:
+                                jumpinstr = "JG"
+                            elif node.operator == TACOperator.GREATEREQ:
+                                jumpinstr = "JGE"
+                            elif node.operator == TACOperator.LESS:
+                                jumpinstr = "JL"
+                            elif node.operator == TACOperator.LESSEQ:
+                                jumpinstr = "JLE"
+                            else:
+                                raise ASMGeneratorError("Invalid Relational Operator {}".format(node.operator))
+                        elif isinstance(n1type, pascaltypes.RealType):
+                            if node.operator == TACOperator.EQUALS:
+                                jumpinstr = "JE"
+                            elif node.operator == TACOperator.NOTEQUAL:
+                                jumpinstr = "JNE"
+                            elif node.operator == TACOperator.GREATER:
+                                jumpinstr = "JA"
+                            elif node.operator == TACOperator.GREATEREQ:
+                                jumpinstr = "JAE"
+                            elif node.operator == TACOperator.LESS:
+                                jumpinstr = "JB"
+                            elif node.operator == TACOperator.LESSEQ:
+                                jumpinstr = "JBE"
+                            else:
+                                raise ASMGeneratorError("Invalid Relational Operator {}".format(node.operator))
+                        else:
+                            raise ASMGeneratorError("Invalid Type {}".format(str(n1type)))
+
+                        if isinstance(n1type, pascaltypes.BooleanType):
+                            self.emitcode("mov al, [{}]".format(node.arg1.memoryaddress))
+                            self.emitcode("mov r11b, [{}]".format(node.arg2.memoryaddress))
+                            self.emitcode("cmp al, r11b")
+                        elif isinstance(n1type, pascaltypes.IntegerType):
+                            self.emitcode("mov eax, [{}]".format(node.arg1.memoryaddress))
+                            self.emitcode("mov r11d, [{}]".format(node.arg2.memoryaddress))
+                            self.emitcode("cmp eax, r11d")
+                        else:  # has to be real; we errored above if any other type
+                            self.emitcode("movsd xmm0, [{}]".format(node.arg1.memoryaddress))
+                            self.emitcode("movsd xmm8, [{}]".format(node.arg2.memoryaddress))
+                            self.emitcode("ucomisd xmm0, xmm8")
+
+                        labeltrue = self.getnextlabel()
+                        labeldone = self.getnextlabel()
+                        self.emitcode("{} {}".format(jumpinstr, labeltrue))
+                        self.emitcode("mov al, 0")
+                        self.emitcode("jmp {}".format(labeldone))
+                        self.emitlabel(labeltrue)
+                        self.emitcode("mov al, 1")
+                        self.emitlabel(labeldone)
+                        self.emitcode("mov [{}], al".format(node.result.memoryaddress))
                     else:
-                        raise ASMGeneratorError("Invalid Type {}".format(node.result.pascaltype))
+                        raise ASMGeneratorError("Invalid Type {}".format(str(node.result.pascaltype)))
                 else:
                     raise Exception("Some better exception")
 

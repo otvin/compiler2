@@ -1,4 +1,5 @@
-import sys, traceback
+import sys
+import traceback
 
 from lexer import Lexer
 from parser import Parser
@@ -53,12 +54,10 @@ def compile(infilename, asmfilename=None, objfilename=None, exefilename=None,
         for q in p.literaltable:
             print(q)
         print("\n\n")
-        print ("symbols")
+        print("symbols")
         p.AST.dump_symboltables()
 
-
     g = TACGenerator(p.literaltable)
-
 
     if verbose:
         print("Literals again:")
@@ -81,6 +80,7 @@ def compile(infilename, asmfilename=None, objfilename=None, exefilename=None,
     ag.generate(objfilename, exefilename)
     return retstr
 
+
 if __name__ == '__main__':
     if len(sys.argv) < 2:
         print("Usage: python3 compiler.py [filename]")
@@ -88,4 +88,4 @@ if __name__ == '__main__':
 
     infilename = sys.argv[1]
     outstr = compile(infilename, verbose=True)
-    print("*" + outstr + "*")
+    print(outstr)
