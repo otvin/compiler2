@@ -145,7 +145,7 @@ def main():
     # dotest("tests/testreal07.pas", "tests/testreal07.out")
     # dotest("tests/testreal08.pas", "tests/testreal08.out")
     # dotest("tests/testrecursion01.pas", "tests/testrecursion01.out")
-    # dotest("tests/testrelop01.pas", "tests/testrelop01.out")
+    dotest("tests/testrelop01.pas", "tests/testrelop01.out")
     # dotest("tests/testrelop02.pas", "tests/testrelop02.out")
     dotest("tests/testrelop03.pas", "tests/testrelop03.out")
     # dotest("tests/testscope01.pas", "tests/testscope01.out")
