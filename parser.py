@@ -80,7 +80,7 @@ class AST:
 
     def nearest_symboltable(self):
         ptr = self
-        while ptr.symboltable is not None:
+        while ptr.symboltable is None:
             ptr = ptr.parent
             # the root of the AST has a symboltable for globals, so ptr should never get to None
             assert ptr is not None, "AST.nearest_symboltable: No symboltable in AST ancestry"
@@ -281,12 +281,14 @@ class Parser:
         nexttwo = self.tokenstream.peekmultitokentype(2)
         assert nexttwo[0] == TokenType.IDENTIFIER, "Parser.parse_assignmentstatement called, identifier not next token."
         assert nexttwo[1] == TokenType.ASSIGNMENT, "Parser.parse_assignmentstatement called without assignment token."
+        assert parent_ast is not None
 
         self.tokenstream.setstartpos()
         ident_token = self.getexpectedtoken(TokenType.IDENTIFIER)
-        if not parent_ast.symboltable.existsanywhere(ident_token.value):
+        symtab = parent_ast.nearest_symboltable()
+        if not symtab.existsanywhere(ident_token.value):
             raise ParseException("Undefined Identifier: {}".format(ident_token.value))
-        sym = parent_ast.symboltable.fetch(ident_token.value)
+        sym = symtab.fetch(ident_token.value)
         if isinstance(sym, VariableSymbol):
             # Two possible designes considered here.  First, having ret have some token that represents
             # the variable-identifier and that it is being assigned to, and then have one child which
@@ -318,6 +320,7 @@ class Parser:
         # 6.5.2 - <variable-identifier> ::= <identifier>
 
         # Currently we process variable assignment and write()/writeln() statements.
+        assert parent_ast is not None
 
         next_tokentype = self.tokenstream.peektokentype()
 
@@ -330,7 +333,7 @@ class Parser:
             else:
                 raise ParseException("Identifier seen, unclear how to parse")
         else:
-            raise Exception("Some Useless Exception")
+            raise ParseException(token_errstr(self.tokenstream.eattoken()), "Unexpected token in parse_simplestatement")
 
     def parse_ifstatement(self, parent_ast):
         # 6.8.3.4 <if-statement> ::= "if" <Boolean-expression> "then" <statement> [else-part]
@@ -363,27 +366,28 @@ class Parser:
         # 6.8.3.1 - <structured-statement> ::= <compound-statement> | <conditional-statement>
         #                                       | <repetitive-statement> | <with-statement>
 
-        # only conditionals are supported now.
-        return self.parse_conditionalstatement(parent_ast)
+        # repetitive-statement and with-statement are not currently supported
+
+        if self.tokenstream.peektokentype() == TokenType.BEGIN:
+            return self.parse_compoundstatement(parent_ast)
+        else:
+            return self.parse_conditionalstatement(parent_ast)
 
     def parse_statement(self, parent_ast):
         # 6.8.1 - <statement> ::= [<label>:] (<simple-statement> | <structured-statement>)
         # labels are not yet supported
+        assert parent_ast is not None
 
         next_tokentype = self.tokenstream.peektokentype()
-        if next_tokentype == TokenType.IF:
-            # only structured statement supported currently is the "IF" statement.
+        if next_tokentype in (TokenType.IF, TokenType.BEGIN):
+            # only structured statements supported currently are "IF" and "BEGIN."
             return self.parse_structuredstatement(parent_ast)
         else:
             return self.parse_simplestatement(parent_ast)
 
-    def parse_statementpart(self, parent_ast):
-        # 6.2.1 defines statement-part simply as <statement-part> ::= <compound-statement>
+    def parse_compoundstatement(self, parent_ast):
         # 6.8.3.2 defines <compound-statement> ::= "begin" <statement-sequence> "end"
         # 6.8.3.1 defines <statement-sequence> ::= <statement> [ ";" <statement> ]
-        # The <statement-part> is the only portion of the <block> that is required.  Each of the
-        # other parts, i.e. label declaration, constant definition, type definition, variable declaration
-        # and procedure/function declaration are optional.
         #
         # This function returns an AST node using the BEGIN as the token, and with one child for each
         # statement.
@@ -407,6 +411,14 @@ class Parser:
                     self.parseerrorlist.append(str(le))
                     return ret
         return ret
+
+    def parse_statementpart(self, parent_ast):
+        # 6.2.1 defines statement-part simply as <statement-part> ::= <compound-statement>
+
+        # The <statement-part> is the only portion of the <block> that is required.  Each of the
+        # other parts, i.e. label declaration, constant definition, type definition, variable declaration
+        # and procedure/function declaration are optional.
+        return self.parse_compoundstatement(parent_ast)
 
     def parse_block(self, parent_ast):
         # 6.2.1 of the ISO standard defines a block.  The BNF:
