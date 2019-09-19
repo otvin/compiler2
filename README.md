@@ -8,7 +8,7 @@ Supports global variables of type Real, Integer or Boolean.  Supports a single m
 
 Supports math expressions using addition, subtraction, multiplication, integer division, the modulo function, and floating point division.  The math expressions can be created using variables or numeric literals.  The compiler can mix integers and reals in a single expression - for example, the compiler can add an integer to a real.  Using floating point division with the divisor and dividend both integers will result in a real.  Also supports parentheses.
 
-Supports relational operators equal, not equal, less than, less than or equal to, greater than, and greater than or equal to.  Can compare Booleans to Booleans, Integers to Integers, Reals to Reals, or Integers to Reals.  Currently, only use of relational operators is to assign a value to a boolean variable or print the boolean via write() or writeln().
+Supports relational operators equal, not equal, less than, less than or equal to, greater than, and greater than or equal to.  Can compare Booleans to Booleans, Integers to Integers, Reals to Reals, or Integers to Reals.  Supports IF/THEN/ELSE construct.
 
 Write() and writeln() each take a comma-separated list of one or more parameters, with each parameter a variable, a math expression, a numeric literal, a string literal, or the boolean constants 'true' and 'false.'
 
@@ -31,7 +31,7 @@ will make it easier to surpass the functionality of my previous attempt.
 
 ### Unit tests
 
-Compiler2 currently passes 11 of the 60 unit tests created for Compiler, plus an additional 12 tests unique to Compiler2.  You can execute the working
+Compiler2 currently passes 15 of the 60 unit tests created for Compiler, plus an additional 12 tests unique to Compiler2.  You can execute the working
 bits of the unit test suite by running:
 
 ```python3 compiler_test.py```

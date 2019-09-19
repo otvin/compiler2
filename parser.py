@@ -22,6 +22,7 @@ def token_errstr(tok, msg="Invalid Token"):
     assert(isinstance(tok, Token)), "Non-token generating token error {}".format(msg)
     return msg + " {0} in {1}".format(tok.value, str(tok.location))
 
+
 def isrelationaloperator(tokentype):
     # 6.7.2.1 <relational-operator> ::= "=" | "<>" | "<" | ">" | "<=" | ">=" | "in"
     if tokentype in(TokenType.EQUALS, TokenType.NOTEQUAL, TokenType.LESS, TokenType.GREATER,
@@ -30,12 +31,14 @@ def isrelationaloperator(tokentype):
     else:
         return False
 
+
 def ismultiplyingoperator(tokentype):
     # 6.7.2.1 <multiplying-operator> ::= "*" | "/" | "div" | "mod" | "and"
     if tokentype in (TokenType.MULTIPLY, TokenType.DIVIDE, TokenType.IDIV, TokenType.MOD, TokenType.AND):
         return True
     else:
         return False
+
 
 def isaddingoperator(tokentype):
     # 6.7.2.1 <adding-operator> ::= "+" | "-" | "or"

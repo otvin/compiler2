@@ -264,6 +264,7 @@ class TACIFZNode(TACNode):
     def __str__(self):
         return "{} {} GOTO {}".format(str(self.operator), str(self.val), str(self.label))
 
+
 """
 class TACBinaryNodeLiteralLeft(TACNode):
     def __init__(self, result, operator, literal1, arg2):
@@ -315,7 +316,10 @@ class TACBlock:
         if ast.comment != "":
             self.addnode(TACCommentNode(ast.comment))
         tok = ast.token
-        if tok.tokentype in (TokenType.WRITE, TokenType.WRITELN):
+        if tok.tokentype == TokenType.BEGIN:
+            for child in ast.children:
+                self.processast(child, generator)
+        elif tok.tokentype in (TokenType.WRITE, TokenType.WRITELN):
             for child in ast.children:
                 tmp = self.processast(child, generator)
                 self.addnode(TACParamNode(tmp))
