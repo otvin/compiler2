@@ -332,9 +332,50 @@ class Parser:
         else:
             raise Exception("Some Useless Exception")
 
+    def parse_ifstatement(self, parent_ast):
+        # 6.8.3.4 <if-statement> ::= "if" <Boolean-expression> "then" <statement> [else-part]
+        # 6.8.3.4 <else-part> ::= "else" <statement>
+        # 6.7.2.3 <Boolean-expression> ::= <expression>
+        assert self.tokenstream.peektokentype() == TokenType.IF, \
+            "Parser.parse_ifstatement called and 'if' not next token."
+
+        self.tokenstream.setstartpos()
+        ret = AST(self.tokenstream.eattoken(), parent_ast)
+        ret.children.append(self.parse_expression(ret))
+        self.getexpectedtoken(TokenType.THEN)
+        self.tokenstream.setendpos()
+        # this makes the comment "If <condition> Then" which is fine.
+        ret.comment = self.tokenstream.printstarttoend()
+
+        ret.children.append(self.parse_statement(ret))
+        if self.tokenstream.peektokentype() == TokenType.ELSE:
+            self.getexpectedtoken(TokenType.ELSE)
+            # The comment "ELSE" is added in tac_ir.py - that is a bit hacky but it works
+            # TODO - figure out if I can add a comment "ELSE" here and remove that one.
+            ret.children.append(self.parse_statement(ret))
+        return ret
+
+    def parse_conditionalstatement(self, parent_ast):
+        # 6.8.3.3 <conditional-statement> ::= <if-statement> | <case-statement>
+        return self.parse_ifstatement(parent_ast)
+
+    def parse_structuredstatement(self, parent_ast):
+        # 6.8.3.1 - <structured-statement> ::= <compound-statement> | <conditional-statement>
+        #                                       | <repetitive-statement> | <with-statement>
+
+        # only conditionals are supported now.
+        return self.parse_conditionalstatement(parent_ast)
+
     def parse_statement(self, parent_ast):
         # 6.8.1 - <statement> ::= [<label>:] (<simple-statement> | <structured-statement>)
-        return self.parse_simplestatement(parent_ast)
+        # labels are not yet supported
+
+        next_tokentype = self.tokenstream.peektokentype()
+        if next_tokentype == TokenType.IF:
+            # only structured statement supported currently is the "IF" statement.
+            return self.parse_structuredstatement(parent_ast)
+        else:
+            return self.parse_simplestatement(parent_ast)
 
     def parse_statementpart(self, parent_ast):
         # 6.2.1 defines statement-part simply as <statement-part> ::= <compound-statement>

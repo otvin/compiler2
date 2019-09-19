@@ -1,6 +1,6 @@
 import os
 from tac_ir import TACBlock, TACLabelNode, TACParamNode, TACCallSystemFunctionNode, TACUnaryLiteralNode, \
-    TACOperator, TACGenerator, TACCommentNode, TACBinaryNode, TACUnaryNode
+    TACOperator, TACGenerator, TACCommentNode, TACBinaryNode, TACUnaryNode, TACGotoNode, TACIFZNode
 from symboltable import StringLiteral, NumericLiteral, Symbol
 import pascaltypes
 
@@ -119,6 +119,12 @@ class AssemblyGenerator:
                     self.emitcomment(node.comment)
                 elif isinstance(node, TACLabelNode):
                     self.emitlabel(node.label.name)
+                elif isinstance(node, TACGotoNode):
+                    self.emitcode("jmp {}".format(node.label.name))
+                elif isinstance(node, TACIFZNode):
+                    self.emitcode("mov al, [{}]".format(node.val.memoryaddress))
+                    self.emitcode("test al,al")
+                    self.emitcode("jz {}".format(node.label.name))
                 elif isinstance(node, TACParamNode):
                     params.append(node)
                 elif isinstance(node, TACUnaryNode):

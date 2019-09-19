@@ -107,6 +107,8 @@ class TACOperator(Enum):
     CALL = "call"
     COMMENT = "comment"
     INTTOREAL = "is int_to_real"
+    IFZ = "ifz"
+    GOTO = "goto"
 
     def __str__(self):
         return self.value
@@ -241,6 +243,27 @@ class TACBinaryNode(TACNode):
         return "{} := {} {} {}".format(str(self.result), str(self.arg1), str(self.operator), str(self.arg2))
 
 
+class TACGotoNode(TACNode):
+    def __init__(self, label):
+        assert isinstance(label, Label)
+        super().__init__(TACOperator.GOTO)
+        self.label = label
+
+    def __str__(self):
+        return "{} {}".format(str(self.operator), str(self.label))
+
+
+class TACIFZNode(TACNode):
+    def __init__(self, val, label):
+        assert isinstance(val, Symbol)
+        assert isinstance(label, Label)
+        super().__init__(TACOperator.IFZ)
+        self.val = val
+        self.label = label
+
+    def __str__(self):
+        return "{} {} GOTO {}".format(str(self.operator), str(self.val), str(self.label))
+
 """
 class TACBinaryNodeLiteralLeft(TACNode):
     def __init__(self, result, operator, literal1, arg2):
@@ -306,6 +329,27 @@ class TACBlock:
                     self.addnode(TACCallSystemFunctionNode(Label("_WRITEI"), 1))
             if tok.tokentype == TokenType.WRITELN:
                 self.addnode(TACCallSystemFunctionNode(Label("_WRITECRLF"), 0))
+            return None
+        elif tok.tokentype == TokenType.IF:
+            assert len(ast.children) in [2, 3], "TACBlock.processast - IF ASTs must have 2 or 3 children."
+            labeldone = generator.getlabel()
+            condition = self.processast(ast.children[0], generator)
+            if not isinstance(condition.pascaltype, pascaltypes.BooleanType):
+                raise TACException("If statements must be followed by Boolean Expressions: ", tok)
+
+            if len(ast.children) == 2:
+                self.addnode(TACIFZNode(condition, labeldone))
+                self.processast(ast.children[1], generator)
+                self.addnode(TACLabelNode(labeldone))
+            else:
+                labelelse = generator.getlabel()
+                self.addnode(TACIFZNode(condition, labelelse))
+                self.processast(ast.children[1], generator)
+                self.addnode(TACGotoNode(labeldone))
+                self.addnode(TACCommentNode("ELSE"))
+                self.addnode(TACLabelNode(labelelse))
+                self.processast(ast.children[2], generator)
+                self.addnode(TACLabelNode(labeldone))
             return None
         elif tok.tokentype == TokenType.ASSIGNMENT:
             assert len(ast.children) == 2, "TACBlock.processast - Assignment ASTs must have 2 children."
@@ -437,7 +481,7 @@ class TACBlock:
             self.addnode(TACBinaryNode(ret, op, newchild1, newchild2))
             return ret
         else:
-            raise TACException("TACBlock.processast - cannot process token:", tok)
+            raise TACException("TACBlock.processast - cannot process token:", str(tok))
 
 
 class TACGenerator:
@@ -483,7 +527,8 @@ class TACGenerator:
             raise ValueError("Oops!")
 
     def getlabel(self):
-        label = "L_" + str(self.nextlabel)
+        # labels begin with _TAC_L so that they do not collide with the labels generated in asmgenerator.
+        label = Label("_TAC_L" + str(self.nextlabel))
         self.nextlabel += 1
         return label
 
