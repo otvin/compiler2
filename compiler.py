@@ -77,15 +77,34 @@ def compile(infilename, asmfilename=None, objfilename=None, exefilename=None,
         g.printblocks()
 
     ag = AssemblyGenerator(asmfilename, g)
-    ag.generate(objfilename, exefilename)
+    try:
+        ag.generate(objfilename, exefilename)
+    except Exception as err:
+        if verbose:  # set to True to debug
+            traceback.print_exc()
+        retstr += str(err)
+        return retstr
     return retstr
 
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
         print("Usage: python3 compiler.py [filename]")
+        print("Or: python3 -s compiler.py [filename]   {for silent mode}")
         sys.exit()
 
+
+    if sys.argv[1] == '-s':
+        if len(sys.argv) < 3:
+            print("Usage: python3 compiler.py [filename]")
+            print("Or: python3 -s compiler.py [filename]   {for silent mode}")
+            sys.exit()
+        verboseparm = False
+        infileparm= sys.argv[2]
+    else:
+        verboseparm = True
+        infileparm = sys.argv[1]
+
     infilename = sys.argv[1]
-    outstr = compile(infilename, verbose=True)
+    outstr = compile(infileparm, verbose=verboseparm)
     print(outstr)

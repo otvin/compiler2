@@ -31,10 +31,27 @@ will make it easier to surpass the functionality of my previous attempt.
 
 ### Unit tests
 
-Compiler2 currently passes 19 of the 60 unit tests created for Compiler, plus an additional 12 tests unique to Compiler2.  You can execute the working
+Compiler2 currently passes 19 of the 60 unit tests created for Compiler, plus an additional 16 tests unique to Compiler2.  You can execute the working
 bits of the unit test suite by running:
 
 ```python3 compiler_test.py```
+
+Current code coverage:
+
+| File | Coverage |
+|------|---------:|
+|asm_generator.py|96%|
+|filelocation.py|100%|
+|lexer.py|86%|
+|parser.py|84%|
+|pascaltypes.py|76%|
+|symboltable.py|81%|
+|tac_ir.py|91%|
+
+_Code for exceptions that should never occur are excluded.  Regular compiler errors e.g. syntax errors in Pascal code are covered via "compilefail" tests.  Code written for future features, e.g. the code that handles 64-bit integers in spots, does count against code coverage, so I do not forget to remove the "no cover" pragma later_
+ 
+
+
 
 ### Bibliography
 

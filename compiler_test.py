@@ -69,6 +69,8 @@ def do_compilefailtest(infilename, resultfilename):
             # the carriage return is included in the output files to end the line
             comparestr = compiler.compile(infilename) + "\n"
 
+            # TODO remove any .asm file that is generated, as some compiler fails occur after some assembly is written.
+
             resultfile = open(resultfilename, "r")
             resultvalue = resultfile.read()
             resultfile.close()
@@ -90,7 +92,6 @@ def main():
     global NUM_SUCCESSES
 
     dotest("tests/testassign01.pas", "tests/testassign01.out")
-    do_compilefailtest("tests/testassign02.pas", "tests/testassign02.out")
     dotest("tests/testboolean01.pas", "tests/testboolean01.out")
     dotest("tests/testbugfix01.pas", "tests/testbugfix01.out")
     # dotest("tests/testbyref01.pas", "tests/testbyref01.out")
@@ -148,6 +149,7 @@ def main():
     dotest("tests/testrelop01.pas", "tests/testrelop01.out")
     # dotest("tests/testrelop02.pas", "tests/testrelop02.out")
     dotest("tests/testrelop03.pas", "tests/testrelop03.out")
+    dotest("tests/testrelop04.pas", "tests/testrelop04.out")
     # dotest("tests/testscope01.pas", "tests/testscope01.out")
     # dotest("tests/testscope02.pas", "tests/testscope02.out")
     # dotest("tests/testscope03.pas", "tests/testscope03.out")
@@ -161,6 +163,11 @@ def main():
     dotest("tests/testwriteln01.pas", "tests/testwriteln01.out")
     dotest("tests/testwriteln02.pas", "tests/testwriteln02.out")
     dotest("tests/testwriteln03.pas", "tests/testwriteln03.out")
+
+    do_compilefailtest("tests/compilefail01.pas", "tests/compilefail01.out")
+    do_compilefailtest("tests/compilefail02.pas", "tests/compilefail02.out")
+    do_compilefailtest("tests/compilefail03.pas", "tests/compilefail03.out")
+    do_compilefailtest("tests/compilefail04.pas", "tests/compilefail04.out")
 
     print("Tests Attempted: " + str(NUM_ATTEMPTS))
     print("Tests Succeeded: " + str(NUM_SUCCESSES))

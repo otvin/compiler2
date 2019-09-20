@@ -463,9 +463,9 @@ class TACBlock:
             c2type = child2.pascaltype
 
             if isinstance(c1type, pascaltypes.BooleanType) and not isinstance(c2type, pascaltypes.BooleanType):
-                raise TACException("Cannot compare Boolean to non-Boolean:", tok)
+                raise TACException(tac_errstr("Cannot compare Boolean to non-Boolean", tok))
             if isinstance(c2type, pascaltypes.BooleanType) and not isinstance(c1type, pascaltypes.BooleanType):
-                raise TACException("Cannot compare Boolean to non-Boolean:", tok)
+                raise TACException(tac_errstr("Cannot compare Boolean to non-Boolean", tok))
             if isinstance(c1type, pascaltypes.IntegerType) and isinstance(c2type, pascaltypes.RealType):
                 newchild1 = Symbol(generator.gettemporary(), tok.location, pascaltypes.RealType())
                 self.symboltable.add(newchild1)

@@ -80,7 +80,7 @@ class AssemblyGenerator:
                     nextid += 1
                     self.emitcode("{} dq {}".format(litname, lit.value))
                     lit.memoryaddress = litname
-                else:
+                else:  # pragma: no cover
                     raise ASMGeneratorError("Invalid literal type")
 
     def generate_code(self):
@@ -152,7 +152,7 @@ class AssemblyGenerator:
                             reg = "eax"
                         elif node.lval.pascaltype.size == 8:
                             reg = "rax"
-                        else:
+                        else:  # pragma: no cover
                             raise ASMGeneratorError("Invalid Size for assignment")
                         # This may be overkill - but at this point I don't know if I will be using rax for anything
                         # else, so it's safest to preserve since I'm inside a block of code.
@@ -160,7 +160,7 @@ class AssemblyGenerator:
                         self.emitcode("mov {}, [{}]".format(reg, node.arg1.memoryaddress))
                         self.emitcode("mov [{}], {}".format(node.lval.memoryaddress, reg))
                         self.emitcode("pop rax")
-                    else:
+                    else:  # pragma: no cover
                         raise ASMGeneratorError("Invalid operator: {}".format(node.operator))
                 elif isinstance(node, TACUnaryLiteralNode):
                     if isinstance(node.literal1, StringLiteral):
@@ -192,7 +192,7 @@ class AssemblyGenerator:
                                                                    node.literal1.value))
                 elif isinstance(node, TACCallSystemFunctionNode):
                     if node.label.name == "_WRITEI":
-                        if node.numparams != 1:
+                        if node.numparams != 1:  # pragma: no cover
                             raise ASMGeneratorError("Invalid numparams to _WRITEI")
                         self.emitcode("push rdi")
                         self.emitcode("push rsi")
@@ -205,7 +205,7 @@ class AssemblyGenerator:
                             destregister = "esi"
                         elif params[0].paramval.pascaltype.size == 8:
                             destregister = "rsi"
-                        else:
+                        else:  # pragma: no cover
                             raise ASMGeneratorError("Invalid Size for _WRITEI")
                         self.emitcode("mov {}, [{}]".format(destregister, params[0].paramval.memoryaddress))
                         # must pass 0 (in rax) as number of floating point args since printf is variadic
@@ -215,7 +215,7 @@ class AssemblyGenerator:
                         self.emitcode("pop rdi")
                         del params[-1]
                     elif node.label.name == "_WRITER":
-                        if node.numparams != 1:
+                        if node.numparams != 1:  # pragma: no cover
                             raise ASMGeneratorError("Invalid numparams to _WRITER")
                         self.emitcode("push rdi")
                         self.emitcode("mov rdi, _printf_realfmt")
@@ -263,7 +263,7 @@ class AssemblyGenerator:
                         self.emitcode("CALL fflush wrt ..plt")
                         self.emitcode("pop rdi")
                         self.emitcode("")
-                    else:
+                    else:  # pragma: no cover
                         raise ASMGeneratorError("Invalid System Function: {}".format(node.label.name))
                 elif isinstance(node, TACBinaryNode):
                     if isinstance(node.result.pascaltype, pascaltypes.IntegerType):
@@ -295,7 +295,7 @@ class AssemblyGenerator:
                             if node.operator == TACOperator.MOD:
                                 self.emitcode("MOV EAX, EDX", "Remainder of IDIV is in EDX")
                             self.emitcode("mov [{}], eax".format(node.result.memoryaddress))
-                        else:
+                        else:  # pragma: no cover
                             raise ASMGeneratorError("Unrecognized operator: {}".format(node.operator))
                     elif isinstance(node.result.pascaltype, pascaltypes.RealType):
                         if node.operator == TACOperator.MULTIPLY:
@@ -306,7 +306,7 @@ class AssemblyGenerator:
                             op = "subsd"
                         elif node.operator == TACOperator.DIVIDE:
                             op = "divsd"
-                        else:
+                        else:  # pragma: no cover
                             raise ASMGeneratorError("Unrecognized operator: {}".format(node.operator))
                         self.emitcode("movsd xmm0, [{}]".format(node.arg1.memoryaddress))
                         self.emitcode("movsd xmm8, [{}]".format(node.arg2.memoryaddress))
@@ -315,7 +315,7 @@ class AssemblyGenerator:
                     elif isinstance(node.result.pascaltype, pascaltypes.BooleanType):
                         n1type = node.arg1.pascaltype
                         n2type = node.arg2.pascaltype
-                        if type(n1type) != type(n2type):
+                        if type(n1type) != type(n2type):  # pragma: no cover
                             raise ASMGeneratorError("Cannot mix {} and {} with relational operator".format(str(n1type),
                                                                                                            str(n2type)))
                         if isinstance(n1type, pascaltypes.BooleanType) or isinstance(n1type, pascaltypes.IntegerType):
@@ -332,7 +332,7 @@ class AssemblyGenerator:
                                 jumpinstr = "JL"
                             elif node.operator == TACOperator.LESSEQ:
                                 jumpinstr = "JLE"
-                            else:
+                            else:  # pragma: no cover
                                 raise ASMGeneratorError("Invalid Relational Operator {}".format(node.operator))
                         elif isinstance(n1type, pascaltypes.RealType):
                             if node.operator == TACOperator.EQUALS:
@@ -347,9 +347,9 @@ class AssemblyGenerator:
                                 jumpinstr = "JB"
                             elif node.operator == TACOperator.LESSEQ:
                                 jumpinstr = "JBE"
-                            else:
+                            else:  # pragma: no cover
                                 raise ASMGeneratorError("Invalid Relational Operator {}".format(node.operator))
-                        else:
+                        else:  # pragma: no cover
                             raise ASMGeneratorError("Invalid Type {}".format(str(n1type)))
 
                         if isinstance(n1type, pascaltypes.BooleanType):
@@ -374,10 +374,10 @@ class AssemblyGenerator:
                         self.emitcode("mov al, 1")
                         self.emitlabel(labeldone)
                         self.emitcode("mov [{}], al".format(node.result.memoryaddress))
-                    else:
+                    else:  # pragma: no cover
                         raise ASMGeneratorError("Invalid Type {}".format(str(node.result.pascaltype)))
-                else:
-                    raise Exception("Some better exception")
+                else:  # pragma: no cover
+                    raise ASMGeneratorError("Unknown TAC node type: {}".format(type(node)))
 
             if totalstorageneeded > 0:
                 self.emitcode("POP RBP")

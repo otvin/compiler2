@@ -1,4 +1,4 @@
-program testassign02(output);
+program compilefail02(output);
 var
 	a:integer;
 begin
