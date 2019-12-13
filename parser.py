@@ -48,6 +48,22 @@ def isaddingoperator(tokentype):
         return False
 
 
+def startsstructuredstatement(tokentype):
+    # 6.8.3.1 - <structured-statement> ::= <compound-statement> | <conditional-statement>
+    #                                       | <repetitive-statement> | <with-statement>
+
+    # compound statement starts with "begin"
+    # conditional statements start with "if" or "case"
+    # repetitive statements start with "repeat," "while,"or "for"
+    # with statements start with "with"
+
+    if tokentype in (TokenType.BEGIN, TokenType.IF, TokenType.CASE, TokenType.REPEAT, TokenType.WHILE,
+                     TokenType.FOR, TokenType.WITH):
+        return True
+    else:
+        return False
+
+
 class ParseException(Exception):
     pass
 
@@ -411,8 +427,7 @@ class Parser:
 
         next_tokentype = self.tokenstream.peektokentype()
         # TODO make a helper function to see if next token type makes for a structured statement
-        if next_tokentype in (TokenType.IF, TokenType.WHILE, TokenType.BEGIN):
-            # only structured statements supported currently are "IF," "WHILE," and "BEGIN."
+        if startsstructuredstatement(next_tokentype):
             return self.parse_structuredstatement(parent_ast)
         else:
             return self.parse_simplestatement(parent_ast)
