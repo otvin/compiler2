@@ -365,14 +365,42 @@ class Parser:
         # 6.8.3.3 <conditional-statement> ::= <if-statement> | <case-statement>
         return self.parse_ifstatement(parent_ast)
 
+    def parse_whilestatement(self, parent_ast):
+        # TODO - add citation
+        # <while-statement> ::= "while" <Boolean-expression> "do" <statement>
+        # 6.7.2.3 <Boolean-expression> ::= <expression>
+        assert self.tokenstream.peektokentype() == TokenType.WHILE, \
+            "Parser.parse_whilestatement called and 'while' not next token."
+
+        self.tokenstream.setstartpos()
+        ret = AST(self.tokenstream.eattoken(), parent_ast)
+        ret.children.append(self.parse_expression(ret))
+        self.getexpectedtoken(TokenType.DO)
+        self.tokenstream.setendpos()
+        # this makes the comment "while <condition> do" which is fine.
+        ret.comment = self.tokenstream.printstarttoend()
+
+        ret.children.append(self.parse_statement(ret))
+        return ret
+
+    def parse_repetitivestatement(self, parent_ast):
+        # TODO - add citation
+        # <repetitive-statement> ::= <repeat-statement> | <while-statement> | <for-statement>
+
+        # only while statement is currently supported
+        return self.parse_whilestatement(parent_ast)
+
     def parse_structuredstatement(self, parent_ast):
         # 6.8.3.1 - <structured-statement> ::= <compound-statement> | <conditional-statement>
         #                                       | <repetitive-statement> | <with-statement>
 
-        # repetitive-statement and with-statement are not currently supported
+        # with-statement is not currently supported.
+        # while-statement is only type of repetitive statement supported.
 
         if self.tokenstream.peektokentype() == TokenType.BEGIN:
             return self.parse_compoundstatement(parent_ast)
+        elif self.tokenstream.peektokentype() == TokenType.WHILE:
+            return self.parse_repetitivestatement(parent_ast)
         else:
             return self.parse_conditionalstatement(parent_ast)
 
@@ -382,8 +410,9 @@ class Parser:
         assert parent_ast is not None
 
         next_tokentype = self.tokenstream.peektokentype()
-        if next_tokentype in (TokenType.IF, TokenType.BEGIN):
-            # only structured statements supported currently are "IF" and "BEGIN."
+        # TODO make a helper function to see if next token type makes for a structured statement
+        if next_tokentype in (TokenType.IF, TokenType.WHILE, TokenType.BEGIN):
+            # only structured statements supported currently are "IF," "WHILE," and "BEGIN."
             return self.parse_structuredstatement(parent_ast)
         else:
             return self.parse_simplestatement(parent_ast)

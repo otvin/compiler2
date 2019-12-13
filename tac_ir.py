@@ -355,6 +355,19 @@ class TACBlock:
                 self.processast(ast.children[2], generator)
                 self.addnode(TACLabelNode(labeldone))
             return None
+        elif tok.tokentype == TokenType.WHILE:
+            assert len(ast.children) == 2, "TACBlock.processast - While ASTs must have 2 children"
+            labelstart = generator.getlabel()
+            labeldone = generator.getlabel()
+
+            self.addnode(TACLabelNode(labelstart))
+            condition = self.processast(ast.children[0], generator)
+            if not isinstance(condition.pascaltype, pascaltypes.BooleanType):
+                raise TACException("While statements must be followed by Boolean Expressions: ", tok)
+            self.addnode(TACIFZNode(condition, labeldone))
+            self.processast(ast.children[1], generator)
+            self.addnode(TACGotoNode(labelstart))
+            self.addnode(TACLabelNode(labeldone))
         elif tok.tokentype == TokenType.ASSIGNMENT:
             assert len(ast.children) == 2, "TACBlock.processast - Assignment ASTs must have 2 children."
             lval = self.symboltable.fetch(ast.children[0].token.value)
