@@ -368,6 +368,17 @@ class TACBlock:
             self.processast(ast.children[1], generator)
             self.addnode(TACGotoNode(labelstart))
             self.addnode(TACLabelNode(labeldone))
+        elif tok.tokentype == TokenType.REPEAT:
+            labelstart = generator.getlabel()
+            self.addnode(TACLabelNode(labelstart))
+            maxchild = len(ast.children) - 1
+            # TODO - there is a more pythonic way to do this, but I cannot look it up now
+            i = 0
+            while i < maxchild:
+                self.processast(ast.children[i], generator)
+                i += 1
+            condition = self.processast(ast.children[maxchild], generator)
+            self.addnode(TACIFZNode(condition, labelstart))
         elif tok.tokentype == TokenType.ASSIGNMENT:
             assert len(ast.children) == 2, "TACBlock.processast - Assignment ASTs must have 2 children."
             lval = self.symboltable.fetch(ast.children[0].token.value)
