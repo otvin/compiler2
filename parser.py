@@ -48,6 +48,22 @@ def isaddingoperator(tokentype):
         return False
 
 
+def startsstructuredstatement(tokentype):
+    # 6.8.3.1 - <structured-statement> ::= <compound-statement> | <conditional-statement>
+    #                                       | <repetitive-statement> | <with-statement>
+
+    # compound statement starts with "begin"
+    # conditional statements start with "if" or "case"
+    # repetitive statements start with "repeat," "while,"or "for"
+    # with statements start with "with"
+
+    if tokentype in (TokenType.BEGIN, TokenType.IF, TokenType.CASE, TokenType.REPEAT, TokenType.WHILE,
+                     TokenType.FOR, TokenType.WITH):
+        return True
+    else:
+        return False
+
+
 class ParseException(Exception):
     pass
 
@@ -366,14 +382,73 @@ class Parser:
         # 6.8.3.3 <conditional-statement> ::= <if-statement> | <case-statement>
         return self.parse_ifstatement(parent_ast)
 
+    def parse_whilestatement(self, parent_ast):
+        # TODO - add citation
+        # <while-statement> ::= "while" <Boolean-expression> "do" <statement>
+        # 6.7.2.3 <Boolean-expression> ::= <expression>
+        assert self.tokenstream.peektokentype() == TokenType.WHILE, \
+            "Parser.parse_whilestatement called and 'while' not next token."
+
+        self.tokenstream.setstartpos()
+        ret = AST(self.tokenstream.eattoken(), parent_ast)
+        ret.children.append(self.parse_expression(ret))
+        self.getexpectedtoken(TokenType.DO)
+        self.tokenstream.setendpos()
+        # this makes the comment "while <condition> do" which is fine.
+        ret.comment = self.tokenstream.printstarttoend()
+
+        ret.children.append(self.parse_statement(ret))
+        return ret
+
+    def parse_repeatstatement(self, parent_ast):
+        # TODO -add citation
+        # <repeat-statement> ::= "repeat" <statement-sequence> "until" <Boolean-expression>
+        # 6.7.2.3 <Boolean-expression> ::= <expression>
+        assert self.tokenstream.peektokentype() == TokenType.REPEAT, \
+            "Parser.parse_repeatstatement called and 'repeat' not next token."
+
+        self.tokenstream.setstartpos()
+        ret = AST(self.tokenstream.eattoken(), parent_ast)
+        self.tokenstream.setendpos()
+        repeatcomment = self.tokenstream.printstarttoend()
+
+        self.parse_statementsequence(TokenType.UNTIL, ret)
+
+        self.tokenstream.setstartpos()
+        self.getexpectedtoken(TokenType.UNTIL)
+        ret.children.append(self.parse_expression(ret))
+        self.tokenstream.setendpos()
+        untilcomment = self.tokenstream.printstarttoend()
+        # comment will be "repeat until <condition>"
+        ret.comment = "{0} {1}".format(repeatcomment, untilcomment)
+        return ret
+
+    def parse_repetitivestatement(self, parent_ast):
+        # TODO - add citation
+        # <repetitive-statement> ::= <repeat-statement> | <while-statement> | <for-statement>
+        assert self.tokenstream.peektokentype() in (TokenType.WHILE, TokenType.REPEAT, TokenType.FOR), \
+            "Parser.parse_repetitivestatement: called for token that is not While, Repeat, or For"
+
+        # while and repeat are supported
+        if self.tokenstream.peektokentype() == TokenType.WHILE:
+            ret = self.parse_whilestatement(parent_ast)
+        elif self.tokenstream.peektokentype() == TokenType.REPEAT:
+            ret = self.parse_repeatstatement(parent_ast)
+        else:
+            pass # we don't handle FOR yet
+        return ret
+
     def parse_structuredstatement(self, parent_ast):
         # 6.8.3.1 - <structured-statement> ::= <compound-statement> | <conditional-statement>
         #                                       | <repetitive-statement> | <with-statement>
 
-        # repetitive-statement and with-statement are not currently supported
+        # with-statement is not currently supported.
+        # while-statement and repeat-statement are the repetitive statements supported.
 
         if self.tokenstream.peektokentype() == TokenType.BEGIN:
             return self.parse_compoundstatement(parent_ast)
+        elif self.tokenstream.peektokentype() in (TokenType.WHILE, TokenType.REPEAT):
+            return self.parse_repetitivestatement(parent_ast)
         else:
             return self.parse_conditionalstatement(parent_ast)
 
@@ -383,24 +458,35 @@ class Parser:
         assert parent_ast is not None
 
         next_tokentype = self.tokenstream.peektokentype()
-        if next_tokentype in (TokenType.IF, TokenType.BEGIN):
-            # only structured statements supported currently are "IF" and "BEGIN."
+        # TODO make a helper function to see if next token type makes for a structured statement
+        if startsstructuredstatement(next_tokentype):
             return self.parse_structuredstatement(parent_ast)
         else:
             return self.parse_simplestatement(parent_ast)
 
+    def parse_statementsequence(self, endtokentype, current_ast):
+        # 6.8.3.1 defines <statement-sequence> ::= <statement> [ ";" <statement> ]
+
+        # statement sequences are, as they are named, sequences of statements.  However,
+        # the end of the sequence is denoted by different tokens depending on where the
+        # statement sequence is embedded.  Two examples are compound-statement, which is
+        # "begin" <statement-sequence> "end" and the repeat-statement, which is
+        # "repeat" <statement-sequence> "until."
+
+        # current_ast is the location where the children should be added
+        current_ast.children.append(self.parse_statement(current_ast))
+        while self.tokenstream.peektokentype() == TokenType.SEMICOLON:
+            self.getexpectedtoken(TokenType.SEMICOLON)
+            if self.tokenstream.peektokentype() != endtokentype:
+                current_ast.children.append(self.parse_statement(current_ast))
+
     def parse_compoundstatement(self, parent_ast):
         # 6.8.3.2 defines <compound-statement> ::= "begin" <statement-sequence> "end"
-        # 6.8.3.1 defines <statement-sequence> ::= <statement> [ ";" <statement> ]
-        #
         # This function returns an AST node using the BEGIN as the token, and with one child for each
         # statement.
         ret = AST(self.getexpectedtoken(TokenType.BEGIN), parent_ast)
-        ret.children.append(self.parse_statement(parent_ast))
-        while self.tokenstream.peektokentype() == TokenType.SEMICOLON:
-            self.getexpectedtoken(TokenType.SEMICOLON)
-            if self.tokenstream.peektokentype() != TokenType.END:
-                ret.children.append(self.parse_statement(parent_ast))
+        self.parse_statementsequence(TokenType.END, ret)
+
         # The expected token here is an END.  However, if the END does not appear, we will try to keep parsing
         # so that other parse errors could be displayed later.  It is frustrating for an end user to have
         # compilation die on the first error.
