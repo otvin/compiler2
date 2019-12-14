@@ -207,9 +207,10 @@ class ParameterList:
     def __init__(self):
         self.paramlist = []
 
-    def add(self, sym):
+    def add(self, sym, is_byref):
         assert isinstance(sym, Symbol)
-        self.paramlist.append(sym)
+        assert isinstance(is_byref, bool)
+        self.paramlist.append((sym, is_byref))
 
 
 class SymbolTable:

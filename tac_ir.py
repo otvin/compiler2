@@ -70,7 +70,8 @@
 from enum import Enum, unique
 from copy import deepcopy
 from parser import AST, isrelationaloperator
-from symboltable import Symbol, Label, Literal, NumericLiteral, StringLiteral, BooleanLiteral, SymbolTable, LiteralTable
+from symboltable import Symbol, Label, Literal, NumericLiteral, StringLiteral, BooleanLiteral,\
+    SymbolTable, LiteralTable, ParameterList
 from lexer import TokenType, Token
 import pascaltypes
 
@@ -298,7 +299,7 @@ class TACBlock:
         self.label = label
         self.tacnodes = []
         self.symboltable = SymbolTable()
-        # TODO - we need to add some representation of the expected parameters
+        self.paramlist = ParameterList()
 
     def addnode(self, node):
         assert isinstance(node, TACNode)

@@ -70,6 +70,7 @@ class AST:
             assert(isinstance(parent, AST)), "AST.__init__:Parent of AST must be an AST"
         self.parent = parent  # pointer back to the parent node in the AST
         self.symboltable = None  # will only be defined for Procedure, Function, and Program tokens
+        self.paramlist = None # will only be defined for Procedure and Function tokens
         self.attrs = {}  # different types of tokens require different attributes
 
     def rpn_print(self, level=0):
