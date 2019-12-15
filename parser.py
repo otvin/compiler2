@@ -25,8 +25,8 @@ def token_errstr(tok, msg="Invalid Token"):
 
 def isrelationaloperator(tokentype):
     # 6.7.2.1 <relational-operator> ::= "=" | "<>" | "<" | ">" | "<=" | ">=" | "in"
-    if tokentype in(TokenType.EQUALS, TokenType.NOTEQUAL, TokenType.LESS, TokenType.GREATER,
-                    TokenType.LESSEQ, TokenType.GREATEREQ, TokenType.IN):
+    if tokentype in (TokenType.EQUALS, TokenType.NOTEQUAL, TokenType.LESS, TokenType.GREATER,
+                     TokenType.LESSEQ, TokenType.GREATEREQ, TokenType.IN):
         return True
     else:
         return False
@@ -86,7 +86,7 @@ class AST:
             assert(isinstance(parent, AST)), "AST.__init__:Parent of AST must be an AST"
         self.parent = parent  # pointer back to the parent node in the AST
         self.symboltable = None  # will only be defined for Procedure, Function, and Program tokens
-        self.paramlist = None # will only be defined for Procedure and Function tokens
+        self.paramlist = None  # will only be defined for Procedure and Function tokens
         self.attrs = {}  # different types of tokens require different attributes
 
     def rpn_print(self, level=0):
@@ -351,7 +351,9 @@ class Parser:
             if nexttwo[1] == TokenType.ASSIGNMENT:
                 return self.parse_assignmentstatement(parent_ast)
             else:
-                raise ParseException("Identifier seen, unclear how to parse")
+                tok = self.tokenstream.eattoken()
+                errstr = "Identifier '{}' seen at {}, unclear how to parse".format(tok.value, tok.location)
+                raise ParseException(errstr)
         else:
             raise ParseException(token_errstr(self.tokenstream.eattoken()), "Unexpected token in parse_simplestatement")
 
@@ -379,13 +381,12 @@ class Parser:
         return ret
 
     def parse_conditionalstatement(self, parent_ast):
-        # 6.8.3.3 <conditional-statement> ::= <if-statement> | <case-statement>
+        # 6.8.3.3 - <conditional-statement> ::= <if-statement> | <case-statement>
         return self.parse_ifstatement(parent_ast)
 
     def parse_whilestatement(self, parent_ast):
-        # TODO - add citation
-        # <while-statement> ::= "while" <Boolean-expression> "do" <statement>
-        # 6.7.2.3 <Boolean-expression> ::= <expression>
+        # 6.8.3.8 - <while-statement> ::= "while" <Boolean-expression> "do" <statement>
+        # 6.7.2.3 - <Boolean-expression> ::= <expression>
         assert self.tokenstream.peektokentype() == TokenType.WHILE, \
             "Parser.parse_whilestatement called and 'while' not next token."
 
@@ -401,9 +402,8 @@ class Parser:
         return ret
 
     def parse_repeatstatement(self, parent_ast):
-        # TODO -add citation
-        # <repeat-statement> ::= "repeat" <statement-sequence> "until" <Boolean-expression>
-        # 6.7.2.3 <Boolean-expression> ::= <expression>
+        # 6.8.3.7 - <repeat-statement> ::= "repeat" <statement-sequence> "until" <Boolean-expression>
+        # 6.7.2.3 - <Boolean-expression> ::= <expression>
         assert self.tokenstream.peektokentype() == TokenType.REPEAT, \
             "Parser.parse_repeatstatement called and 'repeat' not next token."
 
@@ -424,8 +424,7 @@ class Parser:
         return ret
 
     def parse_repetitivestatement(self, parent_ast):
-        # TODO - add citation
-        # <repetitive-statement> ::= <repeat-statement> | <while-statement> | <for-statement>
+        # 6.8.3.6 - <repetitive-statement> ::= <repeat-statement> | <while-statement> | <for-statement>
         assert self.tokenstream.peektokentype() in (TokenType.WHILE, TokenType.REPEAT, TokenType.FOR), \
             "Parser.parse_repetitivestatement: called for token that is not While, Repeat, or For"
 
@@ -435,7 +434,7 @@ class Parser:
         elif self.tokenstream.peektokentype() == TokenType.REPEAT:
             ret = self.parse_repeatstatement(parent_ast)
         else:
-            pass # we don't handle FOR yet
+            ret = None  # we don't handle FOR yet
         return ret
 
     def parse_structuredstatement(self, parent_ast):
@@ -465,7 +464,7 @@ class Parser:
             return self.parse_simplestatement(parent_ast)
 
     def parse_statementsequence(self, endtokentype, current_ast):
-        # 6.8.3.1 defines <statement-sequence> ::= <statement> [ ";" <statement> ]
+        # 6.8.3.1 - <statement-sequence> ::= <statement> [ ";" <statement> ]
 
         # statement sequences are, as they are named, sequences of statements.  However,
         # the end of the sequence is denoted by different tokens depending on where the
@@ -481,7 +480,7 @@ class Parser:
                 current_ast.children.append(self.parse_statement(current_ast))
 
     def parse_compoundstatement(self, parent_ast):
-        # 6.8.3.2 defines <compound-statement> ::= "begin" <statement-sequence> "end"
+        # 6.8.3.2 - <compound-statement> ::= "begin" <statement-sequence> "end"
         # This function returns an AST node using the BEGIN as the token, and with one child for each
         # statement.
         ret = AST(self.getexpectedtoken(TokenType.BEGIN), parent_ast)

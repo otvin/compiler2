@@ -93,14 +93,13 @@ if __name__ == '__main__':
         print("Or: python3 -s compiler.py [filename]   {for silent mode}")
         sys.exit()
 
-
     if sys.argv[1] == '-s':
         if len(sys.argv) < 3:
             print("Usage: python3 compiler.py [filename]")
             print("Or: python3 -s compiler.py [filename]   {for silent mode}")
             sys.exit()
         verboseparm = False
-        infileparm= sys.argv[2]
+        infileparm = sys.argv[2]
     else:
         verboseparm = True
         infileparm = sys.argv[1]

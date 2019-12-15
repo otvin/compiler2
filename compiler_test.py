@@ -68,6 +68,7 @@ def do_compilefailtest(infilename, resultfilename):
         try:
             # the carriage return is included in the output files to end the line
             comparestr = compiler.compile(infilename) + "\n"
+            # print(comparestr)
 
             # TODO remove any .asm file that is generated, as some compiler fails occur after some assembly is written.
 
@@ -150,6 +151,8 @@ def main():
     # dotest("tests/testrelop02.pas", "tests/testrelop02.out")
     dotest("tests/testrelop03.pas", "tests/testrelop03.out")
     dotest("tests/testrelop04.pas", "tests/testrelop04.out")
+    dotest("tests/testrepeat01.pas", "tests/testrepeat01.out")
+    dotest("tests/testrepeat02.pas", "tests/testrepeat02.out")
     # dotest("tests/testscope01.pas", "tests/testscope01.out")
     # dotest("tests/testscope02.pas", "tests/testscope02.out")
     # dotest("tests/testscope03.pas", "tests/testscope03.out")
@@ -169,6 +172,7 @@ def main():
     do_compilefailtest("tests/compilefail02.pas", "tests/compilefail02.out")
     do_compilefailtest("tests/compilefail03.pas", "tests/compilefail03.out")
     do_compilefailtest("tests/compilefail04.pas", "tests/compilefail04.out")
+    do_compilefailtest("tests/compilefail05.pas", "tests/compilefail05.out")
 
     print("Tests Attempted: " + str(NUM_ATTEMPTS))
     print("Tests Succeeded: " + str(NUM_SUCCESSES))
