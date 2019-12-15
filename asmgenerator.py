@@ -284,7 +284,9 @@ class AssemblyGenerator:
                             self.emitcode("mov eax, [{}]".format(node.arg1.memoryaddress))
                             self.emitcode("mov r11d, [{}]".format(node.arg2.memoryaddress))
                             # Error D.45: 6.7.2.2 of ISO Standard requires testing for division by zero at runtime
-                            # Error D.46: 6.7.2.2 also says it is an error if the second term is not positive
+                            # Error D.46: 6.7.2.2 also says it is an error if the divisor is not positive
+                            # 6.7.2.2 also says that the result of the mod operation must be greater than or
+                            # equal to zero, and less than the divisor.
                             self.emitcode("test r11d, r11d", "check for division by zero")
                             if node.operator == TACOperator.IDIV:
                                 self.emitcode("je _PASCAL_DIVZERO_ERROR")
@@ -294,6 +296,11 @@ class AssemblyGenerator:
                             self.emitcode("idiv r11d")
                             if node.operator == TACOperator.MOD:
                                 self.emitcode("MOV EAX, EDX", "Remainder of IDIV is in EDX")
+                                posmodlabel = self.getnextlabel()
+                                self.emitcode("CMP EAX, 0")
+                                self.emitcode("JGE {}".format(posmodlabel))
+                                self.emitcode("IMUL EAX, -1")
+                                self.emitlabel(posmodlabel)
                             self.emitcode("mov [{}], eax".format(node.result.memoryaddress))
                         else:  # pragma: no cover
                             raise ASMGeneratorError("Unrecognized operator: {}".format(node.operator))
