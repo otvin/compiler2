@@ -212,6 +212,12 @@ class ParameterList:
         assert isinstance(is_byref, bool)
         self.paramlist.append((sym, is_byref))
 
+    def __str__(self):
+        ret = ""
+        for param in self.paramlist:
+            ret += str(param) + "\n"
+        return ret
+
 
 class SymbolTable:
     def __init__(self):
@@ -253,6 +259,8 @@ class SymbolTable:
             ptr = ptr.parent
         return ret
 
-    def dump(self):
+    def __str__(self):
+        ret = ""
         for key in self.symbols.keys():
-            print(repr(self.symbols[key]))
+            ret += repr(self.symbols[key]) + "\n"
+        return ret

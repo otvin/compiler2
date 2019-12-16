@@ -1,6 +1,6 @@
 from enum import Enum, unique, auto
 from lexer import TokenType, Token, TokenStream, LexerException
-from symboltable import StringLiteral, NumericLiteral, LiteralTable, SymbolTable, VariableSymbol
+from symboltable import StringLiteral, NumericLiteral, LiteralTable, SymbolTable, VariableSymbol, ParameterList
 import pascaltypes
 
 '''
@@ -87,7 +87,14 @@ class AST:
         self.parent = parent  # pointer back to the parent node in the AST
         self.symboltable = None  # will only be defined for Procedure, Function, and Program tokens
         self.paramlist = None  # will only be defined for Procedure and Function tokens
+        self.resulttype = None  # will only be defined for Function tokens
         self.attrs = {}  # different types of tokens require different attributes
+
+    def initsymboltable(self):
+        self.symboltable = SymbolTable()
+
+    def initparamlist(self):
+        self.paramlist = ParameterList()
 
     def rpn_print(self, level=0):
         for x in self.children:
@@ -110,7 +117,7 @@ class AST:
         for child in self.children:
             child.dump_symboltables()
         if self.symboltable is not None:
-            self.symboltable.dump()
+            print(str(self.symboltable))
             print("*****")
 
 
@@ -141,6 +148,34 @@ class Parser:
     def parse_typedefinitionpart(self, parent_ast):
         return None
 
+    def parse_typeidentifier(self):
+        # Types can be very flexibile due to user-defined types, which we do not support now.  For now, we will use
+        # <type-identifier> ::= "integer" | "real" | "boolean"
+        #
+        # This function returns the type itself.
+
+        type_token = self.tokenstream.eattoken()
+        if type_token.tokentype == TokenType.INTEGER:
+            symboltype = pascaltypes.IntegerType()
+        elif type_token.tokentype == TokenType.REAL:
+            symboltype = pascaltypes.RealType()
+        elif type_token.tokentype == TokenType.BOOLEAN:
+            symboltype = pascaltypes.BooleanType()
+        else:
+            raise ParseException("Invalid type denoter: {}".format(str(type_token)))
+        return symboltype
+
+    def parse_identifierlist(self):
+        # 6.4.2.3 <identifier-list> ::= <identifier> { "," <identifier> }
+        # 6.1.3 <identifier> ::= <letter> {<letter> | <digit>}
+        #
+        # returns a python list of one or more identifier tokens
+        ret = [self.getexpectedtoken(TokenType.IDENTIFIER)]
+        while self.tokenstream.peektokentype() == TokenType.COMMA:
+            self.getexpectedtoken(TokenType.COMMA)
+            ret.append(self.getexpectedtoken(TokenType.IDENTIFIER))
+        return ret
+
     def parse_variabledeclarationpart(self, parent_ast):
         # 6.2.1 <variable-declaration-part> ::= [ "var" <variable-declaration> ";" {<variable-declaration> ";"} ]
         # 6.5.1 <variable-declaration> ::= <identifier-list> ":" <type-denoter>
@@ -148,27 +183,16 @@ class Parser:
         # 6.1.3 <identifier> ::= <letter> {<letter> | <digit>}
         # type-denoter is technically very flexible because of user-defined types, which are not yet supported,
         # so for right now we will use:
-        # <type-denoter> ::= "integer" | "real" | "Boolean"
+        # <type-denoter> ::= <type-identifier> which will be "integer" | "real" | "Boolean"
         if self.tokenstream.peektokentype() == TokenType.VAR:
             assert isinstance(parent_ast.symboltable, SymbolTable),\
                 "Parser.parsevariabledeclarationpart: missing symboltable"
             self.getexpectedtoken(TokenType.VAR)
             done = False
             while not done:
-                identifier_list = [self.getexpectedtoken(TokenType.IDENTIFIER)]
-                while self.tokenstream.peektokentype() == TokenType.COMMA:
-                    self.getexpectedtoken(TokenType.COMMA)
-                    identifier_list.append(self.getexpectedtoken(TokenType.IDENTIFIER))
+                identifier_list = self.parse_identifierlist()
                 self.getexpectedtoken(TokenType.COLON)
-                type_token = self.tokenstream.eattoken()
-                if type_token.tokentype == TokenType.INTEGER:
-                    symboltype = pascaltypes.IntegerType()
-                elif type_token.tokentype == TokenType.REAL:
-                    symboltype = pascaltypes.RealType()
-                elif type_token.tokentype == TokenType.BOOLEAN:
-                    symboltype = pascaltypes.BooleanType()
-                else:
-                    raise ParseException("Invalid type denoter: {}".format(str(type_token)))
+                symboltype = self.parse_typeidentifier()
                 self.getexpectedtoken(TokenType.SEMICOLON)
                 for identifier_token in identifier_list:
                     parent_ast.symboltable.add(VariableSymbol(identifier_token.value,
@@ -177,8 +201,74 @@ class Parser:
                     done = True
         return None
 
+    def parse_formalparameterlist(self, paramlist):
+        # 6.6.3.1 - <formal-parameter-list> ::= "(" <formal-parameter-section> {";" <formal-parameter-section>} ")"
+        # 6.6.3.1 - <formal-parameter-section> ::= <value-parameter-specification> | <variable-parameter-specification>
+        #                                           | <procedural-parameter-specification>
+        #                                           | <functional-parameter-specification>
+        # 6.6.3.1 - <value-parameter-specification> ::= <identifier-list> ":" <type-identifier>
+        # 6.6.3.1 - <variable-parameter-specification> ::= "var" <identifier-list> ":" <type-identifier>
+        # The procedural/funcationl parameter specification are for passing procedures or functions as parameters,
+        # which we do not support now.
+        assert isinstance(paramlist, ParameterList)
+
+        self.getexpectedtoken(TokenType.LPAREN)
+        if self.tokenstream.peektokentype() == TokenType.VAR:
+            self.getexpectedtoken(TokenType.VAR)
+            is_byref = True
+        else:
+            is_byref = False
+        done = False
+        while not done:
+            identifier_list = self.parse_identifierlist()
+            self.getexpectedtoken(TokenType.COLON)
+            symboltype = self.parse_typeidentifier()
+            for identifier_token in identifier_list:
+                paramlist.add(VariableSymbol(identifier_token.value, identifier_token.location, symboltype), is_byref)
+            if self.tokenstream.peektokentype() == TokenType.SEMICOLON:
+                self.getexpectedtoken(TokenType.SEMICOLON)
+            else:
+                done = True
+        self.getexpectedtoken(TokenType.RPAREN)
+
     def parse_procedureandfunctiondeclarationpart(self, parent_ast):
-        return None
+        # returns a list of ASTs, each corresponding to a procedure or function.
+        # 6.2.1 - <procedure-and-function-declaration-part> ::= {(<procedure-declaration>|<function-declaration>)";"}
+        # 6.6.1 - <procedure-declaration> ::= <procedure-heading> ";" directive
+        #                                   | <procedure-identification> ";" <procedure-block>
+        #                                   | <procedure-heading> ";" <procedure-block>
+        # 6.6.1 - <procedure-heading> ::= "procedure" <identifier> [<formal-parameter-list>]
+        # 6.6.1 - <procedure-block> ::= <block>
+        # 6.6.2 - <function-declaration> ::= <function-heading> ";" directive
+        #                                   | <function-identification> ";" <function-block>
+        #                                   | <function-heading> ";" <function-block>
+        # 6.6.2 - <function-heading> ::= "function" <identifier> [<formal-parameter-list>] ":" <result-type>
+        # 6.6.2 - <result-type> ::= <simple-type-identifier> | <pointer-type-identifier>
+        # simple-type-identifier is defined in 6.4.1 and can be any identifier due to user-defined types.
+        # So, for now we will use:
+        # <simple-type-identifier> ::= <type-identifier> = "integer" | "real" | "boolean"
+        # <directive> is defined in 6.1.4 similar to an identifier, but the only directive we will support is "forward"
+        #
+        # NOTE - there is no closing semicolon in the BNF for procedure-declaration or function-declaration, but
+        # I know that the "end" that ends the statement-part of the block must have a semicolon that follows.
+        # So we grab it here.
+
+        ret = []
+        while self.tokenstream.peektokentype() in [TokenType.PROCEDURE, TokenType.FUNCTION]:
+            procfunc = AST(self.tokenstream.eattoken(), parent_ast)
+            procfunc.initsymboltable()
+            procfunc.initparamlist()
+            procfuncname = self.getexpectedtoken(TokenType.IDENTIFIER)
+            if self.tokenstream.peektokentype() == TokenType.LPAREN:
+                self.parse_formalparameterlist(procfunc.paramlist)
+            if procfunc.token.tokentype == TokenType.FUNCTION:
+                self.getexpectedtoken(TokenType.COLON)
+                procfunc.resulttype = self.parse_typeidentifier()
+            self.getexpectedtoken(TokenType.SEMICOLON)
+            procfunc.children.extend(self.parse_block(procfunc))
+            self.getexpectedtoken(TokenType.SEMICOLON)
+            ret.append(procfunc)
+        return ret
 
     def parse_factor(self, parent_ast):
         # 6.7.1 <factor> ::= <variable-access> | <unsigned-constant> | <function-designator> |
@@ -518,20 +608,23 @@ class Parser:
         # children of the AST being returned by the calling function.
 
         ret = []
+
         a = self.parse_labeldeclarationpart(parent_ast)
         if a is not None:
-            ret.append(a)
+            ret.extend(a)
         a = self.parse_constantdefinitionpart(parent_ast)
         if a is not None:
-            ret.append(a)
+            ret.extend(a)
         a = self.parse_typedefinitionpart(parent_ast)
         if a is not None:
-            ret.append(a)
+            ret.extend(a)
+
         # parse_variabledeclarationpart updates the symbol table, it does not return anything to be added to the AST.
         self.parse_variabledeclarationpart(parent_ast)
+
         a = self.parse_procedureandfunctiondeclarationpart(parent_ast)
         if a is not None:
-            ret.append(a)
+            ret.extend(a)
         # Only the <statement-part> is required; other parts above are optional
         a = self.parse_statementpart(parent_ast)
         ret.append(a)
