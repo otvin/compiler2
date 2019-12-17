@@ -1,6 +1,7 @@
 from enum import Enum, unique, auto
 from lexer import TokenType, Token, TokenStream, LexerException
-from symboltable import StringLiteral, NumericLiteral, LiteralTable, SymbolTable, VariableSymbol, ParameterList
+from symboltable import StringLiteral, NumericLiteral, LiteralTable, SymbolTable, VariableSymbol, ParameterList, \
+    ActivationSymbol, FunctionResultVariableSymbol
 import pascaltypes
 
 '''
@@ -88,6 +89,7 @@ class AST:
         self.symboltable = None  # will only be defined for Procedure, Function, and Program tokens
         self.paramlist = None  # will only be defined for Procedure and Function tokens
         self.resulttype = None  # will only be defined for Function tokens
+        # TODO - is self.attrs really needed, or is it just for the three Program-level attributes?
         self.attrs = {}  # different types of tokens require different attributes
 
     def initsymboltable(self):
@@ -255,19 +257,35 @@ class Parser:
 
         ret = []
         while self.tokenstream.peektokentype() in [TokenType.PROCEDURE, TokenType.FUNCTION]:
-            procfunc = AST(self.tokenstream.eattoken(), parent_ast)
-            procfunc.initsymboltable()
-            procfunc.initparamlist()
-            procfuncname = self.getexpectedtoken(TokenType.IDENTIFIER)
+            tok_procfunc = self.tokenstream.eattoken()
+            assert isinstance(tok_procfunc, Token)
+            ast_procfunc = AST(tok_procfunc, parent_ast)
+            ast_procfunc.initsymboltable()
+            ast_procfunc.initparamlist()
+            tok_procfuncname = self.getexpectedtoken(TokenType.IDENTIFIER)
+            assert isinstance(tok_procfuncname, Token)
             if self.tokenstream.peektokentype() == TokenType.LPAREN:
-                self.parse_formalparameterlist(procfunc.paramlist)
-            if procfunc.token.tokentype == TokenType.FUNCTION:
+                self.parse_formalparameterlist(ast_procfunc.paramlist)
+
+            if tok_procfunc.tokentype == TokenType.FUNCTION:
                 self.getexpectedtoken(TokenType.COLON)
-                procfunc.resulttype = self.parse_typeidentifier()
+                ast_procfunc.resulttype = self.parse_typeidentifier()
+                ast_procfunc.symboltable.add(FunctionResultVariableSymbol(tok_procfuncname.value,
+                                                                          tok_procfuncname.location,
+                                                                          ast_procfunc.resulttype))
+                activationtype = pascaltypes.FunctionType()
+            else:
+                activationtype = pascaltypes.ProcedureType()
+
+            # Procedures and Functions can only be declared in Program scope, or in the scope of other procedures
+            # or functions.  So the parent of the procfunc here has to have a symbol table.
+            parent_ast.symboltable.add(ActivationSymbol(tok_procfuncname.value, tok_procfunc.location,
+                                             activationtype, ast_procfunc.paramlist, ast_procfunc.resulttype))
+
             self.getexpectedtoken(TokenType.SEMICOLON)
-            procfunc.children.extend(self.parse_block(procfunc))
+            ast_procfunc.children.extend(self.parse_block(ast_procfunc))
             self.getexpectedtoken(TokenType.SEMICOLON)
-            ret.append(procfunc)
+            ret.append(ast_procfunc)
         return ret
 
     def parse_factor(self, parent_ast):
