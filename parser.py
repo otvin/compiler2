@@ -94,6 +94,16 @@ class AST:
 
     def initsymboltable(self):
         self.symboltable = SymbolTable()
+        # only go forward if not the root of the AST, else leave the parent of the SymbolTable as None
+        if self.parent is not None:
+            ptr = self.parent
+            while ptr.symboltable is None:
+                ptr = ptr.parent
+                # the root of the AST has a symboltable for globals, so since this node is not the root
+                # it should never get to None.
+                assert ptr is not None, "AST.nearest_symboltable: No symboltable in AST ancestry"
+            assert isinstance(ptr.symboltable, SymbolTable)
+            self.symboltable.parent = ptr.symboltable
 
     def initparamlist(self):
         self.paramlist = ParameterList()
@@ -113,6 +123,7 @@ class AST:
             ptr = ptr.parent
             # the root of the AST has a symboltable for globals, so ptr should never get to None
             assert ptr is not None, "AST.nearest_symboltable: No symboltable in AST ancestry"
+        assert isinstance(ptr.symboltable, SymbolTable)
         return ptr.symboltable
 
     def dump_symboltables(self):
@@ -434,6 +445,14 @@ class Parser:
         ret.comment = self.tokenstream.printstarttoend()
         return ret
 
+    def parse_gotostatement(self, parent_ast):
+        assert parent_ast is not None
+        assert self.tokenstream.peektokentype() == TokenType.GOTO, "Parser_parse_gotostatement called without goto"
+        raise ParseException(token_errstr(self.tokenstream.eattoken()), "goto not handled at this time")
+
+    def parse_procedurestatement(self, parent_ast):
+        return None
+
     def parse_simplestatement(self, parent_ast):
         # 6.8.2.1 - <simple-statement> ::= <empty-statement> | <assignment-statement> | <procedure-statement>
         #                                   | <goto-statement>
@@ -446,22 +465,27 @@ class Parser:
         #                               | <buffer-variable>
         # 6.5.2 - <entire-variable> ::= <variable-identifier>
         # 6.5.2 - <variable-identifier> ::= <identifier>
-
-        # Currently we process variable assignment and write()/writeln() statements.
         assert parent_ast is not None
 
         next_tokentype = self.tokenstream.peektokentype()
 
         if next_tokentype in (TokenType.WRITE, TokenType.WRITELN):
             return self.parse_writeandwriteln(parent_ast)
+        elif next_tokentype == TokenType.GOTO:
+            return self.parse_gotostatement(parent_ast)
         elif next_tokentype == TokenType.IDENTIFIER:
             nexttwo = self.tokenstream.peekmultitokentype(2)
             if nexttwo[1] == TokenType.ASSIGNMENT:
                 return self.parse_assignmentstatement(parent_ast)
             else:
-                tok = self.tokenstream.eattoken()
-                errstr = "Identifier '{}' seen at {}, unclear how to parse".format(tok.value, tok.location)
-                raise ParseException(errstr)
+                next_tokenname = self.tokenstream.peektoken().value
+                sym = parent_ast.nearest_symboltable().fetch(next_tokenname)
+                if isinstance(sym, ActivationSymbol):
+                    return self.parse_procedurestatement(parent_ast)
+                else:
+                    tok = self.tokenstream.eattoken()
+                    errstr = "Identifier '{}' seen at {}, unclear how to parse".format(tok.value, tok.location)
+                    raise ParseException(errstr)
         else:
             raise ParseException(token_errstr(self.tokenstream.eattoken()), "Unexpected token in parse_simplestatement")
 
@@ -661,7 +685,7 @@ class Parser:
 
         ret = AST(self.getexpectedtoken(TokenType.PROGRAM), None)
         # this will be the symbol table for globals
-        ret.symboltable = SymbolTable()
+        ret.initsymboltable()
         tok = self.getexpectedtoken(TokenType.IDENTIFIER)
         ret.attrs[ASTAttributes.PROGRAM_NAME] = tok.value
         if self.tokenstream.peektokentype() == TokenType.LPAREN:

@@ -300,6 +300,14 @@ class TokenStream:
         self.pos += 1
         return ret
 
+    def peektoken(self):
+        try:
+            ret = self.tokenlist[self.pos]
+        except IndexError:
+            raise LexerException("Unexpected end of file")
+        assert isinstance(ret, Token)
+        return ret
+
     def peektokentype(self):
         # returns the type of the next token in the token list, but does not advance the position.  Used
         # when interpretation of a token varies based on the token that follows.

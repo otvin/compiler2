@@ -249,6 +249,7 @@ class SymbolTable:
                 foundit = True
             else:
                 curtable = curtable.parent
+        assert isinstance(ret, Symbol)
         return ret
 
     def exists(self, name):
