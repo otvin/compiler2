@@ -491,9 +491,17 @@ class Parser:
         # However, the AST for both will be the same - b or c as identifiers with a single child with a as an
         # identifier.  The AST will be interpreted when generating the TAC, because at that time the parsing pass has
         # been completed and all the symbol tables will have been built and can be queried.
+        assert isinstance(parent_ast, AST)
 
-        pass
-
+        self.getexpectedtoken(TokenType.LPAREN)
+        done = False
+        while not done:
+            parent_ast.children.append(self.parse_expression(parent_ast))
+            if self.tokenstream.peektokentype() == TokenType.COMMA:
+                self.getexpectedtoken(TokenType.COMMA)
+            else:
+                done = True
+        self.getexpectedtoken(TokenType.RPAREN)
 
     def parse_procedurestatement(self, parent_ast):
         # 6.8.2.3 - <procedure-statement> ::= procedure-identifier ([<actual-parameter-list>] | <read-parameter_list>
@@ -502,10 +510,14 @@ class Parser:
         # 6.6.1 - <procedure-identifier> ::= <identifier>
         assert self.tokenstream.peektokentype() == TokenType.IDENTIFIER, \
             "Parser.parseprocedurestatement called and identifier not next token."
+
+        # TODO - fix the setstartpos/setendpos so that comments can nest, and we can get the comments for
+        # code inside the parameter list parsing.  For now, cannot do that.
         self.tokenstream.setstartpos()
         ret = AST(self.getexpectedtoken(TokenType.IDENTIFIER), parent_ast)
-
-
+        self.tokenstream.setendpos()
+        ret.comment = "Call procedure: {}".format(self.tokenstream.printstarttoend())
+        self.parse_actualparameterlist(ret)
         return ret
 
     def parse_simplestatement(self, parent_ast):
