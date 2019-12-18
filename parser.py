@@ -150,6 +150,7 @@ class Parser:
         if ret.tokentype != tokentype:
             errstr = "Expected {0} but saw '{1}' in {2}".format(str(tokentype), str(ret.value), str(ret.location))
             raise ParseException(errstr)
+        assert isinstance(ret, Token)
         return ret
 
     def parse_labeldeclarationpart(self, parent_ast):
@@ -302,6 +303,9 @@ class Parser:
     def parse_factor(self, parent_ast):
         # 6.7.1 <factor> ::= <variable-access> | <unsigned-constant> | <function-designator> |
         #                    <set-constructor> | "(" <expression> ")" | "not" <factor>
+        # 6.7.1 <unsigned-constant> ::= <unsigned-number> | <character-string> | <constant-identifier> | "nil"
+        # 6.1.7 <character-string> ::= "'" <string-element> {<string-element>} "'"
+
         # TODO - add more than unsigned-constant and ( expression )
         if self.tokenstream.peektokentype() == TokenType.LPAREN:
             self.getexpectedtoken(TokenType.LPAREN)
@@ -312,9 +316,17 @@ class Parser:
                 realtok = self.getexpectedtoken(TokenType.UNSIGNED_REAL)
                 self.literaltable.add(NumericLiteral(realtok.value, realtok.location, pascaltypes.RealType()))
                 ret = AST(realtok, parent_ast)
-            elif self.tokenstream.peektokentype() in (TokenType.UNSIGNED_INT, TokenType.TRUE,
-                                                      TokenType.FALSE, TokenType.IDENTIFIER):
+            elif self.tokenstream.peektokentype() in (TokenType.UNSIGNED_INT, TokenType.TRUE, TokenType.FALSE):
                 ret = AST(self.tokenstream.eattoken(), parent_ast)
+            elif self.tokenstream.peektokentype() == TokenType.CHARSTRING:
+                # literalTable.add() allows adding duplicates
+                tok_charstr = self.getexpectedtoken(TokenType.CHARSTRING)
+                self.literaltable.add(StringLiteral(tok_charstr.value, tok_charstr.location))
+                ret = AST(tok_charstr, parent_ast)
+            elif self.tokenstream.peektokentype() == TokenType.IDENTIFIER:
+                ret = AST(self.tokenstream.eattoken(), parent_ast)
+                # TODO Add here - break the Identifier out separately, if the next token is an lparen, it's a function
+                # invocation, then add the parameters as children.
             else:
                 errtok = self.tokenstream.eattoken()
                 raise ParseException(token_errstr(errtok, "Invalid <unsigned-constant>"))
@@ -394,14 +406,7 @@ class Parser:
 
         done = False
         while not done:
-            if self.tokenstream.peektokentype() == TokenType.CHARSTRING:
-                # LiteralTable.add() allows adding duplicates
-                charstrtok = self.getexpectedtoken(TokenType.CHARSTRING)
-                assert isinstance(charstrtok, Token), "Parser.parse_statement: non-token pulled from stream"
-                self.literaltable.add(StringLiteral(charstrtok.value, charstrtok.location))
-                ret.children.append(AST(charstrtok, ret))
-            else:
-                ret.children.append(self.parse_expression(ret))
+            ret.children.append(self.parse_expression(ret))
             if self.tokenstream.peektokentype() == TokenType.COMMA:
                 self.getexpectedtoken(TokenType.COMMA)
             else:
@@ -450,8 +455,58 @@ class Parser:
         assert self.tokenstream.peektokentype() == TokenType.GOTO, "Parser_parse_gotostatement called without goto"
         raise ParseException(token_errstr(self.tokenstream.eattoken()), "goto not handled at this time")
 
+    def parse_actualparameterlist(self, parent_ast):
+        # 6.7.3 - <actual-parameter-list> ::= "(" <actual-parameter> {"," <actual-parameter>} ")"
+        # 6.7.3 - <actual-parameter> ::= <expression> | <variable-access> | <procedure-identifier>
+        #                                   | <function-identifier>
+        # 6.6.1 - <procedure-identifier> ::= <identifier>
+        # 6.6.2 - <function-identifier> ::= <identifier>
+        # 6.5.1 - <variable-access> ::= <entire-variable> | <component-variable> | <identified-variable>
+        #                               | <buffer-variable>
+        # 6.5.2 - <entire-variable> ::= <variable-identifier>
+        # 6.5.2 - <variable-identifier> ::= <identifier>
+
+        # This function appends each parameter to the parent_ast as a child.
+
+        # The <procedure-identifier> and <function-identifier> are for passing in procedures and functions
+        # as parameters.  We do not support that yet.  Passing the value of a function in as a parameter
+        # would come from the <factor> which in turn comes from the <expression>.
+
+        # note there is a weird corner case here.  Look at the following snippet:
+        # var i:integer;
+        #
+        # function a():integer;  {this is a function that takes no parameters}
+        #   ...
+        # function b(x:integer):integer;
+        #   ...
+        # function c(function q():integer):integer;
+        #
+        # begin
+        #   i:=a;   {this computes a and stores the result in i.  This is unlike C where it would be i=a();}
+        #   i:=b(a);  {this computes a, takes the result and passes it in as a parameter to b}
+        #   i:=c(a);  {this passes the function a as a parameter to c}
+        # end.
+        #
+        # You can't tell the difference between i:=b(a) and i:=c(a) without looking at the parameter lists for b and c.
+        # However, the AST for both will be the same - b or c as identifiers with a single child with a as an
+        # identifier.  The AST will be interpreted when generating the TAC, because at that time the parsing pass has
+        # been completed and all the symbol tables will have been built and can be queried.
+
+        pass
+
+
     def parse_procedurestatement(self, parent_ast):
-        return None
+        # 6.8.2.3 - <procedure-statement> ::= procedure-identifier ([<actual-parameter-list>] | <read-parameter_list>
+        #                                            | <readln-parameter-list> | <write-parameter-list>
+        #                                            | <writeln-parameter-list>)
+        # 6.6.1 - <procedure-identifier> ::= <identifier>
+        assert self.tokenstream.peektokentype() == TokenType.IDENTIFIER, \
+            "Parser.parseprocedurestatement called and identifier not next token."
+        self.tokenstream.setstartpos()
+        ret = AST(self.getexpectedtoken(TokenType.IDENTIFIER), parent_ast)
+
+
+        return ret
 
     def parse_simplestatement(self, parent_ast):
         # 6.8.2.1 - <simple-statement> ::= <empty-statement> | <assignment-statement> | <procedure-statement>
