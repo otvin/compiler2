@@ -291,7 +291,7 @@ class Parser:
 
             # Procedures and Functions can only be declared in Program scope, or in the scope of other procedures
             # or functions.  So the parent of the procfunc here has to have a symbol table.
-            parent_ast.symboltable.add(ActivationSymbol(tok_procfuncname.value, tok_procfunc.location,
+            parent_ast.symboltable.add(ActivationSymbol(tok_procfuncname.value, tok_procfuncname.location,
                                              activationtype, ast_procfunc.paramlist, ast_procfunc.resulttype))
 
             self.getexpectedtoken(TokenType.SEMICOLON)
@@ -305,6 +305,9 @@ class Parser:
         #                    <set-constructor> | "(" <expression> ")" | "not" <factor>
         # 6.7.1 <unsigned-constant> ::= <unsigned-number> | <character-string> | <constant-identifier> | "nil"
         # 6.1.7 <character-string> ::= "'" <string-element> {<string-element>} "'"
+        # 6.7.3 <function-designator> ::= <function-identifier> [<actual-parameter-list>]
+        # 6.6.2 <function-identifier> ::= <identifier>
+        # 6.7.3 <actual-parameter-list> ::= "(" <actual-parameter> {"," <actual-parameter>} ")"
 
         # TODO - add more than unsigned-constant and ( expression )
         if self.tokenstream.peektokentype() == TokenType.LPAREN:
@@ -324,9 +327,12 @@ class Parser:
                 self.literaltable.add(StringLiteral(tok_charstr.value, tok_charstr.location))
                 ret = AST(tok_charstr, parent_ast)
             elif self.tokenstream.peektokentype() == TokenType.IDENTIFIER:
+                # An identifier standalone could either be variable-access or function-designator with
+                # no actual parameter list.  That's fine here, we will disambiguate when generating the TAC.
+                # If we see a left paren however, we have the actual parameter list
                 ret = AST(self.tokenstream.eattoken(), parent_ast)
-                # TODO Add here - break the Identifier out separately, if the next token is an lparen, it's a function
-                # invocation, then add the parameters as children.
+                if self.tokenstream.peektokentype() == TokenType.LPAREN:
+                    self.parse_actualparameterlist(ret)
             else:
                 errtok = self.tokenstream.eattoken()
                 raise ParseException(token_errstr(errtok, "Invalid <unsigned-constant>"))

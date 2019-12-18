@@ -84,8 +84,12 @@ class ActivationType(BaseType):
 
 
 class ProcedureType(ActivationType):
-    pass
+    def __init__(self):
+        super().__init__()
+        self.typename = "procedure activation"
 
 
 class FunctionType(ActivationType):
-    pass
+    def __init__(self):
+        super().__init__()
+        self.typename = "function activation"
