@@ -335,7 +335,7 @@ class TACBlock:
             actsym.label = proclabel
             self.addnode(TACLabelNode(proclabel))
 
-            
+
 
         elif tok.tokentype in (TokenType.WRITE, TokenType.WRITELN):
             for child in ast.children:
