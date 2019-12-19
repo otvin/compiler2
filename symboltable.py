@@ -149,6 +149,18 @@ class ActivationSymbol(Symbol):
         super().__init__(name, location, pascaltype)
         self.paramlist = paramlist
         self.returnpascaltype = returnpascaltype
+        self.label = None
+
+    @property
+    def label(self):
+        return self.__label
+
+    @label.setter
+    def label(self, l):
+        if l is None or isinstance(l, Label):
+            self.__label = l
+        else:  # pragma: no cover
+            raise TypeError("Invalid label")
 
 
 class Label:

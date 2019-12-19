@@ -88,11 +88,10 @@ class AssemblyGenerator:
 
         for block in self.tacgenerator.tacblocks:
             assert isinstance(block, TACBlock)
-            self.emitlabel(block.label.name)
 
-            # align stack pointer
-            # todo - make main an attribute of the block instead of testing for label name
-            if block.label.name == 'main':
+            if block.ismain:
+                self.emitlabel("main")
+                # align stack pointer
                 self.emitcode("AND RSP, -16")
 
             # TODO - if this is a procedure or function block we need to allocate temp space for parameters

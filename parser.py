@@ -275,6 +275,7 @@ class Parser:
             ast_procfunc.initsymboltable()
             ast_procfunc.initparamlist()
             tok_procfuncname = self.getexpectedtoken(TokenType.IDENTIFIER)
+            ast_procfunc.children.append(AST(tok_procfuncname, ast_procfunc))
             assert isinstance(tok_procfuncname, Token)
             if self.tokenstream.peektokentype() == TokenType.LPAREN:
                 self.parse_formalparameterlist(ast_procfunc.paramlist)

@@ -71,7 +71,7 @@ from enum import Enum, unique
 from copy import deepcopy
 from parser import AST, isrelationaloperator
 from symboltable import Symbol, Label, Literal, NumericLiteral, StringLiteral, BooleanLiteral,\
-    SymbolTable, LiteralTable, ParameterList
+    SymbolTable, LiteralTable, ParameterList, ActivationSymbol
 from lexer import TokenType, Token
 import pascaltypes
 
@@ -294,9 +294,9 @@ class TACBlock:
     """ For now, assume a TACBlock represents a Pascal Block.  Not entirely language-independent but
     will work.
     """
-    def __init__(self, label):
-        assert isinstance(label, Label)
-        self.label = label
+    def __init__(self, ismain):
+        assert isinstance(ismain, bool)
+        self.ismain = ismain
         self.tacnodes = []
         self.symboltable = SymbolTable()
         self.paramlist = ParameterList()
@@ -311,7 +311,8 @@ class TACBlock:
 
     # TODO - fix passing the generator around like this it's ugly
     def processast(self, ast, generator):
-        """ returns the Symbol of a temporary that holds the result of this computation """
+        """ returns the Symbol of a temporary that holds the result of this computation, or None """
+
         assert isinstance(ast, AST)
         assert isinstance(generator, TACGenerator)
         if ast.comment != "":
@@ -320,6 +321,22 @@ class TACBlock:
         if tok.tokentype == TokenType.BEGIN:
             for child in ast.children:
                 self.processast(child, generator)
+            return None
+        elif tok.tokentype in (TokenType.PROCEDURE, TokenType.FUNCTION):
+            # first child of a Procedure or Function is an identifier with the name of the proc/func
+            assert len(ast.children) >= 1
+            assert ast.children[0].token.tokentype == TokenType.IDENTIFIER
+            str_procname = ast.children[0].token.value
+            # we need to go to the parent to fetch the activation symbol.  If we do the fetch on
+            # the current node, and this is a function, we will get the symbol that would be the result.
+            actsym = ast.parent.symboltable.fetch(ast.children[0].token.value)
+            assert isinstance(actsym, ActivationSymbol)
+            proclabel = generator.getlabel(str_procname)
+            actsym.label = proclabel
+            self.addnode(TACLabelNode(proclabel))
+
+            
+
         elif tok.tokentype in (TokenType.WRITE, TokenType.WRITELN):
             for child in ast.children:
                 tmp = self.processast(child, generator)
@@ -528,36 +545,34 @@ class TACGenerator:
 
     def generateblock(self, ast):
         assert isinstance(ast, AST)
+        assert ast.token.tokentype in (TokenType.BEGIN, TokenType.PROCEDURE, TokenType.FUNCTION)
         # process the main begin
         if ast.token.tokentype == TokenType.BEGIN:
-            main = TACBlock(Label("main"))
-            main.symboltable.parent = self.globalsymboltable
-            for child in ast.children:
-                main.processast(child, self)
-            return main
-        # when we get to if the token type is function or procedure call, then what I think
-        # we need to do is something like:
-        # paramlist = []
-        # for each child in ast.children:
-        #   paramlist.add(tacblock.processast(child, self)
-        # for each symbol in paramlist
-        #   tacblock.addnode(a node with TACOpearator.PARAM and symbol)
-        # tacblock.addnode(a node with TACOperator.CALL, the label for the proc/func, and the len of paramlist)
+            newblock = TACBlock(True)
         else:
-            raise ValueError("Oops!")
+            newblock = TACBlock(False)
+        newblock.symboltable.parent = self.globalsymboltable
+        newblock.processast(ast, self)
+        return newblock
+
 
     def generate(self, ast):
         assert isinstance(ast, AST)
+        assert ast.token.tokentype == TokenType.PROGRAM
         self.globalsymboltable = deepcopy(ast.symboltable)
-        if ast.token.tokentype == TokenType.PROGRAM:
-            for child in ast.children:
-                self.addblock(self.generateblock(child))
-        else:
-            raise ValueError("Oops!")
+        for child in ast.children:
+            self.addblock(self.generateblock(child))
+        # insure there is exactly one main block
+        mainblockcount = 0
+        for block in self.tacblocks:
+            if block.ismain:
+                mainblockcount += 1
+        assert(mainblockcount == 1), \
+            "TACGenerator.generate created {} main blocks instead of 1".format(str(mainblockcount))
 
-    def getlabel(self):
+    def getlabel(self, labelsuffix = ""):
         # labels begin with _TAC_L so that they do not collide with the labels generated in asmgenerator.
-        label = Label("_TAC_L" + str(self.nextlabel))
+        label = Label("_TAC_L{}_{}".format(str(self.nextlabel),labelsuffix))
         self.nextlabel += 1
         return label
 
