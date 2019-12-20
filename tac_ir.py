@@ -71,7 +71,8 @@ from enum import Enum, unique
 from copy import deepcopy
 from parser import AST, isrelationaloperator
 from symboltable import Symbol, Label, Literal, NumericLiteral, StringLiteral, BooleanLiteral,\
-    SymbolTable, LiteralTable, ParameterList, ActivationSymbol
+    SymbolTable, LiteralTable, ParameterList, ActivationSymbol, Parameter, VariableSymbol, \
+    FunctionResultVariableSymbol
 from lexer import TokenType, Token
 import pascaltypes
 
@@ -110,6 +111,7 @@ class TACOperator(Enum):
     INTTOREAL = "is int_to_real"
     IFZ = "ifz"
     GOTO = "goto"
+    RETURN = "return"
 
     def __str__(self):
         return self.value
@@ -170,6 +172,27 @@ class TACLabelNode(TACNode):
 
     def __str__(self):
         return "{}:".format(self.label)
+
+
+class TACDeclareFunctionNode(TACLabelNode):
+    def __init__(self, label, paramlist, returntype=None):
+        super().__init__(label)
+        assert isinstance(paramlist, ParameterList)
+        self.paramlist = paramlist
+        assert returntype is None or isinstance(returntype, pascaltypes.OrdinalType)
+
+    def __str__(self):
+        return ""
+
+
+class TACFunctionReturnNode(TACNode):
+    def __init__(self, returnval):
+        assert isinstance(returnval, Symbol)
+        super().__init__(TACOperator.RETURN)
+        self.returnval = returnval
+
+    def __str__(self):
+        return "return {}".format(str(self.returnval))
 
 
 class TACParamNode(TACNode):
@@ -293,13 +316,17 @@ class TACBinaryNodeLiteralRight(TACNode):
 class TACBlock:
     """ For now, assume a TACBlock represents a Pascal Block.  Not entirely language-independent but
     will work.
+
+    NOTE: For it really to be a Pascal block, we will need to have TACBlocks within TACBlocks when
+    we allow procedures and functions to be declared within another procedure or function.  This
+    could in theory be done with a TACNode that contains a TACBlock?  Need to figure that out later.
     """
     def __init__(self, ismain):
         assert isinstance(ismain, bool)
         self.ismain = ismain
         self.tacnodes = []
         self.symboltable = SymbolTable()
-        self.paramlist = ParameterList()
+        self.paramlist = None
 
     def addnode(self, node):
         assert isinstance(node, TACNode)
@@ -323,19 +350,48 @@ class TACBlock:
                 self.processast(child, generator)
             return None
         elif tok.tokentype in (TokenType.PROCEDURE, TokenType.FUNCTION):
+            # TODO - when we want to have procedures declared within procedures, this next line will fail.
+            # For now, we're ensuring the Procedure/Function is the first TACNode in the list.  This
+            # matters because we are going to copy the parameter list from the AST to the TACBlock
+            # and cannot do that if we have multiple parameter lists.  We need some other structure.
+            assert len(self.tacnodes) == 0
+
             # first child of a Procedure or Function is an identifier with the name of the proc/func
             assert len(ast.children) >= 1
             assert ast.children[0].token.tokentype == TokenType.IDENTIFIER
             str_procname = ast.children[0].token.value
+            self.paramlist = ast.paramlist
+            # need to copy each parameter into the SymbolTable.  If the parameter is a variable parameter (ByRef),
+            # the type of the symbol is a pointer to the type of the Parameter.  If the parameter is a value
+            # parameter (ByVal) then the type of symbol is same as type of Parameter.
+            # Remember also - Paramter Lists are ordered, but Symbol Tables are not.
+            for param in self.paramlist.paramlist:
+                assert isinstance(param, Parameter)
+                if param.is_byref:
+                    # variable parameters can only have limited types, see 6.6.3.1 for details
+                    newsymtype = pascaltypes.PointerType(param.symbol.pascaltype)
+                    newsym = VariableSymbol(param.symbol.name, param.symbol.location, newsymtype)
+                    self.symboltable.add(newsym)
+                else:
+                    self.symboltable.add(param.symbol)
+            if tok.tokentype == TokenType.FUNCTION:
+                # need the name of the function in the symbol table as well so we can assign to it
+                sym_result = ast.symboltable.fetch(str_procname)
+                assert isinstance(sym_result, FunctionResultVariableSymbol)
+                self.symboltable.add(sym_result)
+
             # we need to go to the parent to fetch the activation symbol.  If we do the fetch on
             # the current node, and this is a function, we will get the symbol that would be the result.
-            actsym = ast.parent.symboltable.fetch(ast.children[0].token.value)
+            actsym = self.symboltable.parent.fetch(str_procname)
             assert isinstance(actsym, ActivationSymbol)
             proclabel = generator.getlabel(str_procname)
             actsym.label = proclabel
             self.addnode(TACLabelNode(proclabel))
+            for child in ast.children[1:]:
+                self.processast(child, generator)
 
-
+            if tok.tokentype == TokenType.FUNCTION:
+                self.addnode(TACFunctionReturnNode(self.symboltable.fetch(str_procname)))
 
         elif tok.tokentype in (TokenType.WRITE, TokenType.WRITELN):
             for child in ast.children:
@@ -555,7 +611,6 @@ class TACGenerator:
         newblock.processast(ast, self)
         return newblock
 
-
     def generate(self, ast):
         assert isinstance(ast, AST)
         assert ast.token.tokentype == TokenType.PROGRAM
@@ -570,9 +625,9 @@ class TACGenerator:
         assert(mainblockcount == 1), \
             "TACGenerator.generate created {} main blocks instead of 1".format(str(mainblockcount))
 
-    def getlabel(self, labelsuffix = ""):
+    def getlabel(self, labelsuffix=""):
         # labels begin with _TAC_L so that they do not collide with the labels generated in asmgenerator.
-        label = Label("_TAC_L{}_{}".format(str(self.nextlabel),labelsuffix))
+        label = Label("_TAC_L{}_{}".format(str(self.nextlabel), labelsuffix))
         self.nextlabel += 1
         return label
 

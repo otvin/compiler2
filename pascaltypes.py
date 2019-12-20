@@ -55,7 +55,8 @@ class PointerType(BaseType):
     def __init__(self, pointstotype):
         assert isinstance(pointstotype, BaseType)
         super().__init__()
-        self.size = 4
+        self.typename = "pointer"
+        self.size = 8
         self.pointstotype = pointstotype
 
 
@@ -69,6 +70,7 @@ class ArrayType(StructuredType):
     def __init__(self, arrayoftype, minindex, maxindex):
         assert isinstance(arrayoftype, BaseType)
         super().__init__()
+        self.typename = "array of {}".format(str(arrayoftype))
         self.minindex = minindex
         self.maxindex = maxindex
         self.size = (maxindex-minindex+1) * arrayoftype.size
@@ -77,6 +79,7 @@ class ArrayType(StructuredType):
 class StringType(ArrayType):
     def __init__(self, maxindex):
         super().__init__(CharacterType(), 1, maxindex)
+        self.typename = "string"
 
 
 class ActivationType(BaseType):

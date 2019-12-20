@@ -1,7 +1,7 @@
 from enum import Enum, unique, auto
 from lexer import TokenType, Token, TokenStream, LexerException
 from symboltable import StringLiteral, NumericLiteral, LiteralTable, SymbolTable, VariableSymbol, ParameterList, \
-    ActivationSymbol, FunctionResultVariableSymbol
+    ActivationSymbol, FunctionResultVariableSymbol, Parameter
 import pascaltypes
 
 '''
@@ -88,7 +88,6 @@ class AST:
         self.parent = parent  # pointer back to the parent node in the AST
         self.symboltable = None  # will only be defined for Procedure, Function, and Program tokens
         self.paramlist = None  # will only be defined for Procedure and Function tokens
-        self.resulttype = None  # will only be defined for Function tokens
         # TODO - is self.attrs really needed, or is it just for the three Program-level attributes?
         self.attrs = {}  # different types of tokens require different attributes
 
@@ -238,7 +237,8 @@ class Parser:
             self.getexpectedtoken(TokenType.COLON)
             symboltype = self.parse_typeidentifier()
             for identifier_token in identifier_list:
-                paramlist.add(VariableSymbol(identifier_token.value, identifier_token.location, symboltype), is_byref)
+                vsym = VariableSymbol(identifier_token.value, identifier_token.location, symboltype)
+                paramlist.add(Parameter(vsym, is_byref))
             if self.tokenstream.peektokentype() == TokenType.SEMICOLON:
                 self.getexpectedtoken(TokenType.SEMICOLON)
             else:
@@ -282,18 +282,26 @@ class Parser:
 
             if tok_procfunc.tokentype == TokenType.FUNCTION:
                 self.getexpectedtoken(TokenType.COLON)
-                ast_procfunc.resulttype = self.parse_typeidentifier()
+                resulttype = self.parse_typeidentifier()
+                # 6.6.2 - functions can only return simple types or pointers
+                if not (isinstance(resulttype, pascaltypes.SimpleType) or
+                        isinstance(resulttype, pascaltypes.PointerType)):
+                    errstr = "Function {} has invalid return type: {} at {}".format(tok_procfuncname.value,
+                                                                                    str(resulttype),
+                                                                                    str(tok_procfunc.location))
+                    raise ParseException(errstr)
                 ast_procfunc.symboltable.add(FunctionResultVariableSymbol(tok_procfuncname.value,
                                                                           tok_procfuncname.location,
-                                                                          ast_procfunc.resulttype))
+                                                                          resulttype))
                 activationtype = pascaltypes.FunctionType()
             else:
+                resulttype = None
                 activationtype = pascaltypes.ProcedureType()
 
             # Procedures and Functions can only be declared in Program scope, or in the scope of other procedures
             # or functions.  So the parent of the procfunc here has to have a symbol table.
             parent_ast.symboltable.add(ActivationSymbol(tok_procfuncname.value, tok_procfuncname.location,
-                                             activationtype, ast_procfunc.paramlist, ast_procfunc.resulttype))
+                                                        activationtype, ast_procfunc.paramlist, resulttype))
 
             self.getexpectedtoken(TokenType.SEMICOLON)
             ast_procfunc.children.extend(self.parse_block(ast_procfunc))

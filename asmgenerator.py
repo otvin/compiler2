@@ -196,13 +196,14 @@ class AssemblyGenerator:
                         self.emitcode("push rdi")
                         self.emitcode("push rsi")
                         self.emitcode("mov rdi, _printf_intfmt")
-                        if params[0].paramval.pascaltype.size == 1:
+                        param = params[-1]
+                        if param.paramval.pascaltype.size == 1:
                             destregister = "sil"
-                        elif params[0].paramval.pascaltype.size == 2:
+                        elif param.paramval.pascaltype.size == 2:
                             destregister = "si"
-                        elif params[0].paramval.pascaltype.size == 4:
+                        elif param.paramval.pascaltype.size == 4:
                             destregister = "esi"
-                        elif params[0].paramval.pascaltype.size == 8:
+                        elif param.paramval.pascaltype.size == 8:
                             destregister = "rsi"
                         else:  # pragma: no cover
                             raise ASMGeneratorError("Invalid Size for _WRITEI")
@@ -218,7 +219,7 @@ class AssemblyGenerator:
                             raise ASMGeneratorError("Invalid numparams to _WRITER")
                         self.emitcode("push rdi")
                         self.emitcode("mov rdi, _printf_realfmt")
-                        self.emitcode("movsd xmm0, [{}]".format(params[0].paramval.memoryaddress))
+                        self.emitcode("movsd xmm0, [{}]".format(params[-1].paramval.memoryaddress))
                         self.emitcode("mov rax, 1", "1 floating point param")
                         self.emitcode("call printf wrt ..plt")
                         self.emitcode("pop rdi")
@@ -227,7 +228,7 @@ class AssemblyGenerator:
                         self.emitcode("push rdi")
                         self.emitcode("push rsi")
                         self.emitcode("mov rdi, _printf_strfmt")
-                        self.emitcode("mov rsi, [{}]".format(params[0].paramval.memoryaddress))
+                        self.emitcode("mov rsi, [{}]".format(params[-1].paramval.memoryaddress))
                         self.emitcode("mov rax, 0")
                         self.emitcode("call printf wrt ..plt")
                         self.emitcode("pop rsi")
@@ -237,7 +238,7 @@ class AssemblyGenerator:
                         self.emitcode("push rdi")
                         self.emitcode("push rsi")
                         self.emitcode("mov rdi, _printf_strfmt")
-                        self.emitcode("mov al, [{}]".format(params[0].paramval.memoryaddress))
+                        self.emitcode("mov al, [{}]".format(params[-1].paramval.memoryaddress))
                         self.emitcode("test al, al")
                         labelfalse = self.getnextlabel()
                         labelprint = self.getnextlabel()

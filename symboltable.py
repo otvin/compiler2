@@ -156,9 +156,9 @@ class ActivationSymbol(Symbol):
         return self.__label
 
     @label.setter
-    def label(self, l):
-        if l is None or isinstance(l, Label):
-            self.__label = l
+    def label(self, lab):
+        if lab is None or isinstance(lab, Label):
+            self.__label = lab
         else:  # pragma: no cover
             raise TypeError("Invalid label")
 
@@ -220,14 +220,27 @@ class Label:
         return self.name
 
 
+class Parameter:
+    def __init__(self, symbol, is_byref):
+        assert isinstance(symbol, Symbol)
+        assert isinstance(is_byref, bool)
+        self.symbol = symbol
+        self.is_byref = is_byref
+
+    def __str__(self):
+        ret = str(self.symbol)
+        if self.is_byref:
+            ret = "VAR " + ret
+        return ret
+
+
 class ParameterList:
     def __init__(self):
         self.paramlist = []
 
-    def add(self, sym, is_byref):
-        assert isinstance(sym, Symbol)
-        assert isinstance(is_byref, bool)
-        self.paramlist.append((sym, is_byref))
+    def add(self, param):
+        assert isinstance(param, Parameter)
+        self.paramlist.append(param)
 
     def __str__(self):
         ret = ""
