@@ -1,13 +1,36 @@
 import os
 from tac_ir import TACBlock, TACLabelNode, TACParamNode, TACCallSystemFunctionNode, TACUnaryLiteralNode, \
-    TACOperator, TACGenerator, TACCommentNode, TACBinaryNode, TACUnaryNode, TACGotoNode, TACIFZNode
-from symboltable import StringLiteral, NumericLiteral, Symbol
+    TACOperator, TACGenerator, TACCommentNode, TACBinaryNode, TACUnaryNode, TACGotoNode, TACIFZNode, \
+    TACFunctionReturnNode, TACCallFunctionNode
+from symboltable import StringLiteral, NumericLiteral, Symbol, Parameter
 import pascaltypes
 
 
 class ASMGeneratorError(Exception):
     pass
 
+
+# helper functions
+def intparampos_to_register(pos):
+    # First six integer parameters to functions are stored in registers.
+    # This function converts the position in the function parameter list to a register
+    # once we get > 6 parameters it will be stack pointer offsets
+    assert pos >= 1 and pos <= 6
+
+    if pos == 1:
+        ret = "RDI"
+    elif pos == 2:
+        ret = "RSI"
+    elif pos == 3:
+        ret = "RDX"
+    elif pos == 4:
+        ret = "RCX"
+    elif pos == 5:
+        ret = "R8"
+    elif pos == 6:
+        ret = "R9"
+
+    return ret
 
 # TODO - https://stackoverflow.com/questions/41573502/why-doesnt-gcc-use-partial-registers - when we get to types that
 # are 1 or 2 bytes, need to make sure we don't get in trouble.
@@ -40,6 +63,14 @@ class AssemblyGenerator:
 
     def emitcomment(self, commentstr):
         self.emitln("; {}".format(commentstr))
+
+    def emitpushxmmreg(self, reg):
+        self.emitcode("SUB RSP, 16", "PUSH " + reg)
+        self.emitcode("MOVDQU [RSP], " + reg)
+
+    def emitpopxmmreg(self, reg):
+        self.emitcode("MOVDQU " + reg + ", [RSP]", "POP " + reg)
+        self.emitcode("ADD RSP, 16")
 
     def getnextlabel(self):
         ret = "_L" + str(self.maxlabelnum)
@@ -93,9 +124,10 @@ class AssemblyGenerator:
                 self.emitlabel("main")
                 # align stack pointer
                 self.emitcode("AND RSP, -16")
-
-            # TODO - if this is a procedure or function block we need to allocate temp space for parameters
-            # pass #1 - compute local storage needs
+                tacnodelist = block.tacnodes
+            else:
+                self.emitlabel(block.tacnodes[0].label.name)
+                tacnodelist = block.tacnodes[1:]
 
             totalstorageneeded = 0  # measured in bytes
 
@@ -113,7 +145,57 @@ class AssemblyGenerator:
                 totalstorageneeded += 16 - (totalstorageneeded % 16)
                 self.emitcode("SUB RSP, " + str(totalstorageneeded), "allocate local storage")
 
-            for node in block.tacnodes:
+                if not block.ismain:
+                    # it's a procedure or function, copy the parameters into local storage
+
+                    '''
+                    numintparams = 0
+                    numsseparams = 0
+                    paramstackoffset = 0  # if we have too many parameters, they are pushed on the stack before the call
+                    for param in block.paramlist:
+                        # Integer parameters - passed in rdi, rsi, rdx,rcx, r8, r9 in that order
+                        # Booleans are passed as integers, and need the full 8 bytes.
+                        # Real parameters - passed in xmm0..xmm7
+                        # Variable parameters - we will actually get the pointer to the parameter
+                        # which are also 8 bytes.
+                        paramsym = param.symbol
+                        localsym = block.symboltable.fetch(paramsym.name)
+                        t = paramsym.pascaltype
+                        is_byref = param.is_byref
+                        if is_byref or isinstance(t, pascaltypes.IntegerType) or isinstance(t, pascaltypes.BooleanType):
+                            numintparams += 1
+                            reg = intparampos_to_register(numintparams)
+                            self.emitcode("mov [{}], {}".format(local))
+                    '''
+                    for param in block.paramlist:
+                        localsym = block.symboltable.fetch(param.symbol.name)
+                        if param.is_byref:
+                            reg = "rax"
+                        elif param.symbol.pascaltype.size == 1:
+                            reg = "al"
+                        elif param.symbol.pascaltype.size == 2:
+                            reg = "ax"
+                        elif param.symbol.pascaltype.size == 4:
+                            reg = "eax"
+                        elif param.symbol.pascaltype.size == 8:
+                            reg = "rax"
+                        else:  # pragma: no cover
+                            raise ASMGeneratorError("Invalid Size for parameter")
+                        self.emitcode("push RAX")
+                        # TODO - this will break when we have so many parameters that they will get
+                        # passed on the stack instead of in a register.
+                        if not param.is_byref and isinstance(param.symbol.pascaltype, pascaltypes.RealType):
+                            # the param memory address is one of the xmm registers.
+                            self.emitcode("movsd {}, {}".format(reg, param.symbol.memoryaddress),
+                                          "Copy parameter {} to stack".format(param.symbol.name))
+                        else:
+                            # the param memory address is a register
+                            self.emitcode("mov {}, {}".format(reg, param.symbol.memoryaddress),
+                                          "Copy parameter {} to stack".format(param.symbol.name))
+                        self.emitcode("mov [{}], {}".format(localsym.memoryaddress, reg))
+                        self.emitcode("pop RAX")
+
+            for node in tacnodelist:
                 if isinstance(node, TACCommentNode):
                     self.emitcomment(node.comment)
                 elif isinstance(node, TACLabelNode):
@@ -126,6 +208,11 @@ class AssemblyGenerator:
                     self.emitcode("jz {}".format(node.label.name))
                 elif isinstance(node, TACParamNode):
                     params.append(node)
+                elif isinstance(node, TACFunctionReturnNode):
+                    if isinstance(node.returnval, Symbol):
+                        # do the function returning stuff here
+                        # the "ret" itself is emitted below.
+                        pass
                 elif isinstance(node, TACUnaryNode):
                     if node.operator == TACOperator.INTTOREAL:
                         if node.arg1.pascaltype.size in (1, 2):
@@ -156,9 +243,35 @@ class AssemblyGenerator:
                         # This may be overkill - but at this point I don't know if I will be using rax for anything
                         # else, so it's safest to preserve since I'm inside a block of code.
                         self.emitcode("push rax")
-                        self.emitcode("mov {}, [{}]".format(reg, node.arg1.memoryaddress))
-                        self.emitcode("mov [{}], {}".format(node.lval.memoryaddress, reg))
+
+                        arg1_is_byref = False
+                        lval_is_byref = False
+                        if block.paramlist is not None:
+                            tmp_param = block.paramlist.fetch(node.arg1.name)
+                            if tmp_param is not None:
+                                arg1_is_byref = tmp_param.is_byref
+                            tmp_param = block.paramlist.fetch(node.lval.name)
+                            if tmp_param is not None:
+                                lval_is_byref = tmp_param.is_byref
+
+                        # first, get the arg1 into reg.  If arg1 is a byref parameter, we need to
+                        # dereference the pointer.
+                        if arg1_is_byref:
+                            self.emitcode("mov r11, [{}]".format(node.arg1.memoryaddress))
+                            self.emitcode("mov {}, [r11]".format(reg))
+                        else:
+                            self.emitcode("mov {}, [{}]".format(reg, node.arg1.memoryaddress))
+
+                        # now, get the value from reg into lval.  If lval is a byref parameter, we
+                        # need to dereference the pointer.
+                        if lval_is_byref:
+                            self.emitcode("mov r11, [{}]".format(node.lval.memoryaddress))
+                            self.emitcode("mov [r11], {}".format(reg))
+                        else:
+                            self.emitcode("mov [{}], {}".format(node.lval.memoryaddress, reg))
+
                         self.emitcode("pop rax")
+
                     else:  # pragma: no cover
                         raise ASMGeneratorError("Invalid operator: {}".format(node.operator))
                 elif isinstance(node, TACUnaryLiteralNode):
@@ -189,6 +302,44 @@ class AssemblyGenerator:
                                 raise ASMGeneratorError("Invalid Size for assignment")
                             self.emitcode("mov [{}], {} {}".format(node.lval.memoryaddress, sizedirective,
                                                                    node.literal1.value))
+                elif isinstance(node, TACCallFunctionNode) and \
+                        not isinstance(node, TACCallSystemFunctionNode):
+                    assert len(params) >= node.numparams
+                    localparamlist = params[(-1 * node.numparams):]
+                    numintparams = 0
+                    numrealparams = 0
+                    # remember - pointers count as int parameters
+                    for param in localparamlist:
+                        print(type(param))
+                        assert isinstance(param, Parameter)
+                        if param.is_byref:
+                            pass
+                        elif isinstance(param.symbol.pascaltype, pascaltypes.IntegerType) or \
+                                isinstance(param.symbol.pascaltype, pascaltypes.BooleanType):
+                            numintparams += 1
+                            assert numintparams <= 6  # TODO - remove when we can handle more
+                            reg = intparampos_to_register(numintparams)
+                            self.emitcode("PUSH {}".format(reg))
+
+                            # WHAT IF WE'RE PASSING IN A LITERAL INSTEAD OF A VARIABLE?
+                            # HOW DO WE GET THE [rel {}] in here?
+                            self.emitcode("mov {}, [{}]".format(reg, param.symbol.memoryaddress))
+                            # HOW DO I GET THE PARAMETER IN THE ACTIVATION SYMBOL TO HAVE THIS ADDRESS
+                            # NEED TO BE ABLE TO CONNECT THE CALL TO THE DECLARATION
+                        elif isinstance(param.symbol.pascaltype, pascaltypes.RealType):
+                            reg = "xmm{}".format(numrealparams)
+                            numrealparams += 1
+                            assert numrealparams <= 8
+                            self.emitpushxmmreg(reg)
+                            self.emitcode("mov r11, [{}]".format(param.symbol.memoryaddress))
+                            self.emitcode("movsd {}, r11".format(reg))
+                        else:
+                            raise ASMGeneratorError("Invalid Parameter Type")
+                    self.emitcode("call {}".format(node.label), "insert comment here")
+
+                    #POP ALL THE PARAMETER REGISTERS OFF
+
+                    del params[(-1 * node.numparams):]
                 elif isinstance(node, TACCallSystemFunctionNode):
                     if node.label.name == "_WRITEI":
                         if node.numparams != 1:  # pragma: no cover
@@ -207,7 +358,7 @@ class AssemblyGenerator:
                             destregister = "rsi"
                         else:  # pragma: no cover
                             raise ASMGeneratorError("Invalid Size for _WRITEI")
-                        self.emitcode("mov {}, [{}]".format(destregister, params[0].paramval.memoryaddress))
+                        self.emitcode("mov {}, [{}]".format(destregister, param.paramval.memoryaddress))
                         # must pass 0 (in rax) as number of floating point args since printf is variadic
                         self.emitcode("mov rax, 0")
                         self.emitcode("call printf wrt ..plt")
@@ -388,6 +539,9 @@ class AssemblyGenerator:
 
             if totalstorageneeded > 0:
                 self.emitcode("POP RBP")
+            if not block.ismain:
+                self.emitcode("RET")
+
 
     def generate_errorhandlingcode(self):
         # overflow

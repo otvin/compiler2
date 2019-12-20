@@ -389,7 +389,7 @@ class TACBlock:
                 self.symboltable.add(sym_result)
 
             # we need to go to the parent to fetch the activation symbol.  If we do the fetch on
-            # the current node, and this is a function, we will get the symbol that would be the result.
+            # the current node, and this is a function, we will instead get the symbol that would hold the result.
             actsym = self.symboltable.parent.fetch(str_procname)
             assert isinstance(actsym, ActivationSymbol)
             proclabel = generator.getlabel(str_procname)

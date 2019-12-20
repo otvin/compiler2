@@ -242,6 +242,27 @@ class ParameterList:
         assert isinstance(param, Parameter)
         self.paramlist.append(param)
 
+    def fetch(self, str_paramname):
+        # returns None if not found
+        ret = None
+        for param in self.paramlist:
+            if param.symbol.name == str_paramname:
+                ret = param
+                break
+        return ret
+
+    def __iter__(self):
+        self.__pos = 0
+        return(self)
+
+    def __next__(self):
+        try:
+            ret = self.paramlist[self.__pos]
+            self.__pos += 1
+        except IndexError:
+            raise StopIteration
+        return ret
+
     def __str__(self):
         ret = ""
         for param in self.paramlist:
