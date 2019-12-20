@@ -187,12 +187,15 @@ class TACDeclareFunctionNode(TACLabelNode):
 
 class TACFunctionReturnNode(TACNode):
     def __init__(self, returnval):
-        assert isinstance(returnval, Symbol)
+        assert returnval is None or isinstance(returnval, Symbol)
         super().__init__(TACOperator.RETURN)
         self.returnval = returnval
 
     def __str__(self):
-        return "return {}".format(str(self.returnval))
+        retstr = "return"
+        if self.returnval is not None:
+            retstr += " " + str(self.returnval)
+        return retstr
 
 
 class TACParamNode(TACNode):
@@ -206,21 +209,26 @@ class TACParamNode(TACNode):
 
 
 class TACCallFunctionNode(TACNode):
-    def __init__(self, label, numparams):
+    def __init__(self, label, numparams, lval=None):
         assert isinstance(label, Label)
         assert isinstance(numparams, int)
+        assert lval is None or isinstance(lval, Symbol)
         assert numparams >= 0
         super().__init__(TACOperator.CALL)
         self.label = label
         self.numparams = numparams
+        self.lval = lval
 
     def __str__(self):
-        return "{} {} {}".format(str(self.operator), self.label, str(self.numparams))
+        if self.lval is None:
+            return "{} {} {}".format(str(self.operator), self.label, str(self.numparams))
+        else:
+            return "{} := {} {} {}".format(str(self.lval), str(self.operator), self.label, str(self.numparams))
 
 
 class TACCallSystemFunctionNode(TACCallFunctionNode):
-    def __init__(self, label, numparams):
-        super().__init__(label, numparams)
+    def __init__(self, label, numparams, lval=None):
+        super().__init__(label, numparams, lval)
 
 
 class TACUnaryNode(TACNode):
@@ -392,6 +400,8 @@ class TACBlock:
 
             if tok.tokentype == TokenType.FUNCTION:
                 self.addnode(TACFunctionReturnNode(self.symboltable.fetch(str_procname)))
+            else:
+                self.addnode(TACFunctionReturnNode(None))
 
         elif tok.tokentype in (TokenType.WRITE, TokenType.WRITELN):
             for child in ast.children:
@@ -470,9 +480,31 @@ class TACBlock:
             self.addnode(TACUnaryNode(lval, TACOperator.ASSIGN, newrval))
             return lval
         elif tok.tokentype == TokenType.IDENTIFIER:
-            # TODO - at some point the identifier can be a procedure or function call but for now it's just a variable
-            ret = self.symboltable.fetch(tok.value)
-            return ret
+            sym = self.symboltable.fetch(tok.value)
+            if isinstance(sym, FunctionResultVariableSymbol):
+                # we know it is a function, so get the activation symbol
+                sym = self.symboltable.parent.fetch(tok.value)
+            if isinstance(sym, ActivationSymbol):
+                # children of the AST node are the parameters to the proc/func.  Validate count is correct
+                if len(ast.children) != len(sym.paramlist.paramlist):
+                    errstr = "{} expected {} parameters, only {} provided"
+                    errstr = errstr.format(tok.value, len(sym.paramlist.paramlist), len(ast.children))
+                    raise TACException(tac_errstr(errstr, tok))
+                for child in ast.children:
+                    # TODO - check the type of the parameters for a match
+                    tmp = self.processast(child, generator)
+                    print('hey - tmp = ' + str(tmp))
+                    self.addnode(TACParamNode(tmp))
+                if sym.returnpascaltype is not None:
+                    # means it is a function
+                    ret = Symbol(generator.gettemporary(), tok.location, sym.returnpascaltype)
+                    self.symboltable.add(ret)
+                else:
+                    ret = None
+                self.addnode(TACCallFunctionNode(sym.label, len(ast.children), ret))
+                return ret
+            else:
+                return sym
         elif tok.tokentype in [TokenType.UNSIGNED_INT, TokenType.SIGNED_INT]:
             ret = Symbol(generator.gettemporary(), tok.location, pascaltypes.IntegerType())
             self.symboltable.add(ret)

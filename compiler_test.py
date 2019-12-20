@@ -81,7 +81,7 @@ def do_compilefailtest(infilename, resultfilename):
                 NUM_SUCCESSES += 1
             else:
                 print("*" + comparestr + "*")
-                print("*" + resultvalue + "*")
+                print("&" + resultvalue + "&")
                 print("FAIL: {0}".format(infilename))
         except Exception as e:
             print("FAIL: {0}".format(infilename))
@@ -173,6 +173,8 @@ def main():
     do_compilefailtest("tests/compilefail03.pas", "tests/compilefail03.out")
     do_compilefailtest("tests/compilefail04.pas", "tests/compilefail04.out")
     do_compilefailtest("tests/compilefail05.pas", "tests/compilefail05.out")
+    do_compilefailtest("tests/compilefail06.pas", "tests/compilefail06.out")
+    do_compilefailtest("tests/compilefail07.pas", "tests/compilefail07.out")
 
     print("Tests Attempted: " + str(NUM_ATTEMPTS))
     print("Tests Succeeded: " + str(NUM_SUCCESSES))
