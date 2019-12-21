@@ -301,6 +301,7 @@ class SymbolTable:
                 foundit = True
             else:
                 curtable = curtable.parent
+        assert foundit
         assert isinstance(ret, Symbol)
         return ret
 

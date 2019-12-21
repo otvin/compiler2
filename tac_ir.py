@@ -386,11 +386,12 @@ class TACBlock:
                     self.symboltable.add(newsym)
                 else:
                     self.symboltable.add(param.symbol)
-            if tok.tokentype == TokenType.FUNCTION:
-                # need the name of the function in the symbol table as well so we can assign to it
-                sym_result = ast.symboltable.fetch(str_procname)
-                assert isinstance(sym_result, FunctionResultVariableSymbol)
-                self.symboltable.add(sym_result)
+            #took this out because we do a deepcopy of the symboltable now when we make the TACBlock
+            #if tok.tokentype == TokenType.FUNCTION:
+            #    # need the name of the function in the symbol table as well so we can assign to it
+            #    sym_result = ast.symboltable.fetch(str_procname)
+            #    assert isinstance(sym_result, FunctionResultVariableSymbol)
+            #    self.symboltable.add(sym_result)
 
             # we need to go to the parent to fetch the activation symbol.  If we do the fetch on
             # the current node, and this is a function, we will instead get the symbol that would hold the result.
@@ -497,7 +498,6 @@ class TACBlock:
                 for child in ast.children:
                     # TODO - check the type of the parameters for a match
                     tmp = self.processast(child, generator)
-                    print('hey - tmp = ' + str(tmp))
                     self.addnode(TACParamNode(tmp))
                 if sym.returnpascaltype is not None:
                     # means it is a function
@@ -643,6 +643,7 @@ class TACGenerator:
             newblock = TACBlock(True)
         else:
             newblock = TACBlock(False)
+            newblock.symboltable = deepcopy(ast.symboltable)
         newblock.symboltable.parent = self.globalsymboltable
         newblock.processast(ast, self)
         return newblock
