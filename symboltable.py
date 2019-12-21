@@ -269,6 +269,12 @@ class ParameterList:
             ret += str(param) + "\n"
         return ret
 
+    def __len__(self):
+        return len(self.paramlist)
+
+    def __getitem__(self, item):
+        return self.paramlist[item]
+
 
 class SymbolTable:
     def __init__(self):

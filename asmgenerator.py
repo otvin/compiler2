@@ -2,20 +2,58 @@ import os
 from tac_ir import TACBlock, TACLabelNode, TACParamNode, TACCallSystemFunctionNode, TACUnaryLiteralNode, \
     TACOperator, TACGenerator, TACCommentNode, TACBinaryNode, TACUnaryNode, TACGotoNode, TACIFZNode, \
     TACFunctionReturnNode, TACCallFunctionNode
-from symboltable import StringLiteral, NumericLiteral, Symbol, Parameter
+from symboltable import StringLiteral, NumericLiteral, Symbol, Parameter, ActivationSymbol
 import pascaltypes
 
 
 class ASMGeneratorError(Exception):
     pass
 
-
 # helper functions
+global_VALID_REGISTER_LIST = ["RAX", "RBX", "RCX", "RDX", "RSI", "RDI", "RBP", "RSP", "R8", "R9", "R10", "R11", "R12",
+                                "R13", "R14", "R15", "R16"]
+
+
+def get_register_slice_bybytes(register, numbytes):
+    global global_VALID_REGISTER_LIST
+    assert numbytes in [1, 2, 4, 8]
+    assert register in global_VALID_REGISTER_LIST
+
+    # TODO - https://stackoverflow.com/questions/41573502/why-doesnt-gcc-use-partial-registers - when we get to types that
+    # are 1 or 2 bytes, need to make sure we don't get in trouble.
+
+    if numbytes == 8:
+        ret = register
+    else:
+        if register in ["RAX", "RBX", "RCX", "RDX"]:
+            if numbytes == 4:
+                ret = "E" + register[-2:]
+            elif numbytes == 2:
+                ret = register[-2:]
+            else:
+                ret = register[2] + "L"
+        elif register in ["RSI", "RDI", "RBP", "RSP"]:
+            if numbytes == 4:
+                ret = "E" + register[-2:]
+            elif numbytes == 2:
+                ret = register[-2:]
+            else:
+                ret = register[-2:] + "L"
+        else:
+            if numbytes == 4:
+                ret = register + "D"
+            elif numbytes == 2:
+                ret = register + "W"
+            else:
+                ret = register + "B"
+    return ret
+
+
 def intparampos_to_register(pos):
     # First six integer parameters to functions are stored in registers.
     # This function converts the position in the function parameter list to a register
     # once we get > 6 parameters it will be stack pointer offsets
-    assert pos >= 1 and pos <= 6
+    assert pos in [1, 2, 3, 4, 5, 6]
 
     if pos == 1:
         ret = "RDI"
@@ -32,8 +70,6 @@ def intparampos_to_register(pos):
 
     return ret
 
-# TODO - https://stackoverflow.com/questions/41573502/why-doesnt-gcc-use-partial-registers - when we get to types that
-# are 1 or 2 bytes, need to make sure we don't get in trouble.
 
 class AssemblyGenerator:
     def __init__(self, asmfilename, tacgenerator):
@@ -148,51 +184,33 @@ class AssemblyGenerator:
                 if not block.ismain:
                     # it's a procedure or function, copy the parameters into local storage
 
-                    '''
                     numintparams = 0
-                    numsseparams = 0
-                    paramstackoffset = 0  # if we have too many parameters, they are pushed on the stack before the call
-                    for param in block.paramlist:
-                        # Integer parameters - passed in rdi, rsi, rdx,rcx, r8, r9 in that order
-                        # Booleans are passed as integers, and need the full 8 bytes.
-                        # Real parameters - passed in xmm0..xmm7
-                        # Variable parameters - we will actually get the pointer to the parameter
-                        # which are also 8 bytes.
-                        paramsym = param.symbol
-                        localsym = block.symboltable.fetch(paramsym.name)
-                        t = paramsym.pascaltype
-                        is_byref = param.is_byref
-                        if is_byref or isinstance(t, pascaltypes.IntegerType) or isinstance(t, pascaltypes.BooleanType):
-                            numintparams += 1
-                            reg = intparampos_to_register(numintparams)
-                            self.emitcode("mov [{}], {}".format(local))
-                    '''
+                    numrealparams = 0
+
                     for param in block.paramlist:
                         localsym = block.symboltable.fetch(param.symbol.name)
                         if param.is_byref:
-                            reg = "rax"
-                        elif param.symbol.pascaltype.size == 1:
-                            reg = "al"
-                        elif param.symbol.pascaltype.size == 2:
-                            reg = "ax"
-                        elif param.symbol.pascaltype.size == 4:
-                            reg = "eax"
-                        elif param.symbol.pascaltype.size == 8:
-                            reg = "rax"
-                        else:  # pragma: no cover
-                            raise ASMGeneratorError("Invalid Size for parameter")
+                            tmpreg = "RAX"
+                        else:
+                            tmpreg = get_register_slice_bybytes("RAX", param.symbol.pascaltype.size)
                         self.emitcode("push RAX")
                         # TODO - this will break when we have so many parameters that they will get
                         # passed on the stack instead of in a register.
                         if not param.is_byref and isinstance(param.symbol.pascaltype, pascaltypes.RealType):
+                            paramreg = "xmm{}".format(numrealparams)
+                            numrealparams += 1
                             # the param memory address is one of the xmm registers.
-                            self.emitcode("movsd {}, {}".format(reg, param.symbol.memoryaddress),
+                            self.emitcode("movsd {}, {}".format(tmpreg, paramreg),
                                           "Copy parameter {} to stack".format(param.symbol.name))
                         else:
                             # the param memory address is a register
-                            self.emitcode("mov {}, {}".format(reg, param.symbol.memoryaddress),
+                            numintparams += 1
+                            paramreg = intparampos_to_register(numintparams)
+                            regslice = get_register_slice_bybytes(paramreg, param.symbol.pascaltype.size)
+
+                            self.emitcode("mov {}, {}".format(tmpreg, regslice),
                                           "Copy parameter {} to stack".format(param.symbol.name))
-                        self.emitcode("mov [{}], {}".format(localsym.memoryaddress, reg))
+                        self.emitcode("mov [{}], {}".format(localsym.memoryaddress, tmpreg))
                         self.emitcode("pop RAX")
 
             for node in tacnodelist:
@@ -308,37 +326,53 @@ class AssemblyGenerator:
                     localparamlist = params[(-1 * node.numparams):]
                     numintparams = 0
                     numrealparams = 0
-                    # remember - pointers count as int parameters
-                    for param in localparamlist:
-                        print(type(param))
-                        assert isinstance(param, Parameter)
-                        if param.is_byref:
+                    act_symbol = block.symboltable.parent.fetch(node.funcname)
+                    assert isinstance(act_symbol, ActivationSymbol)
+                    if node.numparams != len(act_symbol.paramlist):
+                        errstr = "{} expected {} parameters, passed {}.".format(act_symbol.name,
+                                                                                len(act_symbol.paramlist),
+                                                                                node.numparams)
+                        raise ASMGeneratorError(errstr)
+                    register_pop_list = []
+
+                    # localparamlist has a list of TACParamNodes - that has information of what is going in.
+                    # act_symbol.paramlist has the information of where it goes
+                    # remove this comment once code is done
+
+                    for parampos in range(0, node.numparams):
+                        # remember - pointers count as int parameters
+                        actualparam = localparamlist[parampos]
+                        paramdef = act_symbol.paramlist[parampos]
+                        assert isinstance(actualparam, TACParamNode)
+                        assert isinstance(paramdef, Parameter)
+
+                        if paramdef.is_byref:
                             pass
-                        elif isinstance(param.symbol.pascaltype, pascaltypes.IntegerType) or \
-                                isinstance(param.symbol.pascaltype, pascaltypes.BooleanType):
+                        elif isinstance(paramdef.symbol.pascaltype, pascaltypes.IntegerType) or \
+                                isinstance(paramdef.symbol.pascaltype, pascaltypes.BooleanType):
                             numintparams += 1
                             assert numintparams <= 6  # TODO - remove when we can handle more
-                            reg = intparampos_to_register(numintparams)
-                            self.emitcode("PUSH {}".format(reg))
-
-                            # WHAT IF WE'RE PASSING IN A LITERAL INSTEAD OF A VARIABLE?
-                            # HOW DO WE GET THE [rel {}] in here?
-                            self.emitcode("mov {}, [{}]".format(reg, param.symbol.memoryaddress))
-                            # HOW DO I GET THE PARAMETER IN THE ACTIVATION SYMBOL TO HAVE THIS ADDRESS
-                            # NEED TO BE ABLE TO CONNECT THE CALL TO THE DECLARATION
-                        elif isinstance(param.symbol.pascaltype, pascaltypes.RealType):
+                            fullreg = intparampos_to_register(numintparams)
+                            reg = get_register_slice_bybytes(fullreg, paramdef.symbol.pascaltype.size)
+                            self.emitcode("PUSH {}".format(fullreg))
+                            register_pop_list.insert(0, fullreg)
+                            self.emitcode("mov {}, [{}]".format(reg, actualparam.paramval.memoryaddress))
+                        elif isinstance(paramdef.symbol.pascaltype, pascaltypes.RealType):
                             reg = "xmm{}".format(numrealparams)
                             numrealparams += 1
                             assert numrealparams <= 8
                             self.emitpushxmmreg(reg)
-                            self.emitcode("mov r11, [{}]".format(param.symbol.memoryaddress))
+                            register_pop_list.insert(0, reg)
+                            self.emitcode("mov r11, [{}]".format(actualparam.paramval.memoryaddress))
                             self.emitcode("movsd {}, r11".format(reg))
                         else:
                             raise ASMGeneratorError("Invalid Parameter Type")
                     self.emitcode("call {}".format(node.label), "insert comment here")
-
-                    #POP ALL THE PARAMETER REGISTERS OFF
-
+                    for reg in register_pop_list:
+                        if reg[0] == 'x':
+                            self.emitpopxmmreg(reg)
+                        else:
+                            self.emitcode("pop {}".format(reg))
                     del params[(-1 * node.numparams):]
                 elif isinstance(node, TACCallSystemFunctionNode):
                     if node.label.name == "_WRITEI":
@@ -348,16 +382,7 @@ class AssemblyGenerator:
                         self.emitcode("push rsi")
                         self.emitcode("mov rdi, _printf_intfmt")
                         param = params[-1]
-                        if param.paramval.pascaltype.size == 1:
-                            destregister = "sil"
-                        elif param.paramval.pascaltype.size == 2:
-                            destregister = "si"
-                        elif param.paramval.pascaltype.size == 4:
-                            destregister = "esi"
-                        elif param.paramval.pascaltype.size == 8:
-                            destregister = "rsi"
-                        else:  # pragma: no cover
-                            raise ASMGeneratorError("Invalid Size for _WRITEI")
+                        destregister = get_register_slice_bybytes("RSI", param.paramval.pascaltype.size)
                         self.emitcode("mov {}, [{}]".format(destregister, param.paramval.memoryaddress))
                         # must pass 0 (in rax) as number of floating point args since printf is variadic
                         self.emitcode("mov rax, 0")
@@ -538,6 +563,7 @@ class AssemblyGenerator:
                     raise ASMGeneratorError("Unknown TAC node type: {}".format(type(node)))
 
             if totalstorageneeded > 0:
+                self.emitcode("MOV RSP, RBP")
                 self.emitcode("POP RBP")
             if not block.ismain:
                 self.emitcode("RET")

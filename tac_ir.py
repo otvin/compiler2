@@ -209,26 +209,30 @@ class TACParamNode(TACNode):
 
 
 class TACCallFunctionNode(TACNode):
-    def __init__(self, label, numparams, lval=None):
+    def __init__(self, label, funcname, numparams, lval=None):
         assert isinstance(label, Label)
         assert isinstance(numparams, int)
+        assert isinstance(funcname, str)
         assert lval is None or isinstance(lval, Symbol)
         assert numparams >= 0
         super().__init__(TACOperator.CALL)
         self.label = label
+        self.funcname = funcname
         self.numparams = numparams
         self.lval = lval
 
     def __str__(self):
         if self.lval is None:
-            return "{} {} {}".format(str(self.operator), self.label, str(self.numparams))
+            return "{} {} [{}] {}".format(str(self.operator), self.label, self.funcname, str(self.numparams))
         else:
-            return "{} := {} {} {}".format(str(self.lval), str(self.operator), self.label, str(self.numparams))
+            return "{} := {} {} {}".format \
+                (str(self.lval), str(self.operator), self.label, self.funcname, str(self.numparams))
 
 
 class TACCallSystemFunctionNode(TACCallFunctionNode):
     def __init__(self, label, numparams, lval=None):
-        super().__init__(label, numparams, lval)
+        assert isinstance(label, Label)
+        super().__init__(label, label.name, numparams, lval)
 
 
 class TACUnaryNode(TACNode):
@@ -501,7 +505,7 @@ class TACBlock:
                     self.symboltable.add(ret)
                 else:
                     ret = None
-                self.addnode(TACCallFunctionNode(sym.label, len(ast.children), ret))
+                self.addnode(TACCallFunctionNode(sym.label, sym.name, len(ast.children), ret))
                 return ret
             else:
                 return sym
@@ -670,4 +674,6 @@ class TACGenerator:
 
     def printblocks(self):
         for block in self.tacblocks:
+            if block.ismain:
+                print("_MAIN:")
             block.printnodes()
