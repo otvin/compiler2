@@ -140,6 +140,8 @@ def main():
     # dotest("tests/testproc04.pas", "tests/testproc04.out")
     dotest("tests/testprocedure01.pas", "tests/testprocedure01.out")
     dotest("tests/testprocedure03.pas", "tests/testprocedure03.out")
+    dotest("tests/testprocedure04.pas", "tests/testprocedure04.out")
+    dotest("tests/testprocedure05.pas", "tests/testprocedure05.out")
     dotest("tests/testreal01.pas", "tests/testreal01.out")
     dotest("tests/testreal02.pas", "tests/testreal02.out")
     dotest("tests/testreal03.pas", "tests/testreal03.out")

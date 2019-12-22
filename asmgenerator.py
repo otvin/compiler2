@@ -31,7 +31,7 @@ def get_register_slice_bybytes(register, numbytes):
             elif numbytes == 2:
                 ret = register[-2:]
             else:
-                ret = register[2] + "L"
+                ret = register[1] + "L"
         elif register in ["RSI", "RDI", "RBP", "RSP"]:
             if numbytes == 4:
                 ret = "E" + register[-2:]
@@ -171,18 +171,28 @@ class AssemblyGenerator:
                 sym = block.symboltable.fetch(symname)
                 assert isinstance(sym, Symbol)
                 if sym.memoryaddress is None:
-                    totalstorageneeded += sym.pascaltype.size
+                    # to ensure stack alignment, we subract 8 from the stack even if we're putting in a 1, 2, or 4
+                    # byte value.
+                    totalstorageneeded += 8
                     sym.memoryaddress = "RBP-{}".format(str(totalstorageneeded))
 
             if totalstorageneeded > 0:
                 self.emitcode("PUSH RBP")  # ABI requires callee to preserve RBP
                 self.emitcode("MOV RBP, RSP", "save stack pointer")
-                # X86-64 ABI requires stack to stay aligned to 16-byte boundary.  Make sure we subtract in chunks of 16.
+                # X86-64 ABI requires stack to stay aligned to 16-byte boundary.  Make sure we subtract in chunks of 16
+                # if we are in main.  If we are in a called function, we will begin with the stack 8-bytes off because
+                # of the 8-byte return address pushed onto the stack.  So if we're in main, make sure that we subtract
+                # enough to stay on the 16-byte boundary.  If we are in a called function, make sure that we are
+                # subtracting enough so that (what we subtract MOD 16 == 8) which will get the stack back to 16-byte
+                # alignment.  If we do not do this, then calling printf with SSE registers will seg fault.
+
                 totalstorageneeded += 16 - (totalstorageneeded % 16)
+                if not block.ismain:
+                    totalstorageneeded += 8  # there has to be a more elegant way to do this and not waste stack space
+
                 self.emitcode("SUB RSP, " + str(totalstorageneeded), "allocate local storage")
 
                 if not block.ismain:
-                    # it's a procedure or function, copy the parameters into local storage
 
                     numintparams = 0
                     numrealparams = 0
@@ -200,7 +210,7 @@ class AssemblyGenerator:
                             paramreg = "xmm{}".format(numrealparams)
                             numrealparams += 1
                             # the param memory address is one of the xmm registers.
-                            self.emitcode("movsd {}, {}".format(tmpreg, paramreg),
+                            self.emitcode("movq {}, {}".format(tmpreg, paramreg),
                                           "Copy parameter {} to stack".format(param.symbol.name))
                         else:
                             # the param memory address is a register
@@ -364,7 +374,7 @@ class AssemblyGenerator:
                             self.emitpushxmmreg(reg)
                             register_pop_list.insert(0, reg)
                             self.emitcode("mov r11, [{}]".format(actualparam.paramval.memoryaddress))
-                            self.emitcode("movsd {}, r11".format(reg))
+                            self.emitcode("movq {}, r11".format(reg))
                         else:
                             raise ASMGeneratorError("Invalid Parameter Type")
                     self.emitcode("call {}".format(node.label), "insert comment here")
