@@ -20,8 +20,8 @@ def get_register_slice_bybytes(register, numbytes):
     assert numbytes in [1, 2, 4, 8]
     assert register in global_VALID_REGISTER_LIST
 
-    # TODO - https://stackoverflow.com/questions/41573502/why-doesnt-gcc-use-partial-registers - when we get to types that
-    # are 1 or 2 bytes, need to make sure we don't get in trouble.
+    # TODO - https://stackoverflow.com/questions/41573502/why-doesnt-gcc-use-partial-registers - when we get to types
+    # that are 1 or 2 bytes, need to make sure we don't get in trouble.
 
     if numbytes == 8:
         ret = register
@@ -245,8 +245,8 @@ class AssemblyGenerator:
                             self.emitcode("mov EAX, [{}]".format(node.returnval.memoryaddress), "set up return value")
                         elif isinstance(node.returnval.pascaltype, pascaltypes.BooleanType):
                             # whereas mov EAX, [{}] will zero out the high 32 bits of RAX, moving AL will not.
-                            # movzbq
-                            self.emitcode("movzbq RAX, [{}]".format(node.returnval.memoryaddress), "set up return value")
+                            self.emitcode("movzx RAX, BYTE [{}]".format(node.returnval.memoryaddress),
+                                          "set up return value")
                         else:
                             self.emitcode("movsd XMM0, [{}]".format(node.returnval.memoryaddress), "set up return val")
                 elif isinstance(node, TACUnaryNode):

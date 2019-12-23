@@ -1,21 +1,51 @@
 # Compiler2
 
-Goal is to eventually build a Pascal compiler.  Compiler is written in python3 in Ubuntu.  The assembly files are written in NASM format.  You must install NASM via e.g. ```sudo apt-get install nasm``` in order for the program to compile the assembly.
+Goal is to build an compiler that implements a large subset of ISO-7185 Pascal.  Compiler is written in python3 in Ubuntu.  The assembly files are written in NASM format.  You must install NASM via e.g. ```sudo apt-get install nasm``` in order for the program to compile the assembly.
 
 ### Current Status
 
-Supports global variables of type Real, Integer or Boolean.  Supports a single main code block in the program.  The code block can be a series of variable assignments or statements.  Write() and writeln() are supported, as are the IF/THEN/ELSE, REPEAT..UNTIL, and WHILE..DO constructs.
-
-Supports math expressions using addition, subtraction, multiplication, integer division, the modulo function, and floating point division.  The math expressions can be created using variables or numeric literals.  The compiler can mix integers and reals in a single expression - for example, the compiler can add an integer to a real.  Using floating point division with the divisor and dividend both integers will result in a real.  Also supports parentheses.
-
-Supports relational operators equal, not equal, less than, less than or equal to, greater than, and greater than or equal to.  Can compare Booleans to Booleans, Integers to Integers, Reals to Reals, or Integers to Reals.
-
-Write() and writeln() each take a comma-separated list of one or more parameters, with each parameter a variable, a math expression, a numeric literal, a string literal, or the boolean constants 'true' and 'false.'
+Compiler2 supports the following Pascal Language features:
+* if - then [- else]
+* while - do
+* repeat - until
+* Math operations: addition, subtraction, multiplication, floating point/integer division, and the modulo function
+    * Can mix integers and reals in a single expression e.g. adding an integer to a real
+    * When Real and Integer combined in an operation, result is a Real
+    * Using floating point division with divisor and dividend both integers will result in a real
+    * Supports Parentheses
+        * Note a quirk in the ISO 7185 BNF - to multiply -7 times -3 you need to write ```-7 * (-3)``` and put parentheses around the second factor
+* Logical operators: equal to, not equal, less than, less than or equal, greater than, greater than or equal
+  * both Real and Integer; can compare integers to reals.
+* Procedures and Functions
+  *  Parameters passed by value only
+  *  Functions can return integers, Booleans, or reals
+  *  Up to 8 Real parameters by value, up to a combined 6 Integer/String or by reference parameters
+  *  Integers passed in byval to Real parameters get converted to Real
+  *  Recursion
+* Global and local variables
+    * Signed Real variables and literals (64-bit)
+    * Signed Integer variables and literals (32-bit)
+    * Boolean variables and literals (8-bit)
+* Write() and Writeln() to stdout
+    * each take a comma-separated list of one or more parameters, with each parameter a variable, a math expression, a numeric literal, a string literal, or the boolean constants 'true' and 'false.'
+* Comments
 
  
 ### Commentary
 
-Compiler2 is less functional than compiler1 at this point.  However, this version has been designed like a more classic compiler.  There is a lexer, which identifies all tokens in the ISO Pascal standard.
+At this point, Compiler2 is missing some functionality that was in compiler1. Specifically:
+* String-typed Variables
+* The concat() String operation
+* "Variable parameters" (parameters to procedures and functions passed by reference)  
+
+However, Compiler2 has the following functionality that compiler1 did not:
+* Boolean type
+* REPEAT..UNTIL construct
+* Ability to do relational operations comparing Integer and Real types
+
+Compiler2 also uses the official BNF from the ISO standard, whereas Compiler1 used a BNF that I updated based on a variation I had downloaded from a random website.
+
+The big improvement in Compiler2 is that this version has been designed like a more classic compiler.  There is a lexer, which identifies all tokens in the ISO Pascal standard.
 The parser generates an Abstract Syntax Tree (AST).  The compiler then transforms the AST into Three-Address Code (TAC), which is an intermediate language.  
 
 The TAC is then converted into ASM.  Each variable in the TAC gets its own space on the stack.  The resulting code is correct, but obviously not very efficient.  However,
@@ -31,7 +61,7 @@ will make it easier to surpass the functionality of my previous attempt.
 
 ### Unit tests
 
-Compiler2 currently passes 30 of the 60 unit tests created for Compiler, plus an additional 26
+Compiler2 currently passes 42 of the 60 unit tests created for Compiler, plus an additional 29
  tests unique to Compiler2.  You can execute the working
 bits of the unit test suite by running:
 
@@ -41,13 +71,13 @@ Current code coverage:
 
 | File | Coverage |
 |------|---------:|
-|asm_generator.py|96%|
+|asm_generator.py|95%|
 |filelocation.py|100%|
 |lexer.py|86%|
-|parser.py|87%|
-|pascaltypes.py|76%|
-|symboltable.py|81%|
-|tac_ir.py|92%|
+|parser.py|88%|
+|pascaltypes.py|74%|
+|symboltable.py|86%|
+|tac_ir.py|91%|
 
 _Code for exceptions that should never occur are excluded.  Regular compiler errors e.g. syntax errors in Pascal code are covered via "compilefail" tests.  Code written for future features, e.g. the code that handles 64-bit integers in spots, does count against code coverage, so I do not forget to add them back to the code to be tested._
  

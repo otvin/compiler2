@@ -365,7 +365,8 @@ class TACBlock:
             # TODO - when we want to have procedures declared within procedures, this next line will fail.
             # For now, we're ensuring the Procedure/Function is the first TACNode in the list.  This
             # matters because we are going to copy the parameter list from the AST to the TACBlock
-            # and cannot do that if we have multiple parameter lists.  We need some other structure.
+            # and cannot do that if we have multiple parameter lists for nested procs.
+            # We need some other structure.
             assert len(self.tacnodes) == 0
 
             # first child of a Procedure or Function is an identifier with the name of the proc/func
@@ -482,18 +483,27 @@ class TACBlock:
         elif tok.tokentype == TokenType.IDENTIFIER:
             sym = self.symboltable.fetch(tok.value)
             if isinstance(sym, FunctionResultVariableSymbol):
-                # we know it is a function, so get the activation symbol
+                # we know it is a function, so get the activation symbol, which is stored in the parent
                 sym = self.symboltable.parent.fetch(tok.value)
             if isinstance(sym, ActivationSymbol):
                 # children of the AST node are the parameters to the proc/func.  Validate count is correct
-                if len(ast.children) != len(sym.paramlist.paramlist):
-                    errstr = "{} expected {} parameters, only {} provided"
+                if len(ast.children) != len(sym.paramlist):
+                    errstr = "{} expected {} parameters, but {} provided"
                     errstr = errstr.format(tok.value, len(sym.paramlist.paramlist), len(ast.children))
                     raise TACException(tac_errstr(errstr, tok))
-                for child in ast.children:
+
+                for i in range(0, len(ast.children)):
+                    child = ast.children[i]
                     # TODO - check the type of the parameters for a match
                     tmp = self.processast(child, generator)
-                    self.addnode(TACParamNode(tmp))
+                    if isinstance(tmp.pascaltype, pascaltypes.IntegerType) and \
+                            isinstance(sym.paramlist[i].symbol.pascaltype, pascaltypes.RealType):
+                        tmp2 = Symbol(generator.gettemporary(), tok.location, pascaltypes.RealType())
+                        self.symboltable.add(tmp2)
+                        self.addnode(TACUnaryNode(tmp2, TACOperator.INTTOREAL, tmp))
+                        self.addnode(TACParamNode(tmp2))
+                    else:
+                        self.addnode(TACParamNode(tmp))
                 if sym.returnpascaltype is not None:
                     # means it is a function
                     ret = Symbol(generator.gettemporary(), tok.location, sym.returnpascaltype)

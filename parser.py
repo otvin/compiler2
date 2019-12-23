@@ -444,23 +444,37 @@ class Parser:
 
         self.tokenstream.setstartpos()
         ident_token = self.getexpectedtoken(TokenType.IDENTIFIER)
+
+        # validate that we are assigning to a valid identifier - either a symbol or a parameter
         symtab = parent_ast.nearest_symboltable()
         if not symtab.existsanywhere(ident_token.value):
-            raise ParseException("Undefined Identifier: {}".format(ident_token.value))
-        sym = symtab.fetch(ident_token.value)
-        if isinstance(sym, VariableSymbol):
-            # Two possible designes considered here.  First, having ret have some token that represents
-            # the variable-identifier and that it is being assigned to, and then have one child which
-            # is the expression, or the one that I'm going with here, which is to have ret explicitly
-            # be the assign operation with first child the variable being assigned and second child
-            # being the expression.  I don't know that either is better but this seemed cleaner
-            # because it put all the tokens in the AST and did not require creation of a new tokentype
-            # like I did in first compiler.
-            ret = AST(self.getexpectedtoken(TokenType.ASSIGNMENT), parent_ast)
-            ret.children.append(AST(ident_token, ret))
-            ret.children.append(self.parse_expression(ret))
+            tmp_ast = parent_ast
+            tmp_paramlist = tmp_ast.paramlist
+            while tmp_paramlist is None:
+                assert isinstance(tmp_ast, AST)
+                assert tmp_ast.parent is not None
+                tmp_ast = tmp_ast.parent
+                tmp_paramlist = tmp_ast.paramlist
+            assert isinstance(tmp_paramlist, ParameterList)
+            param = tmp_paramlist.fetch(ident_token.value)
+            if param is None:
+                raise ParseException("Undefined Identifier: {}".format(ident_token.value))
+            else:
+                assert isinstance(param, Parameter)
         else:
-            raise ParseException("Cannot parse function-identifiers yet.")
+            sym = symtab.fetch(ident_token.value)
+            assert isinstance(sym, VariableSymbol)  # we insert a FunctionResultVariableSymbol when parsing functions
+
+        # Two possible designs considered here.  First, having ret have some token that represents
+        # the variable-identifier and that it is being assigned to, and then have one child which
+        # is the expression, or the one that I'm going with here, which is to have ret explicitly
+        # be the assign operation with first child the variable being assigned and second child
+        # being the expression.  I don't know that either is better but this seemed cleaner
+        # because it put all the tokens in the AST and did not require creation of a new tokentype
+        # like I did in first compiler.
+        ret = AST(self.getexpectedtoken(TokenType.ASSIGNMENT), parent_ast)
+        ret.children.append(AST(ident_token, ret))
+        ret.children.append(self.parse_expression(ret))
         self.tokenstream.setendpos()
         ret.comment = self.tokenstream.printstarttoend()
         return ret

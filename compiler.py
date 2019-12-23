@@ -68,6 +68,7 @@ def compile(infilename, asmfilename=None, objfilename=None, exefilename=None,
         g.generate(p.AST)
     except Exception as err:
         if verbose:  # set to True to debug
+            g.printblocks()
             traceback.print_exc()
         retstr += str(err)
         return retstr
