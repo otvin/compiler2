@@ -225,8 +225,8 @@ class TACCallFunctionNode(TACNode):
         if self.lval is None:
             return "{} {} [{}] {}".format(str(self.operator), self.label, self.funcname, str(self.numparams))
         else:
-            return "{} := {} {} {}".format \
-                (str(self.lval), str(self.operator), self.label, self.funcname, str(self.numparams))
+            return "{} := {} {} {}".format(str(self.lval), str(self.operator),
+                                           self.label, self.funcname, str(self.numparams))
 
 
 class TACCallSystemFunctionNode(TACCallFunctionNode):
@@ -386,12 +386,6 @@ class TACBlock:
                     self.symboltable.add(newsym)
                 else:
                     self.symboltable.add(param.symbol)
-            #took this out because we do a deepcopy of the symboltable now when we make the TACBlock
-            #if tok.tokentype == TokenType.FUNCTION:
-            #    # need the name of the function in the symbol table as well so we can assign to it
-            #    sym_result = ast.symboltable.fetch(str_procname)
-            #    assert isinstance(sym_result, FunctionResultVariableSymbol)
-            #    self.symboltable.add(sym_result)
 
             # we need to go to the parent to fetch the activation symbol.  If we do the fetch on
             # the current node, and this is a function, we will instead get the symbol that would hold the result.
@@ -410,6 +404,7 @@ class TACBlock:
 
         elif tok.tokentype in (TokenType.WRITE, TokenType.WRITELN):
             for child in ast.children:
+                # TODO - if child is a procedure, not a function, we should have a compile error here.
                 tmp = self.processast(child, generator)
                 self.addnode(TACParamNode(tmp))
                 if isinstance(tmp.pascaltype, pascaltypes.StringLiteralType):

@@ -9,9 +9,10 @@ import pascaltypes
 class ASMGeneratorError(Exception):
     pass
 
+
 # helper functions
 global_VALID_REGISTER_LIST = ["RAX", "RBX", "RCX", "RDX", "RSI", "RDI", "RBP", "RSP", "R8", "R9", "R10", "R11", "R12",
-                                "R13", "R14", "R15", "R16"]
+                              "R13", "R14", "R15", "R16"]
 
 
 def get_register_slice_bybytes(register, numbytes):
@@ -65,7 +66,7 @@ def intparampos_to_register(pos):
         ret = "RCX"
     elif pos == 5:
         ret = "R8"
-    elif pos == 6:
+    else:
         ret = "R9"
 
     return ret
@@ -187,10 +188,18 @@ class AssemblyGenerator:
                 # alignment.  If we do not do this, then calling printf with SSE registers will seg fault.
 
                 totalstorageneeded += 16 - (totalstorageneeded % 16)
-                if not block.ismain:
-                    totalstorageneeded += 8  # there has to be a more elegant way to do this and not waste stack space
 
                 self.emitcode("SUB RSP, " + str(totalstorageneeded), "allocate local storage")
+                if not block.ismain:
+                    # In theory, the next two lines are not needed, and I could just add 8 more bytes
+                    # to the "totalstorageneeded" above.  However, no matter what I did, I couldn't
+                    # get it to work.  What would happen is, for example a procedure with a
+                    # boolean, a real, and two integer parameters that called printf on the real would
+                    # work fine, but if it had a boolean, a real,and one integer parameter, it would
+                    # segfault in the printf.  I know the problem is stack misalignment, but couldn't
+                    # get the math above to work, and this did.
+                    self.emitcode("AND RSP, -16")
+                    self.emitcode("SUB RSP, 8")
 
                 if not block.ismain:
 
@@ -199,29 +208,21 @@ class AssemblyGenerator:
 
                     for param in block.paramlist:
                         localsym = block.symboltable.fetch(param.symbol.name)
-                        if param.is_byref:
-                            tmpreg = "RAX"
-                        else:
-                            tmpreg = get_register_slice_bybytes("RAX", param.symbol.pascaltype.size)
-                        self.emitcode("push RAX")
                         # TODO - this will break when we have so many parameters that they will get
                         # passed on the stack instead of in a register.
                         if not param.is_byref and isinstance(param.symbol.pascaltype, pascaltypes.RealType):
                             paramreg = "xmm{}".format(numrealparams)
                             numrealparams += 1
                             # the param memory address is one of the xmm registers.
-                            self.emitcode("movq {}, {}".format(tmpreg, paramreg),
+                            self.emitcode("movq [{}], {}".format(localsym.memoryaddress, paramreg),
                                           "Copy parameter {} to stack".format(param.symbol.name))
                         else:
                             # the param memory address is a register
                             numintparams += 1
                             paramreg = intparampos_to_register(numintparams)
                             regslice = get_register_slice_bybytes(paramreg, param.symbol.pascaltype.size)
-
-                            self.emitcode("mov {}, {}".format(tmpreg, regslice),
+                            self.emitcode("mov [{}], {}".format(localsym.memoryaddress, regslice),
                                           "Copy parameter {} to stack".format(param.symbol.name))
-                        self.emitcode("mov [{}], {}".format(localsym.memoryaddress, tmpreg))
-                        self.emitcode("pop RAX")
 
             for node in tacnodelist:
                 if isinstance(node, TACCommentNode):
@@ -577,7 +578,6 @@ class AssemblyGenerator:
                 self.emitcode("POP RBP")
             if not block.ismain:
                 self.emitcode("RET")
-
 
     def generate_errorhandlingcode(self):
         # overflow
