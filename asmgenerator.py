@@ -241,7 +241,14 @@ class AssemblyGenerator:
                     if isinstance(node.returnval, Symbol):
                         # do the function returning stuff here
                         # the "ret" itself is emitted below.
-                        pass
+                        if isinstance(node.returnval.pascaltype, pascaltypes.IntegerType):
+                            self.emitcode("mov EAX, [{}]".format(node.returnval.memoryaddress), "set up return value")
+                        elif isinstance(node.returnval.pascaltype, pascaltypes.BooleanType):
+                            # whereas mov EAX, [{}] will zero out the high 32 bits of RAX, moving AL will not.
+                            # movzbq
+                            self.emitcode("movzbq RAX, [{}]".format(node.returnval.memoryaddress), "set up return value")
+                        else:
+                            self.emitcode("movsd XMM0, [{}]".format(node.returnval.memoryaddress), "set up return val")
                 elif isinstance(node, TACUnaryNode):
                     if node.operator == TACOperator.INTTOREAL:
                         if node.arg1.pascaltype.size in (1, 2):
@@ -285,11 +292,12 @@ class AssemblyGenerator:
 
                         # first, get the arg1 into reg.  If arg1 is a byref parameter, we need to
                         # dereference the pointer.
+                        comment = "Move {} into {}".format(node.arg1.name, node.lval.name)
                         if arg1_is_byref:
-                            self.emitcode("mov r11, [{}]".format(node.arg1.memoryaddress))
+                            self.emitcode("mov r11, [{}]".format(node.arg1.memoryaddress), comment)
                             self.emitcode("mov {}, [r11]".format(reg))
                         else:
-                            self.emitcode("mov {}, [{}]".format(reg, node.arg1.memoryaddress))
+                            self.emitcode("mov {}, [{}]".format(reg, node.arg1.memoryaddress), comment)
 
                         # now, get the value from reg into lval.  If lval is a byref parameter, we
                         # need to dereference the pointer.
@@ -308,13 +316,15 @@ class AssemblyGenerator:
                         # dealing with PEP8 line length
                         glt = self.tacgenerator.globalliteraltable
                         litaddress = glt.fetch(node.literal1.value, pascaltypes.StringLiteralType()).memoryaddress
-                        self.emitcode("lea rax, [rel {}]".format(litaddress))
+                        comment = "Move literal {} into {}".format(node.literal1.value, node.lval.name)
+                        self.emitcode("lea rax, [rel {}]".format(litaddress), comment)
                         self.emitcode("mov [{}], rax".format(node.lval.memoryaddress))
                     elif isinstance(node.literal1, NumericLiteral) and isinstance(node.literal1.pascaltype,
                                                                                   pascaltypes.RealType):
                         glt = self.tacgenerator.globalliteraltable
                         litaddress = glt.fetch(node.literal1.value, pascaltypes.RealType()).memoryaddress
-                        self.emitcode("movsd xmm0, [rel {}]".format(litaddress))
+                        comment = "Move literal {} into {}".format(node.literal1.value, node.lval.name)
+                        self.emitcode("movsd xmm0, [rel {}]".format(litaddress), comment)
                         self.emitcode("movsd [{}], xmm0".format(node.lval.memoryaddress))
                     else:
                         # TODO is node.operator ever anything other than ASSIGN?
@@ -329,8 +339,9 @@ class AssemblyGenerator:
                                 sizedirective = "QWORD"
                             else:
                                 raise ASMGeneratorError("Invalid Size for assignment")
+                            comment = "Move literal {} into {}".format(node.literal1.value, node.lval.name)
                             self.emitcode("mov [{}], {} {}".format(node.lval.memoryaddress, sizedirective,
-                                                                   node.literal1.value))
+                                                                   node.literal1.value), comment)
                 elif isinstance(node, TACCallFunctionNode) and \
                         not isinstance(node, TACCallSystemFunctionNode):
                     assert len(params) >= node.numparams
@@ -378,7 +389,16 @@ class AssemblyGenerator:
                             self.emitcode("movq {}, r11".format(reg))
                         else:
                             raise ASMGeneratorError("Invalid Parameter Type")
-                    self.emitcode("call {}".format(node.label), "insert comment here")
+                    self.emitcode("call {}".format(node.label), "call {}".format(node.funcname))
+                    if act_symbol.returnpascaltype is not None:
+                        # return value is now in either RAX or XMM0 - need to store it in right place
+                        comment = "assign return value of function to {}".format(node.lval.name)
+                        if isinstance(act_symbol.returnpascaltype, pascaltypes.IntegerType):
+                            self.emitcode("MOV [{}], EAX".format(node.lval.memoryaddress), comment)
+                        elif isinstance(act_symbol.returnpascaltype, pascaltypes.BooleanType):
+                            self.emitcode("MOV [{}], AL".format(node.lval.memoryaddress), comment)
+                        else:
+                            self.emitcode("MOVSD [{}], XMM0".format(node.lval.memoryaddress), comment)
                     for reg in register_pop_list:
                         if reg[0] == 'x':
                             self.emitpopxmmreg(reg)
@@ -623,10 +643,11 @@ class AssemblyGenerator:
             for symname in self.tacgenerator.globalsymboltable.symbols.keys():
                 sym = self.tacgenerator.globalsymboltable.fetch(symname)
                 assert isinstance(sym, Symbol)
-                label = "_globalvar_{}".format(str(varseq))
-                varseq += 1
-                sym.memoryaddress = "rel {}".format(label)
-                self.emitcode("{} resb {}".format(label, sym.pascaltype.size), "global variable {}".format(symname))
+                if not isinstance(sym, ActivationSymbol):
+                    label = "_globalvar_{}".format(str(varseq))
+                    varseq += 1
+                    sym.memoryaddress = "rel {}".format(label)
+                    self.emitcode("{} resb {}".format(label, sym.pascaltype.size), "global variable {}".format(symname))
 
     def generate(self, objfilename, exefilename):
         self.generate_externs()
