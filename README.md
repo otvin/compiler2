@@ -61,7 +61,7 @@ will make it easier to surpass the functionality of my previous attempt.
 
 ### Unit tests
 
-Compiler2 currently passes 42 of the 60 unit tests created for Compiler, plus an additional 29
+Compiler2 currently passes 42 of the 60 unit tests created for Compiler, plus an additional 30
  tests unique to Compiler2.  You can execute the working
 bits of the unit test suite by running:
 

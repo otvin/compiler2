@@ -380,13 +380,7 @@ class TACBlock:
             # Remember also - Paramter Lists are ordered, but Symbol Tables are not.
             for param in self.paramlist.paramlist:
                 assert isinstance(param, Parameter)
-                if param.is_byref:
-                    # variable parameters can only have limited types, see 6.6.3.1 for details
-                    newsymtype = pascaltypes.PointerType(param.symbol.pascaltype)
-                    newsym = VariableSymbol(param.symbol.name, param.symbol.location, newsymtype)
-                    self.symboltable.add(newsym)
-                else:
-                    self.symboltable.add(param.symbol)
+                self.symboltable.add(param.symbol)
 
             # we need to go to the parent to fetch the activation symbol.  If we do the fetch on
             # the current node, and this is a function, we will instead get the symbol that would hold the result.
@@ -494,7 +488,7 @@ class TACBlock:
 
                 for i in range(0, len(ast.children)):
                     child = ast.children[i]
-                    # TODO - check the type of the parameters for a match
+                    # TODO - check type of the parameters for a match, more than just real vs. int
                     tmp = self.processast(child, generator)
                     if isinstance(tmp.pascaltype, pascaltypes.IntegerType) and \
                             isinstance(sym.paramlist[i].symbol.pascaltype, pascaltypes.RealType):

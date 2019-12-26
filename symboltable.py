@@ -102,6 +102,7 @@ class Symbol:
         self.location = location
         self.pascaltype = pascaltype
         self.memoryaddress = None
+        self.is_byref = False
 
     @property
     def memoryaddress(self):
@@ -110,6 +111,15 @@ class Symbol:
     @memoryaddress.setter
     def memoryaddress(self, addr):
         self.__memoryaddress = addr
+
+    @property
+    def is_byref(self):
+        return self.__is_byref
+
+    @is_byref.setter
+    def is_byref(self, byref):
+        assert isinstance(byref, bool)
+        self.__is_byref = byref
 
     def __str__(self):
         return self.name
@@ -226,6 +236,16 @@ class Parameter:
         assert isinstance(is_byref, bool)
         self.symbol = symbol
         self.is_byref = is_byref
+        assert self.symbol.is_byref == self.is_byref
+
+    @property
+    def is_byref(self):
+        return self.__is_byref
+
+    @is_byref.setter
+    def is_byref(self, byref):
+        assert isinstance(byref, bool)
+        self.__is_byref = byref
 
     def __str__(self):
         ret = str(self.symbol)

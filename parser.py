@@ -226,18 +226,20 @@ class Parser:
         assert isinstance(paramlist, ParameterList)
 
         self.getexpectedtoken(TokenType.LPAREN)
-        if self.tokenstream.peektokentype() == TokenType.VAR:
-            self.getexpectedtoken(TokenType.VAR)
-            is_byref = True
-        else:
-            is_byref = False
+
         done = False
         while not done:
+            if self.tokenstream.peektokentype() == TokenType.VAR:
+                self.getexpectedtoken(TokenType.VAR)
+                is_byref = True
+            else:
+                is_byref = False
             identifier_list = self.parse_identifierlist()
             self.getexpectedtoken(TokenType.COLON)
             symboltype = self.parse_typeidentifier()
             for identifier_token in identifier_list:
                 vsym = VariableSymbol(identifier_token.value, identifier_token.location, symboltype)
+                vsym.is_byref = is_byref
                 paramlist.add(Parameter(vsym, is_byref))
             if self.tokenstream.peektokentype() == TokenType.SEMICOLON:
                 self.getexpectedtoken(TokenType.SEMICOLON)
