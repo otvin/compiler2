@@ -71,7 +71,7 @@ from enum import Enum, unique
 from copy import deepcopy
 from parser import AST, isrelationaloperator
 from symboltable import Symbol, Label, Literal, NumericLiteral, StringLiteral, BooleanLiteral,\
-    SymbolTable, LiteralTable, ParameterList, ActivationSymbol, Parameter, \
+    SymbolTable, LiteralTable, ParameterList, ActivationSymbol, Parameter, VariableSymbol,\
     FunctionResultVariableSymbol
 from lexer import TokenType, Token
 import pascaltypes
@@ -497,6 +497,25 @@ class TACBlock:
                     child = ast.children[i]
                     # TODO - check type of the parameters for a match, more than just real vs. int
                     tmp = self.processast(child, generator)
+
+                    if sym.paramlist[i].is_byref:
+                        # 6.6.3.3 of the ISO Standard states that if the formal parameter is a variable
+                        # parameter, then the actual parameter must be the same type as the formal parameter
+                        # and the actual parameter must be a variable access, meaning it cannot be a literal
+                        # or the output of a function.
+                        if not isinstance(tmp, VariableSymbol):
+                            errstr = "Must pass in variable for parameter {} of {}() in {}"
+                            errstr = errstr.format(sym.paramlist[i].symbol.name, sym.name, child.token.location)
+                            raise TACException(errstr)
+                        # Known PEP-8 violation here - but I don't know how else to compare the types
+                        # without creating a canonical example of each type and then using that everywhere in the
+                        # compiler.
+                        if type(tmp.pascaltype) != type(sym.paramlist[i].symbol.pascaltype):
+                            errstr = "Type Mismatch - parameter {} of {}() must be type {} in {}"
+                            errstr = errstr.format(sym.paramlist[i].symbol.name, sym.name,
+                                                   str(sym.paramlist[i].symbol.pascaltype), child.token.location)
+                            raise TACException(errstr)
+
                     if isinstance(tmp.pascaltype, pascaltypes.IntegerType) and \
                             isinstance(sym.paramlist[i].symbol.pascaltype, pascaltypes.RealType):
                         tmp2 = Symbol(generator.gettemporary(), tok.location, pascaltypes.RealType())

@@ -190,6 +190,8 @@ def main():
     do_compilefailtest("tests/compilefail12.pas", "tests/compilefail12.out")
     do_compilefailtest("tests/compilefail13.pas", "tests/compilefail13.out")
     do_compilefailtest("tests/compilefail14.pas", "tests/compilefail14.out")
+    do_compilefailtest("tests/compilefail15.pas", "tests/compilefail15.out")
+    do_compilefailtest("tests/compilefail16.pas", "tests/compilefail16.out")
 
     print("Tests Attempted: " + str(NUM_ATTEMPTS))
     print("Tests Succeeded: " + str(NUM_SUCCESSES))
