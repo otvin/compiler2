@@ -67,9 +67,11 @@ def do_compilefailtest(infilename, resultfilename):
 
         try:
             # the carriage return is included in the output files to end the line
-            comparestr = compiler.compile(infilename).rstrip()
+            asmfilename = infilename[:-4] + ".asm"
+            comparestr = compiler.compile(infilename, asmfilename=asmfilename).rstrip()
 
-            # TODO remove any .asm file that is generated, as some compiler fails occur after some assembly is written.
+            if os.path.exists(asmfilename):
+                os.system("rm {}".format(asmfilename))
 
             resultfile = open(resultfilename, "r")
             resultvalue = resultfile.read().rstrip()
