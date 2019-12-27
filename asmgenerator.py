@@ -2,8 +2,12 @@ import os
 from tac_ir import TACBlock, TACLabelNode, TACParamNode, TACCallSystemFunctionNode, TACUnaryLiteralNode, \
     TACOperator, TACGenerator, TACCommentNode, TACBinaryNode, TACUnaryNode, TACGotoNode, TACIFZNode, \
     TACFunctionReturnNode, TACCallFunctionNode
-from symboltable import StringLiteral, NumericLiteral, Symbol, Parameter, ActivationSymbol
+from symboltable import StringLiteral, NumericLiteral, Symbol, Parameter, ActivationSymbol, FunctionResultVariableSymbol
 import pascaltypes
+
+# These values are only used to make the comments line up nicely in your editor
+global_NUM_SPACES_IN_TAB = 8  # this helps comments land in the right spot in your editor
+global_NUM_TABS_FOR_COMMENT = 6
 
 
 class ASMGeneratorError(Exception):
@@ -87,19 +91,46 @@ class AssemblyGenerator:
         self.emit(s + '\n')
 
     def emitcode(self, s, comment=None):
+        global global_NUM_SPACES_IN_TAB
+        global global_NUM_TABS_FOR_COMMENT
+
         if comment is None:
             self.emitln('\t' + s)
         else:
-            self.emitln('\t' + s + '\t\t;' + comment)
+            numtabs = global_NUM_TABS_FOR_COMMENT - 1 - (len(s) // global_NUM_SPACES_IN_TAB)
+            if numtabs < 0:
+                numtabs = 0
+            tabstr = ""
+            for i in range(numtabs):
+                tabstr += "\t"
+            self.emitln('\t' + s + tabstr + ';' + comment)
 
-    def emitlabel(self, labelname):
-        self.emitln(labelname + ":")
+    def emitlabel(self, labelname, comment=None):
+        global global_NUM_SPACES_IN_TAB
+        global global_NUM_TABS_FOR_COMMENT
+        if comment is None:
+            self.emitln(labelname + ":")
+        else:
+            numtabs = global_NUM_TABS_FOR_COMMENT - (len(labelname) // global_NUM_SPACES_IN_TAB)
+            if numtabs < 0:
+                numtabs = 0
+            tabstr = ""
+            for i in range(numtabs):
+                tabstr += "\t"
+            self.emitln(labelname + ':' + tabstr + ';' + comment)
 
     def emitsection(self, sectionname):
         self.emitln("section .{}".format(sectionname))
 
-    def emitcomment(self, commentstr):
-        self.emitln("; {}".format(commentstr))
+    def emitcomment(self, commentstr, indented=False):
+        global global_NUM_SPACES_IN_TAB
+        global global_NUM_TABS_FOR_COMMENT
+
+        tabstr = ""
+        if indented:
+            for i in range(global_NUM_TABS_FOR_COMMENT):
+                tabstr += "\t"
+        self.emitln("{}; {}".format(tabstr, commentstr))
 
     def emitpushxmmreg(self, reg):
         self.emitcode("SUB RSP, 16", "PUSH " + reg)
@@ -194,7 +225,8 @@ class AssemblyGenerator:
                 self.emitlabel("main")
                 tacnodelist = block.tacnodes
             else:
-                self.emitlabel(block.tacnodes[0].label.name)
+                self.emitlabel(block.tacnodes[0].label.name, block.tacnodes[0].comment
+                               )
                 tacnodelist = block.tacnodes[1:]
 
             totalstorageneeded = 0  # measured in bytes
@@ -217,13 +249,27 @@ class AssemblyGenerator:
                 # which then gets us back to 16-byte alignment.
                 # If we are ever out of alignment, we will segfault calling printf() with XMM registers
 
-                totalstorageneeded += 16 - (totalstorageneeded % 16)
+                if totalstorageneeded % 16 > 0:
+                    totalstorageneeded += 16 - (totalstorageneeded % 16)
                 self.emitcode("SUB RSP, " + str(totalstorageneeded), "allocate local storage")
 
                 if not block.ismain:
 
                     numintparams = 0
                     numrealparams = 0
+
+                    # this is just for getting the comments done
+                    for param in block.paramlist:
+                        localsym = block.symboltable.fetch(param.symbol.name)
+                        self.emitcomment("Parameter {} - [{}]".format(param.symbol.name, localsym.memoryaddress), True)
+                    for symname in block.symboltable.symbols.keys():
+                        if block.paramlist.fetch(symname) is None:
+                            localsym = block.symboltable.symbols[symname]
+                            if isinstance(localsym, FunctionResultVariableSymbol):
+                                self.emitcomment("Function Result - [{}]".format(localsym.memoryaddress), True)
+                            else:
+                                self.emitcomment("Local Variable {} - [{}]".format(symname,
+                                                                                   localsym.memoryaddress), True)
 
                     for param in block.paramlist:
                         localsym = block.symboltable.fetch(param.symbol.name)
@@ -252,7 +298,7 @@ class AssemblyGenerator:
                 if isinstance(node, TACCommentNode):
                     self.emitcomment(node.comment)
                 elif isinstance(node, TACLabelNode):
-                    self.emitlabel(node.label.name)
+                    self.emitlabel(node.label.name, node.comment)
                 elif isinstance(node, TACGotoNode):
                     self.emitcode("jmp {}".format(node.label.name))
                 elif isinstance(node, TACIFZNode):
@@ -318,7 +364,7 @@ class AssemblyGenerator:
                         # dealing with PEP8 line length
                         glt = self.tacgenerator.globalliteraltable
                         litaddress = glt.fetch(node.literal1.value, pascaltypes.StringLiteralType()).memoryaddress
-                        comment = "Move literal {} into {}".format(node.literal1.value, node.lval.name)
+                        comment = "Move literal '{}' into {}".format(node.literal1.value, node.lval.name)
                         self.emitcode("lea rax, [rel {}]".format(litaddress), comment)
                         self.emit_movtostack_fromregister(node.lval, "rax")
                     elif isinstance(node.literal1, NumericLiteral) and isinstance(node.literal1.pascaltype,
@@ -398,7 +444,7 @@ class AssemblyGenerator:
                             self.emit_movtoxmmregister_fromstack(reg, actualparam.paramval, comment)
                         else:
                             raise ASMGeneratorError("Invalid Parameter Type")
-                    self.emitcode("call {}".format(node.label), "call {}".format(node.funcname))
+                    self.emitcode("call {}".format(node.label), "call {}()".format(node.funcname))
                     if act_symbol.returnpascaltype is not None:
                         # return value is now in either RAX or XMM0 - need to store it in right place
                         comment = "assign return value of function to {}".format(node.lval.name)
@@ -454,8 +500,7 @@ class AssemblyGenerator:
                         self.emitcode("mov rdi, _printf_newln")
                         self.emitcode("mov rax, 0")
                         self.emitcode("call printf wrt ..plt")
-                        self.emitcomment("Flush standard output when we do a writeln")
-                        self.emitcode("XOR RDI, RDI")
+                        self.emitcode("XOR RDI, RDI", "Flush standard output when we do a writeln")
                         self.emitcode("CALL fflush wrt ..plt")
                         self.emitcode("")
                     else:  # pragma: no cover
@@ -588,7 +633,7 @@ class AssemblyGenerator:
                     raise ASMGeneratorError("Unknown TAC node type: {}".format(type(node)))
 
             if totalstorageneeded > 0:
-                self.emitcode("MOV RSP, RBP")
+                self.emitcode("MOV RSP, RBP", "restore stack pointer")
                 self.emitcode("POP RBP")
             if not block.ismain:
                 self.emitcode("RET")

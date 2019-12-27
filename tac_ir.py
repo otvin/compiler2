@@ -71,7 +71,7 @@ from enum import Enum, unique
 from copy import deepcopy
 from parser import AST, isrelationaloperator
 from symboltable import Symbol, Label, Literal, NumericLiteral, StringLiteral, BooleanLiteral,\
-    SymbolTable, LiteralTable, ParameterList, ActivationSymbol, Parameter, VariableSymbol, \
+    SymbolTable, LiteralTable, ParameterList, ActivationSymbol, Parameter, \
     FunctionResultVariableSymbol
 from lexer import TokenType, Token
 import pascaltypes
@@ -165,10 +165,12 @@ class TACCommentNode(TACNode):
 
 
 class TACLabelNode(TACNode):
-    def __init__(self, label):
+    def __init__(self, label, comment=None):
         assert isinstance(label, Label)
+        assert comment is None or isinstance(comment, str)
         super().__init__(TACOperator.LABEL)
         self.label = label
+        self.comment = comment
 
     def __str__(self):
         return "{}:".format(self.label)
@@ -388,7 +390,12 @@ class TACBlock:
             assert isinstance(actsym, ActivationSymbol)
             proclabel = generator.getlabel(str_procname)
             actsym.label = proclabel
-            self.addnode(TACLabelNode(proclabel))
+            if tok.tokentype == TokenType.FUNCTION:
+                comment = "Function {}({})".format(str_procname, str(self.paramlist))
+            else:
+                comment = "Procedure {}({})".format(str_procname, str(self.paramlist))
+            self.addnode(TACLabelNode(proclabel, comment))
+
             for child in ast.children[1:]:
                 self.processast(child, generator)
 

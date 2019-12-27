@@ -273,7 +273,7 @@ class ParameterList:
 
     def __iter__(self):
         self.__pos = 0
-        return(self)
+        return self
 
     def __next__(self):
         try:
@@ -285,8 +285,10 @@ class ParameterList:
 
     def __str__(self):
         ret = ""
-        for param in self.paramlist:
-            ret += str(param) + "\n"
+        if len(self.paramlist) > 0:
+            ret = "{}:{}".format(str(self.paramlist[0]), self.paramlist[0].symbol.pascaltype.typename)
+        for param in self.paramlist[1:]:
+            ret += ", " + "{}:{}".format(str(param), param.symbol.pascaltype.typename)
         return ret
 
     def __len__(self):
