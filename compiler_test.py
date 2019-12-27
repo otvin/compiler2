@@ -67,21 +67,20 @@ def do_compilefailtest(infilename, resultfilename):
 
         try:
             # the carriage return is included in the output files to end the line
-            comparestr = compiler.compile(infilename) + "\n"
-            # print(comparestr)
+            comparestr = compiler.compile(infilename).rstrip()
 
             # TODO remove any .asm file that is generated, as some compiler fails occur after some assembly is written.
 
             resultfile = open(resultfilename, "r")
-            resultvalue = resultfile.read()
+            resultvalue = resultfile.read().rstrip()
             resultfile.close()
 
             if resultvalue == comparestr:
                 print("PASS: {0}".format(infilename))
                 NUM_SUCCESSES += 1
             else:
-                print("*" + comparestr + "*")
-                print("&" + resultvalue + "&")
+                print("Actual: " + comparestr)
+                print("Expected: " + resultvalue)
                 print("FAIL: {0}".format(infilename))
         except Exception as e:
             print("FAIL: {0}".format(infilename))
@@ -184,6 +183,13 @@ def main():
     do_compilefailtest("tests/compilefail05.pas", "tests/compilefail05.out")
     do_compilefailtest("tests/compilefail06.pas", "tests/compilefail06.out")
     do_compilefailtest("tests/compilefail07.pas", "tests/compilefail07.out")
+    do_compilefailtest("tests/compilefail08.pas", "tests/compilefail08.out")
+    do_compilefailtest("tests/compilefail09.pas", "tests/compilefail09.out")
+    do_compilefailtest("tests/compilefail10.pas", "tests/compilefail10.out")
+    do_compilefailtest("tests/compilefail11.pas", "tests/compilefail11.out")
+    do_compilefailtest("tests/compilefail12.pas", "tests/compilefail12.out")
+    do_compilefailtest("tests/compilefail13.pas", "tests/compilefail13.out")
+    do_compilefailtest("tests/compilefail14.pas", "tests/compilefail14.out")
 
     print("Tests Attempted: " + str(NUM_ATTEMPTS))
     print("Tests Succeeded: " + str(NUM_SUCCESSES))

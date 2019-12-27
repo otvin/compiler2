@@ -147,7 +147,11 @@ class Parser:
         assert(isinstance(tokentype, TokenType)), "Parser.getexpectedtoken: Expected Token must be a token"
         ret = self.tokenstream.eattoken()
         if ret.tokentype != tokentype:
-            errstr = "Expected {0} but saw '{1}' in {2}".format(str(tokentype), str(ret.value), str(ret.location))
+            if tokentype == tokentype.SEMICOLON:
+                # TODO - insert a semicolon into the stream and allow parsing to continue
+                errstr = "Semicolon expected in {}".format(str(ret.location))
+            else:
+                errstr = "Expected {0} but saw '{1}' in {2}".format(str(tokentype), str(ret.value), str(ret.location))
             raise ParseException(errstr)
         assert isinstance(ret, Token)
         return ret
@@ -320,7 +324,6 @@ class Parser:
         # 6.6.2 <function-identifier> ::= <identifier>
         # 6.7.3 <actual-parameter-list> ::= "(" <actual-parameter> {"," <actual-parameter>} ")"
 
-        # TODO - add more than unsigned-constant and ( expression )
         if self.tokenstream.peektokentype() == TokenType.LPAREN:
             self.getexpectedtoken(TokenType.LPAREN)
             ret = self.parse_expression(parent_ast)
@@ -343,6 +346,18 @@ class Parser:
                 # If we see a left paren however, we have the actual parameter list
                 ret = AST(self.tokenstream.eattoken(), parent_ast)
                 if self.tokenstream.peektokentype() == TokenType.LPAREN:
+                    # now we know it's supposed to be a function-designator.  But, it could be a
+                    # procedure by mistake, which would be a compile error.
+                    str_procfuncname = ret.token.value
+                    # in case of recursion, the actsym will be potentially the return value of a function
+                    # instead of an Activation symbol.  But in every other instance, it should be an
+                    # activation symbol that we can test.
+                    actsym = ret.nearest_symboltable().fetch(str_procfuncname)
+                    if isinstance(actsym, ActivationSymbol):
+                        if actsym.returnpascaltype is None:
+                            errstr = "Procedure {} cannot be used as parameter to {}() in {}"
+                            errstr = errstr.format(str_procfuncname, parent_ast.token.value, ret.token.location)
+                            raise ParseException(errstr)
                     self.parse_actualparameterlist(ret)
             else:
                 errtok = self.tokenstream.eattoken()
@@ -454,13 +469,16 @@ class Parser:
             tmp_paramlist = tmp_ast.paramlist
             while tmp_paramlist is None:
                 assert isinstance(tmp_ast, AST)
-                assert tmp_ast.parent is not None
+                if tmp_ast.parent is None:
+                    # we made it to the top of the AST without finding a param list.  Since
+                    errstr = "Undefined Identifier: {} in {}".format(ident_token.value, ident_token.location)
+                    raise ParseException(errstr)
                 tmp_ast = tmp_ast.parent
                 tmp_paramlist = tmp_ast.paramlist
             assert isinstance(tmp_paramlist, ParameterList)
             param = tmp_paramlist.fetch(ident_token.value)
             if param is None:
-                raise ParseException("Undefined Identifier: {}".format(ident_token.value))
+                raise ParseException("Undefined Identifier: {} in {}".format(ident_token.value, ident_token.location))
             else:
                 assert isinstance(param, Parameter)
         else:
@@ -708,6 +726,12 @@ class Parser:
             self.getexpectedtoken(TokenType.SEMICOLON)
             if self.tokenstream.peektokentype() != endtokentype:
                 current_ast.children.append(self.parse_statement(current_ast))
+            if self.tokenstream.peektokentype() != TokenType.SEMICOLON \
+                    and self.tokenstream.peektokentype() != endtokentype:
+                # TODO - insert a semicolon into the stream and allow parsing to continue
+                # special case error if we don't see the end token and don't see a semicolon
+                nexttok = self.tokenstream.peektoken()
+                raise ParseException("Semicolon expected in {}".format(nexttok.location))
 
     def parse_compoundstatement(self, parent_ast):
         # 6.8.3.2 - <compound-statement> ::= "begin" <statement-sequence> "end"

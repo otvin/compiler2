@@ -260,7 +260,11 @@ class ParameterList:
 
     def add(self, param):
         assert isinstance(param, Parameter)
-        self.paramlist.append(param)
+        if self.fetch(param.symbol.name):
+            errstr = "Parameter Redefined: {} in {}".format(param.symbol.name, param.symbol.location)
+            raise SymbolException(errstr)
+        else:
+            self.paramlist.append(param)
 
     def fetch(self, str_paramname):
         # returns None if not found
@@ -304,10 +308,11 @@ class SymbolTable:
         self.parent = None
 
     def add(self, sym):
-        if not isinstance(sym, Symbol) and not isinstance(sym, Label):
-            raise SymbolException("Can only add Symbols and Labels to SymbolTables")
+        assert isinstance(sym, Symbol) or isinstance(sym, Label), "Can only add Symbols and Labels to SymbolTables"
         if sym.name in self.symbols.keys():
             errstr = "Symbol Redefined: {}".format(sym.name)
+            if isinstance(sym, Symbol):
+                errstr += " in {}".format(sym.location)
             raise SymbolRedefinedException(errstr)
         # Unlike literals, where case matters ('abc' is different from 'aBc'), symbols in Pascal are
         # case-insensitive.  So, store them in our symbol table as lower-case.
