@@ -1,0 +1,3 @@
+before calling myfunc, r = 34
+after calling myfunc, r = 51
+68

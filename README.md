@@ -17,7 +17,7 @@ Compiler2 supports the following Pascal Language features:
 * Logical operators: equal to, not equal, less than, less than or equal, greater than, greater than or equal
   * both Real and Integer; can compare integers to reals.
 * Procedures and Functions
-  *  Parameters passed by value only
+  *  Parameters passed by value or by reference ("variable parameters" in Pascal-speak)
   *  Functions can return integers, Booleans, or reals
   *  Up to 8 Real parameters by value, up to a combined 6 Integer/String or by reference parameters
   *  Integers passed in byval to Real parameters get converted to Real
@@ -33,12 +33,9 @@ Compiler2 supports the following Pascal Language features:
  
 ### Commentary
 
-At this point, Compiler2 is missing some functionality that was in compiler1. Specifically:
-* String-typed Variables
-* The concat() String operation
-* "Variable parameters" (parameters to procedures and functions passed by reference)  
+At this point, Compiler2 has all features from Compiler1 except for String support.
 
-However, Compiler2 has the following functionality that compiler1 did not:
+Compiler2 also has the following functionality that compiler1 did not:
 * Boolean type
 * REPEAT..UNTIL construct
 * Ability to do relational operations comparing Integer and Real types
@@ -61,7 +58,7 @@ will make it easier to surpass the functionality of my previous attempt.
 
 ### Unit tests
 
-Compiler2 currently passes 42 of the 60 unit tests created for Compiler, plus an additional 30
+Compiler2 currently passes 46 of the 60 unit tests created for Compiler, plus an additional 31
  tests unique to Compiler2.  You can execute the working
 bits of the unit test suite by running:
 

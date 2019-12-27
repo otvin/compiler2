@@ -1,0 +1,28 @@
+Before a byval edit call, b = 84
+func returns: 42
+After byval edit call, b = 84
+
+reset b
+Before byref edit call, b = 33
+func returns: 
+a is this 33
+a is now this 34
+a is now this 34
+17
+After byref edit call, b = 34
+
+master func = -2
+Before a byval edit call, b = -74
+func returns: -36
+After byval edit call, b = -74
+
+reset b
+Before byref edit call, b = -46
+func returns: 
+a is this -46
+a is now this -45
+a is now this -45
+-22
+After byref edit call, b = -45
+
+master func = -2
