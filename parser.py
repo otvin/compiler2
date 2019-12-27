@@ -151,7 +151,7 @@ class Parser:
                 # TODO - insert a semicolon into the stream and allow parsing to continue
                 errstr = "Semicolon expected in {}".format(str(ret.location))
             else:
-                errstr = "Expected {0} but saw '{1}' in {2}".format(str(tokentype), str(ret.value), str(ret.location))
+                errstr = "Expected '{0}' but saw '{1}' in {2}".format(str(tokentype), str(ret.value), str(ret.location))
             raise ParseException(errstr)
         assert isinstance(ret, Token)
         return ret
@@ -287,6 +287,21 @@ class Parser:
                 self.parse_formalparameterlist(ast_procfunc.paramlist)
 
             if tok_procfunc.tokentype == TokenType.FUNCTION:
+                if self.tokenstream.peektokentype() != TokenType.COLON:
+                    # see if the next token is a return type
+                    tmp_symboltype = None
+                    tmp_token = self.tokenstream.peektoken()
+                    try:
+                        tmp_symboltype = self.parse_typeidentifier()
+                    except ParseException:
+                        pass  # errors' are ok here.
+
+                    if tmp_symboltype is None:
+                        errstr = "Function {} missing return type at {}".format(tok_procfuncname.value,
+                                                                                tok_procfunc.location)
+                    else:
+                        errstr = "Expected ':' but saw '{}' in {}".format(tmp_token.value, tmp_token.location)
+                    raise ParseException(errstr)
                 self.getexpectedtoken(TokenType.COLON)
                 resulttype = self.parse_typeidentifier()
                 # 6.6.2 - functions can only return simple types or pointers
