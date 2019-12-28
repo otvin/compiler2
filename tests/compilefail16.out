@@ -1,1 +1,1 @@
-Type Mismatch - parameter r of addone() must be type real in file:tests/compilefail16.pas line:13    column:9  
+Type Mismatch - parameter r of addone() must be type real in file:tests/compilefail16.pas line:13    column:12 

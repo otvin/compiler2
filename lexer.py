@@ -1,6 +1,7 @@
 from enum import Enum, unique
 from copy import copy
 from filelocation import FileLocation
+from editor_settings import NUM_SPACES_IN_TAB
 
 
 class LexerException(Exception):
@@ -374,6 +375,8 @@ class Lexer:
             if ret == '\n':
                 self.location.line += 1
                 self.location.column = 1
+            elif ret == '\t':
+                self.location.column += NUM_SPACES_IN_TAB
             else:
                 self.location.column += 1
             return ret

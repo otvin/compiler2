@@ -3,11 +3,10 @@ from tac_ir import TACBlock, TACLabelNode, TACParamNode, TACCallSystemFunctionNo
     TACOperator, TACGenerator, TACCommentNode, TACBinaryNode, TACUnaryNode, TACGotoNode, TACIFZNode, \
     TACFunctionReturnNode, TACCallFunctionNode
 from symboltable import StringLiteral, NumericLiteral, Symbol, Parameter, ActivationSymbol, FunctionResultVariableSymbol
+from editor_settings import NUM_SPACES_IN_TAB, NUM_TABS_FOR_COMMENT
 import pascaltypes
 
-# These values are only used to make the comments line up nicely in your editor
-global_NUM_SPACES_IN_TAB = 8  # this helps comments land in the right spot in your editor
-global_NUM_TABS_FOR_COMMENT = 6
+
 
 
 class ASMGeneratorError(Exception):
@@ -15,14 +14,13 @@ class ASMGeneratorError(Exception):
 
 
 # helper functions
-global_VALID_REGISTER_LIST = ["RAX", "RBX", "RCX", "RDX", "RSI", "RDI", "RBP", "RSP", "R8", "R9", "R10", "R11", "R12",
-                              "R13", "R14", "R15", "R16"]
+VALID_REGISTER_LIST = ["RAX", "RBX", "RCX", "RDX", "RSI", "RDI", "RBP", "RSP", "R8", "R9", "R10", "R11", "R12",
+                       "R13", "R14", "R15", "R16"]
 
 
 def get_register_slice_bybytes(register, numbytes):
-    global global_VALID_REGISTER_LIST
     assert numbytes in [1, 2, 4, 8]
-    assert register in global_VALID_REGISTER_LIST
+    assert register in VALID_REGISTER_LIST
 
     # TODO - https://stackoverflow.com/questions/41573502/why-doesnt-gcc-use-partial-registers - when we get to types
     # that are 1 or 2 bytes, need to make sure we don't get in trouble.
@@ -91,13 +89,10 @@ class AssemblyGenerator:
         self.emit(s + '\n')
 
     def emitcode(self, s, comment=None):
-        global global_NUM_SPACES_IN_TAB
-        global global_NUM_TABS_FOR_COMMENT
-
         if comment is None:
             self.emitln('\t' + s)
         else:
-            numtabs = global_NUM_TABS_FOR_COMMENT - 1 - (len(s) // global_NUM_SPACES_IN_TAB)
+            numtabs = NUM_TABS_FOR_COMMENT - 1 - (len(s) // NUM_SPACES_IN_TAB)
             if numtabs < 0:
                 numtabs = 0
             tabstr = ""
@@ -106,12 +101,10 @@ class AssemblyGenerator:
             self.emitln('\t' + s + tabstr + ';' + comment)
 
     def emitlabel(self, labelname, comment=None):
-        global global_NUM_SPACES_IN_TAB
-        global global_NUM_TABS_FOR_COMMENT
         if comment is None:
             self.emitln(labelname + ":")
         else:
-            numtabs = global_NUM_TABS_FOR_COMMENT - (len(labelname) // global_NUM_SPACES_IN_TAB)
+            numtabs = NUM_TABS_FOR_COMMENT - (len(labelname) // NUM_SPACES_IN_TAB)
             if numtabs < 0:
                 numtabs = 0
             tabstr = ""
@@ -123,12 +116,10 @@ class AssemblyGenerator:
         self.emitln("section .{}".format(sectionname))
 
     def emitcomment(self, commentstr, indented=False):
-        global global_NUM_SPACES_IN_TAB
-        global global_NUM_TABS_FOR_COMMENT
 
         tabstr = ""
         if indented:
-            for i in range(global_NUM_TABS_FOR_COMMENT):
+            for i in range(NUM_TABS_FOR_COMMENT):
                 tabstr += "\t"
         self.emitln("{}; {}".format(tabstr, commentstr))
 

@@ -1,1 +1,1 @@
-Procedure two cannot be used as parameter to writeln() in file:tests/compilefail14.pas line:11    column:10 
+Procedure two cannot be used as parameter to writeln() in file:tests/compilefail14.pas line:11    column:13 
