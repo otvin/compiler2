@@ -19,9 +19,9 @@ resemble more common BNF terminology.
 
 
 # Helper Functions
-def token_errstr(tok, msg="Invalid Token"):
+def token_errstr(tok, msg="Invalid Token:"):
     assert(isinstance(tok, Token)), "Non-token generating token error {}".format(msg)
-    return msg + " {0} in {1}".format(tok.value, str(tok.location))
+    return msg + " '{0}' in {1}".format(tok.value, str(tok.location))
 
 
 def isrelationaloperator(tokentype):
@@ -107,7 +107,8 @@ class AST:
     def initparamlist(self):
         self.paramlist = ParameterList()
 
-    def rpn_print(self, level=0):
+    def rpn_print(self, level=0):  # pragma: no-cover
+        # used only for debugging
         for x in self.children:
             x.rpn_print(level + 1)
         if self.comment == "":
@@ -125,7 +126,8 @@ class AST:
         assert isinstance(ptr.symboltable, SymbolTable)
         return ptr.symboltable
 
-    def dump_symboltables(self):
+    def dump_symboltables(self):  # pragma: no-cover
+        # used only for debugging
         for child in self.children:
             child.dump_symboltables()
         if self.symboltable is not None:
@@ -448,6 +450,7 @@ class Parser:
         # to see if it is a file-variable.
         # TODO: The file-variable, or implied file-variable OUTPUT should be a symbol.
         if self.tokenstream.peektokentype() == TokenType.OUTPUT:
+            # note - the below code will fail because TAC-IR won't know how to parse the OUTPUT token
             ret.children.append(AST(self.getexpectedtoken(TokenType.OUTPUT), parent_ast))
             self.getexpectedtoken(TokenType.COMMA)
 
@@ -618,7 +621,7 @@ class Parser:
                     errstr = "Identifier '{}' seen at {}, unclear how to parse".format(tok.value, tok.location)
                     raise ParseException(errstr)
         else:
-            raise ParseException(token_errstr(self.tokenstream.eattoken()), "Unexpected token in parse_simplestatement")
+            raise ParseException(token_errstr(self.tokenstream.eattoken()))
 
     def parse_ifstatement(self, parent_ast):
         # 6.8.3.4 <if-statement> ::= "if" <Boolean-expression> "then" <statement> [else-part]

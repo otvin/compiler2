@@ -482,6 +482,9 @@ class TACBlock:
             self.addnode(TACUnaryNode(lval, TACOperator.ASSIGN, newrval))
             return lval
         elif tok.tokentype == TokenType.IDENTIFIER:
+            if not self.symboltable.existsanywhere(tok.value):
+                errstr = "Undefined Identifier: {} in {}".format(tok.value, tok.location)
+                raise TACException(errstr)
             sym = self.symboltable.fetch(tok.value)
             if isinstance(sym, FunctionResultVariableSymbol):
                 # we know it is a function, so get the activation symbol, which is stored in the parent

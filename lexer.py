@@ -296,7 +296,7 @@ class TokenStream:
         try:
             ret = self.tokenlist[self.pos]
         except IndexError:
-            raise LexerException("Unexpected end of file")
+            raise LexerException("Missing 'end' statement or Unexpected end of file")
         self.pos += 1
         return ret
 

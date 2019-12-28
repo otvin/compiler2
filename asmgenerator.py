@@ -321,32 +321,22 @@ class AssemblyGenerator:
                             self.emitcode("movsd XMM0, [{}]".format(node.returnval.memoryaddress), "set up return val")
                 elif isinstance(node, TACUnaryNode):
                     if node.operator == TACOperator.INTTOREAL:
+                        assert node.arg1.pascaltype.size in [1,2,4,8]
                         if node.arg1.pascaltype.size in (1, 2):
                             raise ASMGeneratorError("Cannot handle 8- or 16-bit int convert to real")
                         elif node.arg1.pascaltype.size == 4:
                             # extend to 8 bytes
                             self.emitcode("mov eax, [{}]".format(node.arg1.memoryaddress))
                             self.emitcode("cdqe")
-                        elif node.arg1.pascaltype.size == 8:
-                            self.emitcode("mov rax, [{}]".format(node.arg1.memoryaddress))
                         else:
-                            raise ASMGeneratorError("Invalid size for integer")
+                            self.emitcode("mov rax, [{}]".format(node.arg1.memoryaddress))
                         # rax now has the value we need to convert to the float
                         comment = "convert {} to real, store result in {}".format(node.arg1.name, node.lval.name)
                         self.emitcode("cvtsi2sd xmm0, rax", comment)
                         # now save the float into its location
                         self.emitcode("movsd [{}], xmm0".format(node.lval.memoryaddress))
                     elif node.operator == TACOperator.ASSIGN:
-                        if node.lval.pascaltype.size == 1:
-                            reg = "al"
-                        elif node.lval.pascaltype.size == 2:
-                            reg = "ax"
-                        elif node.lval.pascaltype.size == 4:
-                            reg = "eax"
-                        elif node.lval.pascaltype.size == 8:
-                            reg = "rax"
-                        else:  # pragma: no cover
-                            raise ASMGeneratorError("Invalid Size for assignment")
+                        reg = get_register_slice_bybytes("RAX", node.lval.pascaltype.size)
 
                         # first, get the arg1 into reg.  If arg1 is a byref parameter, we need to
                         # dereference the pointer.
@@ -392,11 +382,7 @@ class AssemblyGenerator:
                     numrealparams = 0
                     act_symbol = block.symboltable.parent.fetch(node.funcname)
                     assert isinstance(act_symbol, ActivationSymbol)
-                    if node.numparams != len(act_symbol.paramlist):
-                        errstr = "{} expected {} parameters, passed {}.".format(act_symbol.name,
-                                                                                len(act_symbol.paramlist),
-                                                                                node.numparams)
-                        raise ASMGeneratorError(errstr)
+                    assert node.numparams == len(act_symbol.paramlist)  # mismatches are caught upstream
 
                     # localparamlist has a list of TACParamNodes - that has information of what is going in.
                     # act_symbol.paramlist has the information of where it goes
