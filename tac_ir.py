@@ -69,7 +69,7 @@
 
 from enum import Enum, unique
 from copy import deepcopy
-from parser import AST, isrelationaloperator
+from parser import AST, isrelationaloperator, is_isorequiredfunction
 from symboltable import Symbol, Label, Literal, NumericLiteral, StringLiteral, BooleanLiteral,\
     SymbolTable, LiteralTable, ParameterList, ActivationSymbol, Parameter, VariableSymbol,\
     FunctionResultVariableSymbol
@@ -119,6 +119,7 @@ class TACOperator(Enum):
 
 def maptokentype_to_tacoperator(tokentype):
     # Token Types have equivalent TACOperators, this is a mapping
+    assert isinstance(tokentype, TokenType)
     if tokentype == TokenType.EQUALS:
         ret = TACOperator.EQUALS
     elif tokentype == TokenType.NOTEQUAL:
@@ -146,6 +147,64 @@ def maptokentype_to_tacoperator(tokentype):
     else:
         raise ValueError("Unable to map tokentype {} to TACOperator.".format(tokentype))
     return ret
+
+
+def invalidparm_forsystemfunction_errstr(tok, str_requiredtypes):
+    assert isinstance(tok, Token)
+    return "Function {}() requires {} parameter in {}".format(tok.tokentype, str_requiredtypes, tok.location)
+
+
+def requiredfunction_acceptsreal(tokentype):
+    # The arithmetic functions in 6.6.6.2 all accept reals as do the transfer functions in 6.6.6.3.
+    assert isinstance(tokentype, TokenType)
+    if tokentype in (TokenType.ABS, TokenType.SQR, TokenType.SIN, TokenType.COS, TokenType.EXP,
+                     TokenType.LN, TokenType.SQRT, TokenType.ARCTAN, TokenType.TRUNC, TokenType.ROUND):
+        return True
+    else:
+        return False
+
+
+def requiredfunction_acceptsinteger(tokentype):
+    # abs() and sqr() in 6.6.6.2, chr() in 6.6.6.4, and odd() from 6.6.6.5 accept integers
+    assert isinstance(tokentype, TokenType)
+    if tokentype in (TokenType.ABS, TokenType.SQR, TokenType.CHR, TokenType.ODD):
+        return True
+    else:
+        return False
+
+
+def requiredfunction_acceptsordinal(tokentype):
+    # ord(), succ(), pred() in 6.6.6.4 accept ordinals
+    assert isinstance(tokentype, TokenType)
+    if tokentype in (TokenType.ORD, TokenType.SUCC, TokenType.PRED):
+        return True
+    else:
+        return False
+
+
+def requiredfunction_returntype(tokentype, paramtype):
+    # abs() and sqr() in 6.6.6.2 as well as succ() and pred() in 6.6.6.4 return same type as parameter
+    # Remaining functions in 6.6.6.2 return reals
+    # Transfer functions in 6.6.6.3 return ints
+    # ord() in 6.6.6.4 returns int.
+    # chr() in 6.6.6.4 returns char - TODO - support character type
+    # functions in 6.6.6.5 return Boolean
+    if tokentype in (TokenType.ABS, TokenType.SQR, TokenType.SUCC, TokenType.PRED):
+        # this is a bit of hackery but it works
+        ret = deepcopy(paramtype)
+    elif tokentype in (TokenType.SIN, TokenType.COS, TokenType.EXP, TokenType.LN, TokenType.SQRT, TokenType.ARCTAN):
+        ret = pascaltypes.RealType()
+    elif tokentype in (TokenType.TRUNC, TokenType.ROUND, TokenType.ORD):
+        ret = pascaltypes.IntegerType()
+    else:
+        assert tokentype in (TokenType.ODD, TokenType.EOF, TokenType.EOLN)
+        ret = pascaltypes.BooleanType()
+    return ret
+
+
+def maptoken_to_systemfunction_name(tok, typechar):
+    assert isinstance(tok, Token)
+    return "_{}{}".format(str(tok.tokentype).upper(), typechar.upper())
 
 
 class TACNode:
@@ -227,8 +286,8 @@ class TACCallFunctionNode(TACNode):
         if self.lval is None:
             return "{} {} [{}] {}".format(str(self.operator), self.label, self.funcname, str(self.numparams))
         else:
-            return "{} := {} {} {}".format(str(self.lval), str(self.operator),
-                                           self.label, self.funcname, str(self.numparams))
+            return "{} := {} {} [{}]".format(str(self.lval), str(self.operator),
+                                             self.label, self.funcname, str(self.numparams))
 
 
 class TACCallSystemFunctionNode(TACCallFunctionNode):
@@ -403,10 +462,50 @@ class TACBlock:
                 self.addnode(TACFunctionReturnNode(self.symboltable.fetch(str_procname)))
             else:
                 self.addnode(TACFunctionReturnNode(None))
+        elif is_isorequiredfunction(tok.tokentype):
+            tmp = self.processast(ast.children[0], generator)
+            lval = Symbol(generator.gettemporary(), tok.location,
+                          requiredfunction_returntype(tok.tokentype, tmp.pascaltype))
+            self.symboltable.add(lval)
+            if requiredfunction_acceptsordinal(tok.tokentype):
+                if isinstance(tmp.pascaltype, pascaltypes.OrdinalType):
+                    self.addnode(TACParamNode(tmp))
+                    self.addnode(TACCallSystemFunctionNode(Label(maptoken_to_systemfunction_name(tok, "O")), 1, lval))
+                else:
+                    errstr = "Function {}() requires parameter of ordinal type in {}".format(tok.tokentype,
+                                                                                             tok.location)
+                    raise TACException(errstr)
+            elif requiredfunction_acceptsinteger(tok.tokentype):
+                if isinstance(tmp.pascaltype, pascaltypes.IntegerType):
+                    self.addnode(TACParamNode(tmp))
+                    self.addnode(TACCallSystemFunctionNode(Label(maptoken_to_systemfunction_name(tok, "I")), 1, lval))
+                else:
+                    errstr = "Function {}() requires parameter of integer type in {}".format(tok.tokentype,
+                                                                                             tok.location)
+                    raise TACException(errstr)
+            else:
+                assert requiredfunction_acceptsreal(tok.tokentype)
+                if isinstance(tmp.pascaltype, pascaltypes.IntegerType):
+                    tmp2 = Symbol(generator.gettemporary(), tok.location, pascaltypes.RealType())
+                    self.symboltable.add(tmp2)
+                    self.addnode(TACUnaryNode(tmp2, TACOperator.INTTOREAL, tmp))
+                    self.addnode(TACParamNode(tmp2))
+                    self.addnode(TACCallSystemFunctionNode(Label(maptoken_to_systemfunction_name(tok, "R")), 1, lval))
+                elif isinstance(tmp.pascaltype, pascaltypes.RealType):
+                    self.addnode(TACParamNode(tmp))
+                    self.addnode(TACCallSystemFunctionNode(Label(maptoken_to_systemfunction_name(tok, "R")), 1, lval))
+                else:
+                    # sqr() and abs() accept integer and real, others only accept reals
+                    if tok.tokentype in (TokenType.SQR, TokenType.ABS):
+                        errstr = "Function {}() requires parameter of integer or real type in {}"
+                    else:
+                        errstr = "Function {}() requires parameter of real type in {}"
+                    errstr = errstr.format(tok.tokentype, tok.location)
+                    raise TACException(errstr)
 
+                return lval
         elif tok.tokentype in (TokenType.WRITE, TokenType.WRITELN):
             for child in ast.children:
-                # TODO - if child is a procedure, not a function, we should have a compile error here.
                 tmp = self.processast(child, generator)
                 self.addnode(TACParamNode(tmp))
                 if isinstance(tmp.pascaltype, pascaltypes.StringLiteralType):
@@ -458,11 +557,8 @@ class TACBlock:
             labelstart = generator.getlabel()
             self.addnode(TACLabelNode(labelstart))
             maxchild = len(ast.children) - 1
-            # TODO - there is a more pythonic way to do this, but I cannot look it up now
-            i = 0
-            while i < maxchild:
-                self.processast(ast.children[i], generator)
-                i += 1
+            for child in ast.children[:-1]:
+                self.processast(child, generator)
             condition = self.processast(ast.children[maxchild], generator)
             self.addnode(TACIFZNode(condition, labelstart))
         elif tok.tokentype == TokenType.ASSIGNMENT:

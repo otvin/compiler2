@@ -1,7 +1,7 @@
 from enum import Enum, unique, auto
 from lexer import TokenType, Token, TokenStream, LexerException
 from symboltable import StringLiteral, NumericLiteral, LiteralTable, SymbolTable, VariableSymbol, ParameterList, \
-    ActivationSymbol, FunctionResultVariableSymbol, Parameter
+    ActivationSymbol, FunctionResultVariableSymbol, Parameter, SymbolException
 import pascaltypes
 
 '''
@@ -20,12 +20,13 @@ resemble more common BNF terminology.
 
 # Helper Functions
 def token_errstr(tok, msg="Invalid Token:"):
-    assert(isinstance(tok, Token)), "Non-token generating token error {}".format(msg)
+    assert isinstance(tok, Token), "Non-token generating token error {}".format(msg)
     return msg + " '{0}' in {1}".format(tok.value, str(tok.location))
 
 
 def isrelationaloperator(tokentype):
     # 6.7.2.1 <relational-operator> ::= "=" | "<>" | "<" | ">" | "<=" | ">=" | "in"
+    assert isinstance(tokentype, TokenType)
     if tokentype in (TokenType.EQUALS, TokenType.NOTEQUAL, TokenType.LESS, TokenType.GREATER,
                      TokenType.LESSEQ, TokenType.GREATEREQ, TokenType.IN):
         return True
@@ -35,6 +36,7 @@ def isrelationaloperator(tokentype):
 
 def ismultiplyingoperator(tokentype):
     # 6.7.2.1 <multiplying-operator> ::= "*" | "/" | "div" | "mod" | "and"
+    assert isinstance(tokentype, TokenType)
     if tokentype in (TokenType.MULTIPLY, TokenType.DIVIDE, TokenType.IDIV, TokenType.MOD, TokenType.AND):
         return True
     else:
@@ -43,7 +45,20 @@ def ismultiplyingoperator(tokentype):
 
 def isaddingoperator(tokentype):
     # 6.7.2.1 <adding-operator> ::= "+" | "-" | "or"
+    assert isinstance(tokentype, TokenType)
     if tokentype in (TokenType.PLUS, TokenType.MINUS, TokenType.OR):
+        return True
+    else:
+        return False
+
+
+def is_isorequiredfunction(tokentype):
+    # 6.6.6 in the ISO Standard lists required functions.
+    assert isinstance(tokentype, TokenType)
+    if tokentype in (TokenType.ABS, TokenType.SQR, TokenType.SIN, TokenType.COS, TokenType.EXP,
+                     TokenType.LN, TokenType.SQRT, TokenType.ARCTAN, TokenType.TRUNC,
+                     TokenType.ROUND, TokenType.ORD, TokenType.CHR, TokenType.SUCC, TokenType.PRED,
+                     TokenType.ODD, TokenType.EOF, TokenType.EOLN):
         return True
     else:
         return False
@@ -357,6 +372,15 @@ class Parser:
                 tok_charstr = self.getexpectedtoken(TokenType.CHARSTRING)
                 self.literaltable.add(StringLiteral(tok_charstr.value, tok_charstr.location))
                 ret = AST(tok_charstr, parent_ast)
+            elif is_isorequiredfunction(self.tokenstream.peektokentype()):
+                # 6.6.6 in the ISO Standard lists required functions.  All required functions take one
+                # argument.  Note, by parsing it this way instead of parsing out the parameter list, we will
+                # compile error with a right paren is expected instead of a comma, instead of number of
+                # parameters not matching the 1 that is expected.
+                ret = AST(self.tokenstream.eattoken(), parent_ast)
+                self.getexpectedtoken(TokenType.LPAREN)
+                ret.children.append(self.parse_expression(ret))
+                self.getexpectedtoken(TokenType.RPAREN)
             elif self.tokenstream.peektokentype() == TokenType.IDENTIFIER:
                 # An identifier standalone could either be variable-access or function-designator with
                 # no actual parameter list.  That's fine here, we will disambiguate when generating the TAC.
@@ -613,7 +637,10 @@ class Parser:
                 return self.parse_assignmentstatement(parent_ast)
             else:
                 next_tokenname = self.tokenstream.peektoken().value
-                sym = parent_ast.nearest_symboltable().fetch(next_tokenname)
+                try:
+                    sym = parent_ast.nearest_symboltable().fetch(next_tokenname)
+                except SymbolException:
+                    raise ParseException(token_errstr(self.tokenstream.peektoken(), "Identifier undefined"))
                 if isinstance(sym, ActivationSymbol):
                     return self.parse_procedurestatement(parent_ast)
                 else:

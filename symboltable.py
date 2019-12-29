@@ -328,7 +328,8 @@ class SymbolTable:
                 foundit = True
             else:
                 curtable = curtable.parent
-        assert foundit
+        if not foundit:
+            raise SymbolException("Identifier not found: {}".format(name))
         assert isinstance(ret, Symbol)
         return ret
 

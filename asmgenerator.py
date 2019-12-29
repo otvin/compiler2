@@ -179,6 +179,8 @@ class AssemblyGenerator:
         self.emitcode('_stringerr_0 db `Overflow error`, 0')
         self.emitcode('_stringerr_1 db `Division by zero error`, 0')
         self.emitcode('_stringerr_2 db `Error: Divisor in Mod must be positive`, 0')
+        self.emitcode('_stringerr_3 db `Error: Cannot take sqrt() of negative number`, 0')
+        self.emitcode('_stringerr_4 db `Error: Cannot take ln() of number less than or equal to zero`, 0')
         self.emitcomment("support for write() commands")
         self.emitcode('_printf_intfmt db "%d",0')
         self.emitcode('_printf_strfmt db "%s",0')
@@ -284,7 +286,14 @@ class AssemblyGenerator:
                             regslice = get_register_slice_bybytes(paramreg, param.symbol.pascaltype.size)
                             self.emitcode("mov [{}], {}".format(localsym.memoryaddress, regslice),
                                           "Copy parameter {} to stack".format(param.symbol.name))
-
+                else:
+                    for symname in block.symboltable.symbols.keys():
+                        localsym = block.symboltable.symbols[symname]
+                        if isinstance(localsym, FunctionResultVariableSymbol):
+                            self.emitcomment("Function Result - [{}]".format(localsym.memoryaddress), True)
+                        else:
+                            self.emitcomment("Local Variable {} - [{}]".format(symname,
+                                                                               localsym.memoryaddress), True)
             for node in tacnodelist:
                 if isinstance(node, TACCommentNode):
                     self.emitcomment(node.comment)
@@ -480,6 +489,15 @@ class AssemblyGenerator:
                         self.emitcode("XOR RDI, RDI", "Flush standard output when we do a writeln")
                         self.emitcode("CALL fflush wrt ..plt")
                         self.emitcode("")
+                    elif node.label.name == "_SQRTR":
+                        comment = "parameter {} for sqrt()".format(str(params[-1].paramval))
+                        self.emit_movtoxmmregister_fromstack("xmm0", params[-1].paramval, comment)
+                        self.emitcode("xorps xmm8, xmm8", "validate parameter is >= 0")
+                        self.emitcode("ucomisd xmm0, xmm8")
+                        self.emitcode("jb _PASCAL_SQRT_ERROR")
+                        self.emitcode("sqrtsd xmm0, xmm0", 'sqrt()')
+                        comment = "assign return value of function to {}".format(node.lval.name)
+                        self.emitcode("MOVSD [{}], XMM0".format(node.lval.memoryaddress), comment)
                     else:  # pragma: no cover
                         raise ASMGeneratorError("Invalid System Function: {}".format(node.label.name))
                 elif isinstance(node, TACBinaryNode):
@@ -619,23 +637,25 @@ class AssemblyGenerator:
         # overflow
         self.emitcomment("overflow error")
         self.emitlabel("_PASCAL_OVERFLOW_ERROR")
-        self.emitcode("push rdi")
         self.emitcode("mov rdi, _stringerr_0")
         self.emitcode("jmp _PASCAL_PRINT_ERROR")
         self.emitlabel("_PASCAL_DIVZERO_ERROR")
-        self.emitcode("push rdi")
         self.emitcode("mov rdi, _stringerr_1")
         self.emitcode("jmp _PASCAL_PRINT_ERROR")
         self.emitlabel("_PASCAL_MOD_ERROR")
-        self.emitcode("push rdi")
         self.emitcode("mov rdi, _stringerr_2")
+        self.emitcode("jmp _PASCAL_PRINT_ERROR")
+        self.emitlabel("_PASCAL_SQRT_ERROR")
+        self.emitcode("mov rdi, _stringerr_3")
+        self.emitcode("jmp _PASCAL_PRINT_ERROR")
+        self.emitlabel("_PASCAL_LN_ERROR")
+        self.emitcode("mov rdi, _stringerr_4")
         self.emitcode("jmp _PASCAL_PRINT_ERROR")
 
         self.emitlabel("_PASCAL_PRINT_ERROR")
         self.emitcomment("required: pointer to error message in rdi")
         self.emitcode("mov rax, 0")
         self.emitcode("call printf wrt ..plt")
-        self.emitcode("pop rdi")
         self.emitcode("jmp _PASCAL_EXIT")
         self.emitcomment("exit program")
         self.emitlabel("_PASCAL_EXIT")
