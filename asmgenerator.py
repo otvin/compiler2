@@ -7,8 +7,6 @@ from editor_settings import NUM_SPACES_IN_TAB, NUM_TABS_FOR_COMMENT
 import pascaltypes
 
 
-
-
 class ASMGeneratorError(Exception):
     pass
 
@@ -321,7 +319,7 @@ class AssemblyGenerator:
                             self.emitcode("movsd XMM0, [{}]".format(node.returnval.memoryaddress), "set up return val")
                 elif isinstance(node, TACUnaryNode):
                     if node.operator == TACOperator.INTTOREAL:
-                        assert node.arg1.pascaltype.size in [1,2,4,8]
+                        assert node.arg1.pascaltype.size in [1, 2, 4, 8]
                         if node.arg1.pascaltype.size in (1, 2):
                             raise ASMGeneratorError("Cannot handle 8- or 16-bit int convert to real")
                         elif node.arg1.pascaltype.size == 4:
@@ -497,7 +495,67 @@ class AssemblyGenerator:
                         self.emitcode("jb _PASCAL_SQRT_ERROR")
                         self.emitcode("sqrtsd xmm0, xmm0", 'sqrt()')
                         comment = "assign return value of function to {}".format(node.lval.name)
-                        self.emitcode("MOVSD [{}], XMM0".format(node.lval.memoryaddress), comment)
+                        # Currently all of the system functions use a temporary, which I know is not byref.
+                        # So, technically it would be quicker to do this:
+                        # self.emitcode("MOVSD [{}], XMM0".format(node.lval.memoryaddress), comment)
+                        # however, to future-proof this for optimizations, I'll use the movtostack() functions
+                        self.emit_movtostack_fromxmmregister(node.lval, "XMM0", comment)
+                    elif node.label.name in ("_SINR", "_COSR"):
+                        comment = "parameter {} for sin()".format(str(params[-1].paramval))
+                        self.emit_movtoxmmregister_fromstack("xmm0", params[-1].paramval, comment)
+                        # sin() and cos() use the legacy x87 FPU.  This is slow but also very few instructions
+                        # so easy for the compiler writer.  In x86-64 one is supposed to use library functions
+                        # for this, but this is faster to code.
+                        # Cannot move directly from xmm0 to the FPU stack; cannot move directly from a standard
+                        # register to the FPU stack.  Can only move from memory
+                        self.emitcode("movsd [{}], xmm0".format(node.lval.memoryaddress),
+                                      "use {} to move value to FPU".format(node.lval.name))
+                        self.emitcode("fld qword [{}]".format(node.lval.memoryaddress))
+                        self.emitcode("f{}".format(node.label.name[1:4]).lower())  # will generate fsin or fcos
+                        comment = "assign return value of function to {}".format(node.lval.name)
+                        # TODO - see comment to _SQRTR where I use the movtostack() functions.  Technically
+                        # there should be a test for node.lval.is_byref here, but for now I know it has to be
+                        # a local temporary, not a byref parameter, so this is safe.  I don't want to write
+                        # a fstp equivalent for that function when I don't need it.
+                        self.emitcode("fstp qword [{}]".format(node.lval.memoryaddress), comment)
+                    elif node.label.name == "_ABSR":
+                        # There is an X87 abs() call, but that is slow.  So here is the logic:
+                        # To find abs(x) we take x, and compare it to 0-x (which is the negative of x) and then
+                        # return whichever is the largest.
+                        comment = "parameter {} for abs()".format(str(params[-1].paramval))
+                        self.emit_movtoxmmregister_fromstack("xmm0", params[-1].paramval, comment)
+                        self.emitcode("xorps xmm8, xmm8")
+                        self.emitcode("subsd xmm8, xmm0")
+                        self.emitcode("maxsd xmm0, xmm8")
+                        comment = "assign return value of function to {}".format(node.lval.name)
+                        self.emit_movtostack_fromxmmregister(node.lval, "XMM0", comment)
+                    elif node.label.name == "_ABSI":
+                        # There is no X86 ABS() call.  There is a slow way where you test the value, compare to zero
+                        # then if it's >= than zero jump ahead, and if it's less than zero, negate it.  Jumps make
+                        # code execution very slow.  This is the way CLang 7.0 handles abs() with -O3 enabled
+                        comment = "parameter {} for abs()".format(str(params[-1].paramval))
+                        self.emit_movtoregister_fromstack("eax", params[-1].paramval, comment)
+                        self.emitcode("mov r11d, eax")
+                        self.emitcode("neg eax")  # neg sets the FLAGS
+                        self.emitcode("cmovl eax, r11d")  # if neg eax made eax less than zero, move r11d into eax
+                        comment = "assign return value of function to {}".format(node.lval.name)
+                        self.emit_movtostack_fromregister(node.lval, "EAX", comment)
+                    elif node.label.name == "_SQRR":
+                        # easy - multiply the value by itself
+                        # TODO - test for INF since that would be an error, and per ISO standard we need to exit
+                        comment = "parameter {} for sqr()".format(str(params[-1].paramval))
+                        self.emit_movtoxmmregister_fromstack("xmm0", params[-1].paramval, comment)
+                        self.emitcode("mulsd xmm0, xmm0")
+                        comment = "assign return value of function to {}".format(node.lval.name)
+                        self.emit_movtostack_fromxmmregister(node.lval, "XMM0", comment)
+                    elif node.label.name == "_SQRI":
+                        # similarly easy - multiply the value by itself
+                        comment = "parameter {} for sqr()".format(str(params[-1].paramval))
+                        self.emit_movtoregister_fromstack("eax", params[-1].paramval, comment)
+                        self.emitcode("imul eax, eax")
+                        self.emitcode("jo _PASCAL_OVERFLOW_ERROR")
+                        comment = "assign return value of function to {}".format(node.lval.name)
+                        self.emit_movtostack_fromregister(node.lval, "EAX", comment)
                     else:  # pragma: no cover
                         raise ASMGeneratorError("Invalid System Function: {}".format(node.label.name))
                 elif isinstance(node, TACBinaryNode):
@@ -566,6 +624,7 @@ class AssemblyGenerator:
                         if type(n1type) != type(n2type):  # pragma: no cover
                             raise ASMGeneratorError("Cannot mix {} and {} with relational operator".format(str(n1type),
                                                                                                            str(n2type)))
+
                         if isinstance(n1type, pascaltypes.BooleanType) or isinstance(n1type, pascaltypes.IntegerType):
                             # Boolean and Integer share same jump instructions
                             if node.operator == TACOperator.EQUALS:
@@ -582,7 +641,8 @@ class AssemblyGenerator:
                                 jumpinstr = "JLE"
                             else:  # pragma: no cover
                                 raise ASMGeneratorError("Invalid Relational Operator {}".format(node.operator))
-                        elif isinstance(n1type, pascaltypes.RealType):
+                        else:
+                            assert isinstance(n1type, pascaltypes.RealType)
                             if node.operator == TACOperator.EQUALS:
                                 jumpinstr = "JE"
                             elif node.operator == TACOperator.NOTEQUAL:
@@ -597,8 +657,6 @@ class AssemblyGenerator:
                                 jumpinstr = "JBE"
                             else:  # pragma: no cover
                                 raise ASMGeneratorError("Invalid Relational Operator {}".format(node.operator))
-                        else:  # pragma: no cover
-                            raise ASMGeneratorError("Invalid Type {}".format(str(n1type)))
 
                         if isinstance(n1type, pascaltypes.BooleanType):
                             self.emit_movtoregister_fromstack("al", node.arg1, comment)

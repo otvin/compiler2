@@ -5,16 +5,17 @@ Goal is to build an compiler that implements a large subset of ISO-7185 Pascal. 
 ### Current Status
 
 Compiler2 supports the following Pascal Language features:
-* if - then [- else]
-* while - do
-* repeat - until
+* ```if - then [- else]```
+* ```while - do```
+* ```repeat - until```
 * Math operations: addition, subtraction, multiplication, floating point/integer division, and the modulo function
     * Can mix integers and reals in a single expression e.g. adding an integer to a real
     * When Real and Integer combined in an operation, result is a Real
     * Using floating point division with divisor and dividend both integers will result in a real
     * Supports Parentheses
         * Note a quirk in the ISO 7185 BNF - to multiply -7 times -3 you need to write ```-7 * (-3)``` and put parentheses around the second factor, because you cannot have the ```*``` token be immediately followed by the ```-``` token
-    * Supports following function required by ISO standard: sqrt()
+    * Supports following functions required by ISO standard: 
+        * ```sqrt()```, ```abs()```, ```sqr()```, ```sin()```, ```cos()```
 * Logical operators: equal to, not equal, less than, less than or equal, greater than, greater than or equal
   * both Real and Integer; can compare integers to reals.
 * Procedures and Functions
@@ -40,7 +41,7 @@ Compiler2 also has the following functionality that compiler1 did not:
 * Boolean type
 * REPEAT..UNTIL construct
 * Ability to do relational operations comparing Integer and Real types
-* sqrt() function
+* sqrt(), abs(), sqr(), sin(), and cos() functions
 
 Compiler2 also uses the official BNF from the ISO standard, whereas Compiler1 used a BNF that I updated based on a variation I had downloaded from a random website.
 
@@ -60,7 +61,7 @@ will make it easier to surpass the functionality of my previous attempt.
 
 ### Unit tests
 
-Compiler2 currently passes 46 of the 60 unit tests created for Compiler, plus an additional 53
+Compiler2 currently passes 46 of the 60 unit tests created for Compiler, plus an additional 59
  tests unique to Compiler2.  You can execute the working
 bits of the unit test suite by running:
 

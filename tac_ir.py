@@ -173,6 +173,15 @@ def requiredfunction_acceptsinteger(tokentype):
         return False
 
 
+def requiredfunction_acceptsinteger_or_real(tokentype):
+    # abs() and sqr() in 6.6.6.2 accept both integer or real
+    assert isinstance(tokentype, TokenType)
+    if tokentype in (TokenType.ABS, TokenType.SQR):
+        return True
+    else:
+        return False
+
+
 def requiredfunction_acceptsordinal(tokentype):
     # ord(), succ(), pred() in 6.6.6.4 accept ordinals
     assert isinstance(tokentype, TokenType)
@@ -475,6 +484,17 @@ class TACBlock:
                     errstr = "Function {}() requires parameter of ordinal type in {}".format(tok.tokentype,
                                                                                              tok.location)
                     raise TACException(errstr)
+            elif requiredfunction_acceptsinteger_or_real(tok.tokentype):
+                if isinstance(tmp.pascaltype, pascaltypes.IntegerType):
+                    self.addnode(TACParamNode(tmp))
+                    self.addnode(TACCallSystemFunctionNode(Label(maptoken_to_systemfunction_name(tok, "I")), 1, lval))
+                elif isinstance(tmp.pascaltype, pascaltypes.RealType):
+                    self.addnode(TACParamNode(tmp))
+                    self.addnode(TACCallSystemFunctionNode(Label(maptoken_to_systemfunction_name(tok, "R")), 1, lval))
+                else:
+                    errstr = "Function {}() requires parameter of integer or real type in {}".format(tok.tokentype,
+                                                                                                     tok.location)
+                    raise TACException(errstr)
             elif requiredfunction_acceptsinteger(tok.tokentype):
                 if isinstance(tmp.pascaltype, pascaltypes.IntegerType):
                     self.addnode(TACParamNode(tmp))
@@ -502,8 +522,7 @@ class TACBlock:
                         errstr = "Function {}() requires parameter of real type in {}"
                     errstr = errstr.format(tok.tokentype, tok.location)
                     raise TACException(errstr)
-
-                return lval
+            return lval
         elif tok.tokentype in (TokenType.WRITE, TokenType.WRITELN):
             for child in ast.children:
                 tmp = self.processast(child, generator)
