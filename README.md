@@ -15,7 +15,7 @@ Compiler2 supports the following Pascal Language features:
     * Supports Parentheses
         * Note a quirk in the ISO 7185 BNF - to multiply -7 times -3 you need to write ```-7 * (-3)``` and put parentheses around the second factor, because you cannot have the ```*``` token be immediately followed by the ```-``` token
     * Supports following functions required by ISO standard: 
-        * ```sqrt()```, ```abs()```, ```sqr()```, ```sin()```, ```cos()```
+        * ```sqrt()```, ```abs()```, ```sqr()```, ```sin()```, ```cos()```, ```round()```, ```trunc()```
 * Logical operators: equal to, not equal, less than, less than or equal, greater than, greater than or equal
   * both Real and Integer; can compare integers to reals.
 * Procedures and Functions
@@ -41,7 +41,7 @@ Compiler2 also has the following functionality that compiler1 did not:
 * Boolean type
 * REPEAT..UNTIL construct
 * Ability to do relational operations comparing Integer and Real types
-* sqrt(), abs(), sqr(), sin(), and cos() functions
+* sqrt(), abs(), sqr(), sin(), cos(), round(), and trunc() functions
 
 Compiler2 also uses the official BNF from the ISO standard, whereas Compiler1 used a BNF that I updated based on a variation I had downloaded from a random website.
 
@@ -61,7 +61,7 @@ will make it easier to surpass the functionality of my previous attempt.
 
 ### Unit tests
 
-Compiler2 currently passes 46 of the 60 unit tests created for Compiler, plus an additional 59
+Compiler2 currently passes 46 of the 60 unit tests created for Compiler, plus an additional 60
  tests unique to Compiler2.  You can execute the working
 bits of the unit test suite by running:
 

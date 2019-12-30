@@ -556,6 +556,19 @@ class AssemblyGenerator:
                         self.emitcode("jo _PASCAL_OVERFLOW_ERROR")
                         comment = "assign return value of function to {}".format(node.lval.name)
                         self.emit_movtostack_fromregister(node.lval, "EAX", comment)
+                    elif node.label.name in ("_ROUNDR", "_TRUNCR"):
+                        comment = "parameter {} for {}()".format(str(params[-1].paramval), node.label.name[1:6].lower())
+                        self.emit_movtoxmmregister_fromstack("xmm0", params[-1].paramval, comment)
+                        assert node.lval.pascaltype.size in (4, 8)  # can't round into 1 or 2 bytes
+                        destreg = get_register_slice_bybytes("RAX", node.lval.pascaltype.size)
+                        if node.label.name == "_ROUNDR":
+                            instruction = "CVTSD2SI"
+                        else:
+                            instruction = "CVTTSD2SI"
+                        # TODO - test for overflow here
+                        self.emitcode("{} {}, XMM0".format(instruction, destreg))
+                        comment = "assign return value of function to {}".format(node.lval.name)
+                        self.emit_movtostack_fromregister(node.lval, destreg, comment)
                     else:  # pragma: no cover
                         raise ASMGeneratorError("Invalid System Function: {}".format(node.label.name))
                 elif isinstance(node, TACBinaryNode):
