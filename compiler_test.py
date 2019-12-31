@@ -130,7 +130,7 @@ def main():
     run_test_list("byref", 1, 5)
     run_test_list("comments", 1, 1)
     run_test_list("divide", 1, 1)
-    run_test_list("fpmath", 1, 6)
+    run_test_list("fpmath", 1, 7)
     run_test_list("functions", 1, 11)
     run_test_list("functions", 13, 15)
     run_test_list("globalvar", 1, 3)

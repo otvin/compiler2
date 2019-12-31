@@ -14,8 +14,10 @@ Compiler2 supports the following Pascal Language features:
     * Using floating point division with divisor and dividend both integers will result in a real
     * Supports Parentheses
         * Note a quirk in the ISO 7185 BNF - to multiply -7 times -3 you need to write ```-7 * (-3)``` and put parentheses around the second factor, because you cannot have the ```*``` token be immediately followed by the ```-``` token
-    * Supports following functions required by ISO standard: 
-        * ```sqrt()```, ```abs()```, ```sqr()```, ```sin()```, ```cos()```, ```ln()```, ```round()```, ```trunc()```
+    * Supports following arithmetic functions required by ISO standard: 
+        * ```abs()```, ```sqr()```, ```sin()```, ```cos()```, ```exp()```, ```ln()```, and ```sqrt()```
+    * Supports following transfer functions required by ISO standard:
+        * ``` trunc()``` and ```round()``` 
 * Logical operators: equal to, not equal, less than, less than or equal, greater than, greater than or equal
   * both Real and Integer; can compare integers to reals.
 * Procedures and Functions
@@ -41,7 +43,7 @@ Compiler2 also has the following functionality that compiler1 did not:
 * Boolean type
 * REPEAT..UNTIL construct
 * Ability to do relational operations comparing Integer and Real types
-* sqrt(), abs(), sqr(), sin(), cos(), ln(), round(), and trunc() functions
+* abs(), sqr(), sin(), cos(), exp(), ln(), sqrt(), trunc(), and round()
 
 Compiler2 also uses the official BNF from the ISO standard, whereas Compiler1 used a BNF that I updated based on a variation I had downloaded from a random website.
 
@@ -61,7 +63,7 @@ will make it easier to surpass the functionality of my previous attempt.
 
 ### Unit tests
 
-Compiler2 currently passes 46 of the 60 unit tests created for Compiler, plus an additional 60
+Compiler2 currently passes 46 of the 60 unit tests created for Compiler, plus an additional 62
  tests unique to Compiler2.  You can execute the working
 bits of the unit test suite by running:
 
@@ -96,7 +98,7 @@ Johnson, M. and Zelenski, J. "Three Address Code Examples" - handout from Stanfo
 
 "Three Address Code IR" - lecture slides from Stanford CS143 class.  Retrieved from [https://web.stanford.edu/class/archive/cs/cs143/cs143.1128/lectures/13/Slides13.pdf]
 
-
+"Simply FPU" by Raymond Filiatreault - documented tutorials for using the x87 floating point instructions.  Retrieved from [http://www.ray.masmcode.com/tutorial/]
 
 
 

@@ -537,6 +537,50 @@ class AssemblyGenerator:
                         self.emitcode("FYL2X")
                         comment = "assign return value of function to {}".format(node.lval.name)
                         self.emitcode("fstp qword [{}]".format(node.lval.memoryaddress), comment)
+                    elif node.label.name == '_EXPR':
+                        comment = "parameter {} for exp()".format(str(params[-1].paramval))
+                        self.emit_movtoxmmregister_fromstack("xmm0", params[-1].paramval, comment)
+                        # exp() also uses the legacy x87 FPU.  The legacy FPU has a command for (2^x)-1.
+                        # However, the instruction F2XM1 requires an X between -1 and 1.  Since Pascal EXP() can take
+                        # an arbitrary real, this is less desirable.
+                        # Let's say that we have a real number.  Represent that number as a + b where a is an integer
+                        # and b is the remainder.  e^(a+b) = e^a * e^b where 0 <= b < 1 which is in the range of this
+                        # command.
+                        # To compute e^b, note that e^b = 2^(log2(e) * b).
+                        #       2 ^ (log2(e) * b) = (2^log2(e))^b
+                        #       (2^log2(e)) = e
+                        #       (2^log2(e)) ^ b = e^b
+                        # So call the F2XM1 on b, then add 1 to that, and you get e^b
+                        # Need to add that to e^a.  a is an integer, and the FSCALE instruction computes 2^a
+                        # See: https://stackoverflow.com/questions/44957136
+                        # See: http://www.ray.masmcode.com/tutorial/fpuchap11.htm
+                        self.emitcode("movsd [{}], xmm0".format(node.lval.memoryaddress),
+                                      "use {} to move value to FPU".format(node.lval.name))
+                        self.emitcode("FLDL2E")  # loads log base 2 of e into ST0
+                        assert node.lval.pascaltype.size in (4,8)
+                        if node.lval.pascaltype.size == 4:
+                            opsize = "DWORD"
+                        else:
+                            opsize = "QWORD"
+                        self.emitcode("FMUL {} [{}]".format(opsize, node.lval.memoryaddress))  # ST0 contains x*log2(e)
+                        self.emitcode("FLD1")  # ST0 now contains 1, ST1 contains x * log2(e)
+                        self.emitcode("FLD ST1")  # Pushes a copy of ST1 to the top of the stack.  So now
+                                                    # ST0 = x * log2(e), ST1 = 1, and ST2 = x * log2(e)
+                        self.emitcode("FPREM1")  # This is clever.  To get the non-integer portion of x * log2(e),
+                                                 # we divide it by 1 and take the remainder.  So now
+                                                 # ST0 has this remainder, ST1 has 1
+                                                 # and ST2 has x * log2(e)
+                        self.emitcode("F2XM1")  # now ST0 has (2^remainder) - 1, ST1 has 1, St2 has x * log2(e)
+                        self.emitcode("FADDP ST1, ST0")  # this adds ST1 to ST0, pops the stack (moving the 1 into
+                                                             # ST0) but then overwrites ST0 with the result.  So
+                                                             # ST0 has 2^remainder and ST1 has x * log2(e)
+                        self.emitcode("FSCALE")  # Per the fpuchap11.htm link above, FSCALE multiplies ST0 by
+                                                 # 2^(ST1), first truncating ST1 to an integer.  It leaves ST1 intact.
+                                                 # ST0 has 2^remainder of (x * log2(e)) * 2^integer part of (x*log2(e))
+                                                 # So ST0 has e^x in it.  Neat.  ST1 still has x * log2(e) in it.
+                        self.emitcode("FSTP ST1")  # We need to clean up the stack, so this gets rid of ST1
+                        comment = "assign return value of function to {}".format(node.lval.name)
+                        self.emitcode("fstp qword [{}]".format(node.lval.memoryaddress), comment)
                     elif node.label.name == "_ABSR":
                         # There is an X87 abs() call, but that is slow.  So here is the logic:
                         # To find abs(x) we take x, and compare it to 0-x (which is the negative of x) and then
