@@ -214,6 +214,7 @@ class AssemblyGenerator:
 
             if block.ismain:
                 self.emitlabel("main")
+                self.emitcode("finit")  # TODO - this should only be written if we use x87 anywhere.
                 tacnodelist = block.tacnodes
             else:
                 self.emitlabel(block.tacnodes[0].label.name, block.tacnodes[0].comment
@@ -517,6 +518,24 @@ class AssemblyGenerator:
                         # there should be a test for node.lval.is_byref here, but for now I know it has to be
                         # a local temporary, not a byref parameter, so this is safe.  I don't want to write
                         # a fstp equivalent for that function when I don't need it.
+                        self.emitcode("fstp qword [{}]".format(node.lval.memoryaddress), comment)
+                    elif node.label.name == '_LNR':
+                        comment = "parameter {} for ln()".format(str(params[-1].paramval))
+                        self.emit_movtoxmmregister_fromstack("xmm0", params[-1].paramval, comment)
+                        # ln() also uses the legacy x87 FPU.  The legacy FPU has a command for log base 2.
+                        # Can get log in any other base from log base 2 by multiplying by the right factor
+                        # FYL2X computes the Log base 2 of the value in ST0 and multiplies it by the value
+                        # in ST1.  ln(x) = log base 2 of x / log base 2 of e
+                        # which in turn equals log base 2 of x * ln 2.
+                        self.emitcode("movsd [{}], xmm0".format(node.lval.memoryaddress),
+                                      "use {} to move value to FPU".format(node.lval.name))
+                        self.emitcode("xorps xmm8, xmm8", "validate parameter is > 0")
+                        self.emitcode("ucomisd xmm0, xmm8")
+                        self.emitcode("jbe _PASCAL_LN_ERROR")
+                        self.emitcode("FLDLN2")
+                        self.emitcode("FLD QWORD [{}]".format(node.lval.memoryaddress))
+                        self.emitcode("FYL2X")
+                        comment = "assign return value of function to {}".format(node.lval.name)
                         self.emitcode("fstp qword [{}]".format(node.lval.memoryaddress), comment)
                     elif node.label.name == "_ABSR":
                         # There is an X87 abs() call, but that is slow.  So here is the logic:
