@@ -1,7 +1,7 @@
 from enum import Enum, unique, auto
 from lexer import TokenType, Token, TokenStream, LexerException
 from symboltable import StringLiteral, NumericLiteral, LiteralTable, SymbolTable, VariableSymbol, ParameterList, \
-    ActivationSymbol, FunctionResultVariableSymbol, Parameter, SymbolException
+    ActivationSymbol, FunctionResultVariableSymbol, Parameter, SymbolException, ConstantSymbol
 import pascaltypes
 
 '''
@@ -177,6 +177,111 @@ class Parser:
         return None
 
     def parse_constantdefinitionpart(self, parent_ast):
+        # 6.2.1 <constant-definition-part> ::= [ "const" <constant-definition> ";" {<constant-definition> ";"} ]
+        # 6.3 <constant-definition> ::= <identifier> "=" <constant>
+        # 6.3 <constant> ::= [sign] (<unsigned-number> | <constant-identifier>) | <character-string>
+        # 6.1.5 <sign> ::= "+" | "-"
+        # 6.3 <constant-identifier> ::= <identifier>
+        # 6.1.7 <character-string> ::= "'" <string-element> {<string-element>} "'"
+
+        # Note - this appears to state that you cannot have a constant of a user-defined type, but you can
+        # do:
+        #   const pi = 3.14; negpi = -pi;
+        # <constant-identifier> can be an identifier of another constant, or one of the required constants
+        #   maxint, true, or false.
+
+        if self.tokenstream.peektokentype() == TokenType.CONST:
+            assert isinstance(parent_ast.symboltable, SymbolTable), \
+                "Parser.parse_constantdefinitionpart: missing symboltable"
+            self.getexpectedtoken(TokenType.CONST)
+            done = False
+            while not done:
+                # p.65 of [Cooper] states that if a constant has a sign then the next token must be
+                # a real, an integer, or a real/integer constant.  That can't be captured in the BNF.
+
+                const_id = self.getexpectedtoken(TokenType.IDENTIFIER)
+                self.getexpectedtoken(TokenType.EQUALS)
+                if self.tokenstream.peektokentype() == TokenType.MINUS:
+                    self.getexpectedtoken(TokenType.MINUS)
+                    isneg = True
+                    sawsign = True
+                else:
+                    if self.tokenstream.peektokentype() == TokenType.PLUS:
+                        sawsign = True
+                        self.getexpectedtoken(TokenType.PLUS)
+                    else:
+                        sawsign = False
+                    isneg = False
+
+                if self.tokenstream.peektokentype() == TokenType.UNSIGNED_REAL:
+                    realtok = self.getexpectedtoken(TokenType.UNSIGNED_REAL)
+                    if isneg:
+                        tokval = "-" + realtok.value
+                    else:
+                        tokval = realtok.value
+                    self.literaltable.add(NumericLiteral(tokval, realtok.location, pascaltypes.RealType()))
+                    parent_ast.symboltable.add(ConstantSymbol(const_id.value, const_id.location,
+                                                              pascaltypes.RealType(), tokval))
+                elif self.tokenstream.peektokentype() == TokenType.UNSIGNED_INT:
+                    inttok = self.getexpectedtoken(TokenType.UNSIGNED_INT)
+                    if isneg:
+                        tokval = "-" + inttok.value
+                    else:
+                        tokval = inttok.value
+                    parent_ast.symboltable.add(ConstantSymbol(const_id.value, const_id.location,
+                                                              pascaltypes.IntegerType(), tokval))
+                elif self.tokenstream.peektokentype() in (TokenType.TRUE, TokenType.FALSE):
+                    if sawsign:
+                        errstr = "Cannot have a sign before a Boolean constant in {}".format(const_id.location)
+                        raise ParseException(errstr)
+                    booltok = self.tokenstream.eattoken()
+                    parent_ast.symboltable.add(ConstantSymbol(const_id.value, const_id.location,
+                                                              pascaltypes.BooleanType(), booltok.value))
+                elif self.tokenstream.peektokentype() == TokenType.CHARSTRING:
+                    if sawsign:
+                        errstr = "Cannot have a sign before a string constant in {}".format(const_id.location)
+                        raise ParseException(errstr)
+                    charstrtok = self.getexpectedtoken(TokenType.CHARSTRING)
+                    self.literaltable.add(StringLiteral(charstrtok.value, charstrtok.location))
+                    parent_ast.symboltable.add(ConstantSymbol(const_id.value, const_id.location,
+                                                              pascaltypes.StringLiteralType(), charstrtok.value))
+                elif self.tokenstream.peektokentype() == TokenType.IDENTIFIER:
+                    ident_token = self.getexpectedtoken(TokenType.IDENTIFIER)
+                    if not parent_ast.symboltable.exists(ident_token.value):
+                        errstr = "Undefined Identifier: {} in {}".format(ident_token.value, ident_token.location)
+                        raise ParseException(errstr)
+                    sym = parent_ast.symboltable.fetch(ident_token.value)
+                    if not isinstance(sym, ConstantSymbol):
+                        errstr = "Constant {} must be defined as a literal or another constant in {}"
+                        errstr = errstr.format(const_id.value, ident_token.location)
+                        raise ParseException(errstr)
+                    if sawsign:
+                        if isinstance(sym.pascaltype, pascaltypes.RealType) or \
+                                isinstance(sym.pascaltype, pascaltypes.IntegerType):
+                            if isneg:
+                                if sym.value[0] == "-":
+                                    tokval = sym.value[1:]  # remove the negative
+                                else:
+                                    tokval = "-" + sym.value
+                            else:
+                                tokval = sym.value
+                        else:
+                            errstr = "Can only have signs before numeric constants in {}. {} is not numeric"
+                            errstr = errstr.format(ident_token.location, ident_token.value)
+                            raise ParseException(errstr)
+                    else:
+                        tokval = sym.value
+                    parent_ast.symboltable.add(ConstantSymbol(const_id.value, const_id.location,
+                                                              sym.pascaltype, tokval))
+                else:
+                    nexttok = self.tokenstream.eattoken()
+                    errstr = "Unexpected token {} in {}.".format(str(nexttok.value), nexttok.location)
+                    raise ParseException(errstr)
+
+                self.getexpectedtoken(TokenType.SEMICOLON)
+                if self.tokenstream.peektokentype() != TokenType.IDENTIFIER:
+                    done = True
+
         return None
 
     def parse_typedefinitionpart(self, parent_ast):
@@ -220,7 +325,7 @@ class Parser:
         # <type-denoter> ::= <type-identifier> which will be "integer" | "real" | "Boolean"
         if self.tokenstream.peektokentype() == TokenType.VAR:
             assert isinstance(parent_ast.symboltable, SymbolTable),\
-                "Parser.parsevariabledeclarationpart: missing symboltable"
+                "Parser.parse_variabledeclarationpart: missing symboltable"
             self.getexpectedtoken(TokenType.VAR)
             done = False
             while not done:
@@ -645,7 +750,11 @@ class Parser:
                     return self.parse_procedurestatement(parent_ast)
                 else:
                     tok = self.tokenstream.eattoken()
-                    errstr = "Identifier '{}' seen at {}, unclear how to parse".format(tok.value, tok.location)
+                    if self.tokenstream.peektokentype() == TokenType.EQUALS:
+                        errstr = "Identifier '{}' followed by '=' seen at {}, was assignment intended?"
+                        errstr = errstr.format(tok.value, tok.location)
+                    else:
+                        errstr = "Identifier '{}' seen at {}, unclear how to parse".format(tok.value, tok.location)
                     raise ParseException(errstr)
         else:
             raise ParseException(token_errstr(self.tokenstream.eattoken()))
@@ -821,9 +930,10 @@ class Parser:
         a = self.parse_labeldeclarationpart(parent_ast)
         if a is not None:
             ret.extend(a)
-        a = self.parse_constantdefinitionpart(parent_ast)
-        if a is not None:
-            ret.extend(a)
+
+        # parse_constantdefinitionpart updates the literal and symbol tables, does not return anything to add to AST.
+        self.parse_constantdefinitionpart(parent_ast)
+
         a = self.parse_typedefinitionpart(parent_ast)
         if a is not None:
             ret.extend(a)

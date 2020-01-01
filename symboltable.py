@@ -140,10 +140,10 @@ class FunctionResultVariableSymbol(VariableSymbol):
 
 class ConstantSymbol(Symbol):
     def __init__(self, name, location, pascaltype, value):
-        # only valid constants are maxint, integers, characters, booleans, and reals per 6.3 of the iso standard
-        # TODO: Will we support constant strings?
+        # only valid constants are maxint, integers, character strings, booleans, and reals per 6.3 of the iso standard
         assert (isinstance(pascaltype, pascaltypes.OrdinalType)
-                or isinstance(pascaltype, pascaltypes.RealType))
+                or isinstance(pascaltype, pascaltypes.RealType)
+                or isinstance(pascaltype, pascaltypes.StringLiteralType))
         super().__init__(name, location, pascaltype)
         self.value = value
 
