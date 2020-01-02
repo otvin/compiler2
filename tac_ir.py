@@ -72,7 +72,7 @@ from copy import deepcopy
 from parser import AST, isrelationaloperator, is_isorequiredfunction
 from symboltable import Symbol, Label, Literal, NumericLiteral, StringLiteral, BooleanLiteral,\
     SymbolTable, LiteralTable, ParameterList, ActivationSymbol, Parameter, VariableSymbol,\
-    FunctionResultVariableSymbol
+    FunctionResultVariableSymbol, ConstantSymbol
 from lexer import TokenType, Token
 import pascaltypes
 
@@ -120,6 +120,9 @@ class TACOperator(Enum):
 def maptokentype_to_tacoperator(tokentype):
     # Token Types have equivalent TACOperators, this is a mapping
     assert isinstance(tokentype, TokenType)
+    assert tokentype in (TokenType.EQUALS, TokenType.NOTEQUAL, TokenType.LESS, TokenType.LESSEQ, TokenType.GREATER,
+                         TokenType.GREATEREQ, TokenType.IDIV, TokenType.MOD, TokenType.MULTIPLY, TokenType.PLUS,
+                         TokenType.MINUS, TokenType.DIVIDE)
     if tokentype == TokenType.EQUALS:
         ret = TACOperator.EQUALS
     elif tokentype == TokenType.NOTEQUAL:
@@ -142,10 +145,9 @@ def maptokentype_to_tacoperator(tokentype):
         ret = TACOperator.ADD
     elif tokentype == TokenType.MINUS:
         ret = TACOperator.SUBTRACT
-    elif tokentype == TokenType.DIVIDE:
-        ret = TACOperator.DIVIDE
     else:
-        raise ValueError("Unable to map tokentype {} to TACOperator.".format(tokentype))
+        assert tokentype == TokenType.DIVIDE
+        ret = TACOperator.DIVIDE
     return ret
 
 
@@ -583,6 +585,8 @@ class TACBlock:
         elif tok.tokentype == TokenType.ASSIGNMENT:
             assert len(ast.children) == 2, "TACBlock.processast - Assignment ASTs must have 2 children."
             lval = self.symboltable.fetch(ast.children[0].token.value)
+            if isinstance(lval, ConstantSymbol):
+                raise TACException(tac_errstr("Cannot assign a value to a constant", tok))
             rval = self.processast(ast.children[1], generator)
             if isinstance(lval.pascaltype, pascaltypes.RealType) and\
                     isinstance(rval.pascaltype, pascaltypes.IntegerType):
@@ -601,7 +605,28 @@ class TACBlock:
                 errstr = "Undefined Identifier: {} in {}".format(tok.value, tok.location)
                 raise TACException(errstr)
             sym = self.symboltable.fetch(tok.value)
-            if isinstance(sym, FunctionResultVariableSymbol):
+            if isinstance(sym, ConstantSymbol):
+                ret = Symbol(generator.gettemporary(), tok.location, sym.pascaltype)
+                self.symboltable.add(ret)
+                if isinstance(sym.pascaltype, pascaltypes.BooleanType):
+                    # the value of the symbol will always be a string
+                    assert sym.value.lower() in ("true", "false")
+                    if sym.value.lower() == 'true':
+                        tokval = 1
+                    else:
+                        tokval = 0
+                    lit = BooleanLiteral(tokval, tok.location)
+                elif isinstance(sym.pascaltype, pascaltypes.StringLiteralType):
+                    lit = StringLiteral(sym.value, tok.location)
+                elif isinstance(sym.pascaltype, pascaltypes.RealType):
+                    lit = NumericLiteral(sym.value, tok.location, pascaltypes.RealType())
+                else:
+                    assert isinstance(sym.pascaltype, pascaltypes.IntegerType)
+                    lit = NumericLiteral(sym.value, tok.location, pascaltypes.IntegerType())
+                self.addnode(TACUnaryLiteralNode(ret, TACOperator.ASSIGN, lit))
+                return ret
+
+            elif isinstance(sym, FunctionResultVariableSymbol):
                 # we know it is a function, so get the activation symbol, which is stored in the parent
                 sym = self.symboltable.parent.fetch(tok.value)
             if isinstance(sym, ActivationSymbol):

@@ -1,0 +1,10 @@
+A constant of 3 plus a literal of 2, assigned to a variable, equals: 5
+2 pi equals: 6.280000000000
+My name is Fred
+Successful test with constant: TRUE
+Successful test with constant: FALSE
+4 times double-negative pi equals: 12.560000000000
+Negative pi equals: -3.140000000000
+Plus pi equals: 3.140000000000
+Should be neg 3: -3
+Should be neg 4: -4

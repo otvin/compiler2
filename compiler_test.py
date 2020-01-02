@@ -4,7 +4,7 @@ import compiler
 
 NUM_ATTEMPTS = 0
 NUM_SUCCESSES = 0
-TEST_FPC_INSTEAD = False  # switch to true to validate the .out files using fpc
+TEST_FPC_INSTEAD = False # switch to true to validate the .out files using fpc
 
 
 def dotest(infilename, resultfilename):
@@ -22,7 +22,7 @@ def dotest(infilename, resultfilename):
         if not TEST_FPC_INSTEAD:
             compiler.compile(infilename, asmfilename=asmfilename, objfilename=objfilename, exefilename=exefilename)
         else:
-            os.system("fpc -v0 {}".format(infilename))
+            os.system("fpc -Miso -v0 {}".format(infilename))
 
         os.system("./{0} > {1}".format(exefilename, testoutputfilename))
 
@@ -129,6 +129,7 @@ def main():
     run_test_list("bugfix", 1, 1)
     run_test_list("byref", 1, 5)
     run_test_list("comments", 1, 1)
+    run_test_list("const", 1, 3)
     run_test_list("divide", 1, 1)
     run_test_list("fpmath", 1, 7)
     run_test_list("functions", 1, 11)
@@ -153,7 +154,7 @@ def main():
     run_test_list("write", 1, 1)
     run_test_list("writeln", 1, 3)
 
-    run_compilefail_test_list(1, 25)
+    run_compilefail_test_list(1, 36)
 
     # tests from old compiler not yet running in compiler2
     # dotest("tests/testconcat01.pas", "tests/testconcat01.out")

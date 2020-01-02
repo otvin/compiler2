@@ -147,6 +147,11 @@ class ConstantSymbol(Symbol):
         super().__init__(name, location, pascaltype)
         self.value = value
 
+    def __repr__(self):
+        ret = super().__repr__()
+        ret += ' CONSTANT - value = {}'.format(self.value)
+        return ret
+
 
 class ActivationSymbol(Symbol):
     def __init__(self, name, location, pascaltype, paramlist, returnpascaltype=None):
@@ -310,7 +315,11 @@ class SymbolTable:
     def add(self, sym):
         assert isinstance(sym, Symbol) or isinstance(sym, Label), "Can only add Symbols and Labels to SymbolTables"
         if sym.name in self.symbols.keys():
-            errstr = "Symbol Redefined: {}".format(sym.name)
+            current_sym = self.fetch(sym.name)
+            if isinstance(sym, ConstantSymbol) and isinstance(current_sym, ConstantSymbol):
+                errstr = "Constant Redefined: {}".format(sym.name)
+            else:
+                errstr = "Symbol Redefined: {}".format(sym.name)
             if isinstance(sym, Symbol):
                 errstr += " in {}".format(sym.location)
             raise SymbolRedefinedException(errstr)

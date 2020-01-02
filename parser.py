@@ -122,7 +122,7 @@ class AST:
     def initparamlist(self):
         self.paramlist = ParameterList()
 
-    def rpn_print(self, level=0):  # pragma: no-cover
+    def rpn_print(self, level=0):  # pragma: no cover
         # used only for debugging
         for x in self.children:
             x.rpn_print(level + 1)
@@ -141,7 +141,7 @@ class AST:
         assert isinstance(ptr.symboltable, SymbolTable)
         return ptr.symboltable
 
-    def dump_symboltables(self):  # pragma: no-cover
+    def dump_symboltables(self):  # pragma: no cover
         # used only for debugging
         for child in self.children:
             child.dump_symboltables()
@@ -213,6 +213,8 @@ class Parser:
                         sawsign = False
                     isneg = False
 
+
+
                 if self.tokenstream.peektokentype() == TokenType.UNSIGNED_REAL:
                     realtok = self.getexpectedtoken(TokenType.UNSIGNED_REAL)
                     if isneg:
@@ -247,13 +249,17 @@ class Parser:
                                                               pascaltypes.StringLiteralType(), charstrtok.value))
                 elif self.tokenstream.peektokentype() == TokenType.IDENTIFIER:
                     ident_token = self.getexpectedtoken(TokenType.IDENTIFIER)
-                    if not parent_ast.symboltable.exists(ident_token.value):
-                        errstr = "Undefined Identifier: {} in {}".format(ident_token.value, ident_token.location)
+                    if not parent_ast.symboltable.existsanywhere(ident_token.value):
+                        if ident_token.value == const_id.value:
+                            errstr = "Self-referencing constant definition '{}' in {}"
+                            errstr = errstr.format(ident_token.value, ident_token.location)
+                        else:
+                            errstr = "Undefined Identifier: '{}' in {}".format(ident_token.value, ident_token.location)
                         raise ParseException(errstr)
                     sym = parent_ast.symboltable.fetch(ident_token.value)
                     if not isinstance(sym, ConstantSymbol):
-                        errstr = "Constant {} must be defined as a literal or another constant in {}"
-                        errstr = errstr.format(const_id.value, ident_token.location)
+                        errstr = "Constant '{}' must be defined as a literal or another constant, cannot use '{}' in {}"
+                        errstr = errstr.format(const_id.value, ident_token.value, ident_token.location)
                         raise ParseException(errstr)
                     if sawsign:
                         if isinstance(sym.pascaltype, pascaltypes.RealType) or \
@@ -263,14 +269,23 @@ class Parser:
                                     tokval = sym.value[1:]  # remove the negative
                                 else:
                                     tokval = "-" + sym.value
+                                # If we define a constant as negative another constant, we need to ensure the
+                                # literal value is in the literals table if it's a real constant.
+                                # LiteralTable.add() allows adding duplicates and filters them out.
+                                if isinstance(sym.pascaltype, pascaltypes.RealType):
+                                    self.literaltable.add(NumericLiteral(tokval, ident_token.location,
+                                                                         pascaltypes.RealType()))
                             else:
                                 tokval = sym.value
                         else:
-                            errstr = "Can only have signs before numeric constants in {}. {} is not numeric"
-                            errstr = errstr.format(ident_token.location, ident_token.value)
+                            errstr = "Constant '{}' is not numeric."
+                            errstr += " Cannot define constant '{}' by putting a sign before a non-numeric constant."
+                            errstr += " In: {}"
+                            errstr = errstr.format(ident_token.value, const_id.value, ident_token.location)
                             raise ParseException(errstr)
                     else:
                         tokval = sym.value
+
                     parent_ast.symboltable.add(ConstantSymbol(const_id.value, const_id.location,
                                                               sym.pascaltype, tokval))
                 else:
@@ -457,6 +472,7 @@ class Parser:
         #                    <set-constructor> | "(" <expression> ")" | "not" <factor>
         # 6.7.1 <unsigned-constant> ::= <unsigned-number> | <character-string> | <constant-identifier> | "nil"
         # 6.1.7 <character-string> ::= "'" <string-element> {<string-element>} "'"
+        # 6.3 <constant-identifier> ::= <identifier>
         # 6.7.3 <function-designator> ::= <function-identifier> [<actual-parameter-list>]
         # 6.6.2 <function-identifier> ::= <identifier>
         # 6.7.3 <actual-parameter-list> ::= "(" <actual-parameter> {"," <actual-parameter>} ")"
@@ -487,9 +503,9 @@ class Parser:
                 ret.children.append(self.parse_expression(ret))
                 self.getexpectedtoken(TokenType.RPAREN)
             elif self.tokenstream.peektokentype() == TokenType.IDENTIFIER:
-                # An identifier standalone could either be variable-access or function-designator with
-                # no actual parameter list.  That's fine here, we will disambiguate when generating the TAC.
-                # If we see a left paren however, we have the actual parameter list
+                # An identifier standalone could either be variable-access, constant-identifier or
+                # function-designator with no actual parameter list.  That's fine here, we will disambiguate
+                # when generating the TAC. If we see a left paren however, we have the actual parameter list.
                 ret = AST(self.tokenstream.eattoken(), parent_ast)
                 if self.tokenstream.peektokentype() == TokenType.LPAREN:
                     # now we know it's supposed to be a function-designator.  But, it could be a
@@ -630,6 +646,9 @@ class Parser:
                 assert isinstance(param, Parameter)
         else:
             sym = symtab.fetch(ident_token.value)
+            if isinstance(sym, ConstantSymbol):
+                errstr = "Cannot assign to constant '{}' in {}".format(ident_token.value, ident_token.location)
+                raise ParseException(errstr)
             assert isinstance(sym, VariableSymbol)  # we insert a FunctionResultVariableSymbol when parsing functions
 
         # Two possible designs considered here.  First, having ret have some token that represents

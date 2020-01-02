@@ -1,0 +1,1 @@
+Constant 'localtwo' must be defined as a literal or another constant, cannot use 'globaltwo' in file:tests/compilefail31.pas line:9     column:18 

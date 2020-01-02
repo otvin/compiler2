@@ -1,0 +1,1 @@
+Constant 'pi' is not numeric. Cannot define constant 'negpi' by putting a sign before a non-numeric constant. In: file:tests/compilefail27.pas line:5     column:14 

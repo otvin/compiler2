@@ -30,6 +30,8 @@ Compiler2 supports the following Pascal Language features:
     * Signed Real variables and literals (64-bit)
     * Signed Integer variables and literals (32-bit)
     * Boolean variables and literals (8-bit)
+* Global and local constants
+    * Signed Real, Signed Integer, or String
 * Write() and Writeln() to stdout
     * each take a comma-separated list of one or more parameters, with each parameter a variable, a math expression, a numeric literal, a string literal, or the boolean constants 'true' and 'false.'
 * Comments
@@ -41,6 +43,7 @@ At this point, Compiler2 has all features from Compiler1 except for String suppo
 
 Compiler2 also has the following functionality that compiler1 did not:
 * Boolean type
+* Constants
 * REPEAT..UNTIL construct
 * Ability to do relational operations comparing Integer and Real types
 * abs(), sqr(), sin(), cos(), exp(), ln(), sqrt(), trunc(), and round()
@@ -63,8 +66,7 @@ will make it easier to surpass the functionality of my previous attempt.
 
 ### Unit tests
 
-Compiler2 currently passes 46 of the 60 unit tests created for Compiler, plus an additional 62
- tests unique to Compiler2.  You can execute the working
+Compiler2 currently passes 122 unit tests, including 46 of the 60 unit tests created for Compiler.  You can execute the working
 bits of the unit test suite by running:
 
 ```python3 compiler_test.py```
@@ -76,10 +78,10 @@ Current code coverage:
 |asm_generator.py|97%|
 |filelocation.py|100%|
 |lexer.py|88%|
-|parser.py|92%|
+|parser.py|94%|
 |pascaltypes.py|76%|
 |symboltable.py|92%|
-|tac_ir.py|92%|
+|tac_ir.py|89%|
 
 _Code for exceptions that should never occur are excluded.  Regular compiler errors e.g. syntax errors in Pascal code are covered via "compilefail" tests.  Code written for future features, e.g. the code that handles 64-bit integers in spots, does count against code coverage, so I do not forget to add them back to the code to be tested._
  
