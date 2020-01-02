@@ -698,6 +698,12 @@ class TACBlock:
                 tokval = 0
             self.addnode(TACUnaryLiteralNode(ret, TACOperator.ASSIGN, BooleanLiteral(tokval, tok.location)))
             return ret
+        elif tok.tokentype == TokenType.MAXINT:
+            ret = Symbol(generator.gettemporary(), tok.location, pascaltypes.IntegerType())
+            self.symboltable.add(ret)
+            lit = NumericLiteral(pascaltypes.MAXINT, tok.location, pascaltypes.IntegerType())
+            self.addnode(TACUnaryLiteralNode(ret, TACOperator.ASSIGN, lit))
+            return ret
         elif tok.tokentype == TokenType.CHARSTRING:
             ret = Symbol(generator.gettemporary(), tok.location, pascaltypes.StringLiteralType())
             self.symboltable.add(ret)

@@ -232,6 +232,14 @@ class Parser:
                         tokval = inttok.value
                     parent_ast.symboltable.add(ConstantSymbol(const_id.value, const_id.location,
                                                               pascaltypes.IntegerType(), tokval))
+                elif self.tokenstream.peektokentype() == TokenType.MAXINT:
+                    self.getexpectedtoken(TokenType.MAXINT)
+                    if isneg:
+                        tokval = pascaltypes.STRNEGMAXINT
+                    else:
+                        tokval = pascaltypes.STRMAXINT
+                    parent_ast.symboltable.add(ConstantSymbol(const_id.value, const_id.location,
+                                                              pascaltypes.IntegerType(), tokval))
                 elif self.tokenstream.peektokentype() in (TokenType.TRUE, TokenType.FALSE):
                     if sawsign:
                         errstr = "Cannot have a sign before a Boolean constant in {}".format(const_id.location)
@@ -486,7 +494,8 @@ class Parser:
                 realtok = self.getexpectedtoken(TokenType.UNSIGNED_REAL)
                 self.literaltable.add(NumericLiteral(realtok.value, realtok.location, pascaltypes.RealType()))
                 ret = AST(realtok, parent_ast)
-            elif self.tokenstream.peektokentype() in (TokenType.UNSIGNED_INT, TokenType.TRUE, TokenType.FALSE):
+            elif self.tokenstream.peektokentype() in (TokenType.UNSIGNED_INT, TokenType.TRUE,
+                                                      TokenType.MAXINT, TokenType.FALSE):
                 ret = AST(self.tokenstream.eattoken(), parent_ast)
             elif self.tokenstream.peektokentype() == TokenType.CHARSTRING:
                 # literalTable.add() allows adding duplicates

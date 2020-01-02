@@ -23,6 +23,13 @@ class OrdinalType(SimpleType):
     pass
 
 
+# Putting these constants here because if we change the size of the Integer, we would need to change
+# the constants.
+MAXINT = 2147483647
+NEGMAXINT = -1 * MAXINT
+STRMAXINT = str(MAXINT)
+STRNEGMAXINT = str(NEGMAXINT)
+
 class IntegerType(OrdinalType):
     def __init__(self):
         super().__init__()

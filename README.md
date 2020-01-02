@@ -32,6 +32,7 @@ Compiler2 supports the following Pascal Language features:
     * Boolean variables and literals (8-bit)
 * Global and local constants
     * Signed Real, Signed Integer, or String
+    * the required constants ```true```, ```false```, and ```maxint```
 * Write() and Writeln() to stdout
     * each take a comma-separated list of one or more parameters, with each parameter a variable, a math expression, a numeric literal, a string literal, or the boolean constants 'true' and 'false.'
 * Comments
@@ -66,7 +67,7 @@ will make it easier to surpass the functionality of my previous attempt.
 
 ### Unit tests
 
-Compiler2 currently passes 122 unit tests, including 46 of the 60 unit tests created for Compiler.  You can execute the working
+Compiler2 currently passes 123 unit tests, including 46 of the 60 unit tests created for Compiler.  You can execute the working
 bits of the unit test suite by running:
 
 ```python3 compiler_test.py```

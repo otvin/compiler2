@@ -129,7 +129,7 @@ def main():
     run_test_list("bugfix", 1, 1)
     run_test_list("byref", 1, 5)
     run_test_list("comments", 1, 1)
-    run_test_list("const", 1, 3)
+    run_test_list("const", 1, 4)
     run_test_list("divide", 1, 1)
     run_test_list("fpmath", 1, 7)
     run_test_list("functions", 1, 11)
