@@ -34,7 +34,7 @@ Compiler2 supports the following Pascal Language features:
     * Signed Real, Signed Integer, or String
     * the required constants ```true```, ```false```, and ```maxint```
 * Write() and Writeln() to stdout
-    * each take a comma-separated list of one or more parameters, with each parameter a variable, a math expression, a numeric literal, a string literal, or the boolean constants 'true' and 'false.'
+    * each take a comma-separated list of one or more parameters, with each parameter a variable, a math expression, a numeric literal, a string literal, or a constant.'
 * Comments
 
  
