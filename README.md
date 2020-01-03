@@ -23,7 +23,7 @@ Compiler2 supports the following Pascal Language features:
 * Procedures and Functions
   *  Parameters passed by value or by reference ("variable parameters" in Pascal-speak)
   *  Functions can return integers, Booleans, or reals
-  *  Up to 8 Real parameters by value, up to a combined 6 Integer/String or by reference parameters
+  *  Up to 8 Real parameters by value, up to a combined 6 Integer/Boolean or by reference parameters
   *  Integers passed in byval to Real parameters get converted to Real
   *  Recursion
 * Global and local variables
