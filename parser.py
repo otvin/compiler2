@@ -213,8 +213,6 @@ class Parser:
                         sawsign = False
                     isneg = False
 
-
-
                 if self.tokenstream.peektokentype() == TokenType.UNSIGNED_REAL:
                     realtok = self.getexpectedtoken(TokenType.UNSIGNED_REAL)
                     if isneg:
@@ -502,6 +500,10 @@ class Parser:
                 tok_charstr = self.getexpectedtoken(TokenType.CHARSTRING)
                 self.literaltable.add(StringLiteral(tok_charstr.value, tok_charstr.location))
                 ret = AST(tok_charstr, parent_ast)
+            elif self.tokenstream.peektokentype() == TokenType.NOT:
+                nottok = self.getexpectedtoken(TokenType.NOT)
+                ret = AST(nottok, parent_ast)
+                ret.children.append(self.parse_factor(ret))
             elif is_isorequiredfunction(self.tokenstream.peektokentype()):
                 # 6.6.6 in the ISO Standard lists required functions.  All required functions take one
                 # argument.  Note, by parsing it this way instead of parsing out the parameter list, we will

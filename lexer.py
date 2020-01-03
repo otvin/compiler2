@@ -186,7 +186,7 @@ TOKENTYPE_LOOKUP = {
     'get': TokenType.GET, 'goto': TokenType.GOTO, 'if': TokenType.IF, 'in': TokenType.IN,
     'input': TokenType.INPUT, 'integer': TokenType.INTEGER,
     'label': TokenType.LABEL, 'ln': TokenType.LN, 'maxint': TokenType.MAXINT, 'mod': TokenType.MOD,
-    'new': TokenType.NEW, 'nil': TokenType.NIL, 'odd': TokenType.ODD, 'of': TokenType.OF,
+    'new': TokenType.NEW, 'nil': TokenType.NIL, 'not': TokenType.NOT, 'odd': TokenType.ODD, 'of': TokenType.OF,
     'or': TokenType.OR, 'ord': TokenType.ORD, 'output': TokenType.OUTPUT,
     'pack': TokenType.PACK, 'packed': TokenType.PACKED,
     'page': TokenType.PAGE, 'procedure': TokenType.PROCEDURE,

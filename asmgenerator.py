@@ -346,6 +346,14 @@ class AssemblyGenerator:
                         # need to dereference the pointer.
                         self.emit_movtostack_fromregister(node.lval, reg)
 
+                    elif node.operator == TACOperator.NOT:
+                        assert isinstance(node.arg1.pascaltype, pascaltypes.BooleanType)
+                        assert isinstance(node.lval.pascaltype, pascaltypes.BooleanType)
+                        self.emit_movtoregister_fromstack("AL", node.arg1)
+                        self.emitcode("NOT AL")
+                        self.emitcode("AND AL, 0x01")
+                        self.emit_movtostack_fromregister(node.lval, "AL")
+
                     else:  # pragma: no cover
                         raise ASMGeneratorError("Invalid operator: {}".format(node.operator))
                 elif isinstance(node, TACUnaryLiteralNode):
@@ -557,7 +565,7 @@ class AssemblyGenerator:
                         self.emitcode("movsd [{}], xmm0".format(node.lval.memoryaddress),
                                       "use {} to move value to FPU".format(node.lval.name))
                         self.emitcode("FLDL2E")  # loads log base 2 of e into ST0
-                        assert node.lval.pascaltype.size in (4,8)
+                        assert node.lval.pascaltype.size in (4, 8)
                         if node.lval.pascaltype.size == 4:
                             opsize = "DWORD"
                         else:
@@ -572,8 +580,8 @@ class AssemblyGenerator:
                                                  # and ST2 has x * log2(e)
                         self.emitcode("F2XM1")  # now ST0 has (2^remainder) - 1, ST1 has 1, St2 has x * log2(e)
                         self.emitcode("FADDP ST1, ST0")  # this adds ST1 to ST0, pops the stack (moving the 1 into
-                                                             # ST0) but then overwrites ST0 with the result.  So
-                                                             # ST0 has 2^remainder and ST1 has x * log2(e)
+                                                        # ST0) but then overwrites ST0 with the result.  So
+                                                        # ST0 has 2^remainder and ST1 has x * log2(e)
                         self.emitcode("FSCALE")  # Per the fpuchap11.htm link above, FSCALE multiplies ST0 by
                                                  # 2^(ST1), first truncating ST1 to an integer.  It leaves ST1 intact.
                                                  # ST0 has 2^remainder of (x * log2(e)) * 2^integer part of (x*log2(e))
@@ -700,6 +708,8 @@ class AssemblyGenerator:
                         if type(n1type) != type(n2type):  # pragma: no cover
                             raise ASMGeneratorError("Cannot mix {} and {} with relational operator".format(str(n1type),
                                                                                                            str(n2type)))
+
+                        # TODO: Handling String types in relational operators
 
                         if isinstance(n1type, pascaltypes.BooleanType) or isinstance(n1type, pascaltypes.IntegerType):
                             # Boolean and Integer share same jump instructions

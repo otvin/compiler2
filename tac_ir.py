@@ -105,6 +105,9 @@ class TACOperator(Enum):
     LESSEQ = "<="
     GREATER = ">"
     GREATEREQ = ">="
+    AND = "and"
+    OR = "or"
+    NOT = "not"
     PARAM = "param"
     CALL = "call"
     COMMENT = "comment"
@@ -122,7 +125,7 @@ def maptokentype_to_tacoperator(tokentype):
     assert isinstance(tokentype, TokenType)
     assert tokentype in (TokenType.EQUALS, TokenType.NOTEQUAL, TokenType.LESS, TokenType.LESSEQ, TokenType.GREATER,
                          TokenType.GREATEREQ, TokenType.IDIV, TokenType.MOD, TokenType.MULTIPLY, TokenType.PLUS,
-                         TokenType.MINUS, TokenType.DIVIDE)
+                         TokenType.MINUS, TokenType.DIVIDE, TokenType.AND, TokenType.OR, TokenType.NOT)
     if tokentype == TokenType.EQUALS:
         ret = TACOperator.EQUALS
     elif tokentype == TokenType.NOTEQUAL:
@@ -135,6 +138,12 @@ def maptokentype_to_tacoperator(tokentype):
         ret = TACOperator.GREATER
     elif tokentype == TokenType.GREATEREQ:
         ret = TACOperator.GREATEREQ
+    elif tokentype == TokenType.NOT:
+        ret = TACOperator.NOT
+    elif tokentype == TokenType.AND:
+        ret = TACOperator.AND
+    elif tokentype == TokenType.OR:
+        ret = TACOperator.OR
     elif tokentype == TokenType.IDIV:
         ret = TACOperator.IDIV
     elif tokentype == TokenType.MOD:
@@ -754,10 +763,10 @@ class TACBlock:
             child2 = self.processast(ast.children[1], generator)
             if isinstance(child1.pascaltype, pascaltypes.RealType) or\
                     isinstance(child2.pascaltype, pascaltypes.RealType):
-                raise ValueError("Cannot use integer division with Real values.")
+                raise TACException(tac_errstr("Cannot use integer division with Real values.", tok))
             if isinstance(child1.pascaltype, pascaltypes.BooleanType) or \
                     isinstance(child2.pascaltype, pascaltypes.BooleanType):
-                raise ValueError("Cannot use integer division with Boolean values.")
+                raise TACException(tac_errstr("Cannot use integer division with Boolean values.", tok))
             ret = Symbol(generator.gettemporary(), tok.location, pascaltypes.IntegerType())
             self.symboltable.add(ret)
             self.addnode(TACBinaryNode(ret, op, child1, child2))
@@ -770,10 +779,15 @@ class TACBlock:
             c1type = child1.pascaltype
             c2type = child2.pascaltype
 
+            # 6.7.2.5 of the ISO standard says that the operands of relational operators shall be of compatible
+            # types, or one operand shall be of real-type and the other of integer-type.  Table 6, has
+            # simple-types, pointer-types, and string-types allowed in the comparisons..
+
             if isinstance(c1type, pascaltypes.BooleanType) and not isinstance(c2type, pascaltypes.BooleanType):
                 raise TACException(tac_errstr("Cannot compare Boolean to non-Boolean", tok))
             if isinstance(c2type, pascaltypes.BooleanType) and not isinstance(c1type, pascaltypes.BooleanType):
                 raise TACException(tac_errstr("Cannot compare Boolean to non-Boolean", tok))
+
             if isinstance(c1type, pascaltypes.IntegerType) and isinstance(c2type, pascaltypes.RealType):
                 newchild1 = Symbol(generator.gettemporary(), tok.location, pascaltypes.RealType())
                 self.symboltable.add(newchild1)
@@ -791,6 +805,14 @@ class TACBlock:
             ret = Symbol(generator.gettemporary(), tok.location, pascaltypes.BooleanType())
             self.symboltable.add(ret)
             self.addnode(TACBinaryNode(ret, op, newchild1, newchild2))
+            return ret
+        elif tok.tokentype == TokenType.NOT:
+            child = self.processast(ast.children[0], generator)
+            if not isinstance(child.pascaltype, pascaltypes.BooleanType):
+                raise TACException(tac_errstr("Operator 'not' can only be applied to Boolean factors", tok))
+            ret = Symbol(generator.gettemporary(), tok.location, pascaltypes.BooleanType())
+            self.symboltable.add(ret)
+            self.addnode(TACUnaryNode(ret, TACOperator.NOT, child))
             return ret
         else:
             raise TACException("TACBlock.processast - cannot process token:", str(tok))
