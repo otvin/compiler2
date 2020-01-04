@@ -125,7 +125,7 @@ def main():
     global NUM_SUCCESSES
 
     run_test_list("assign", 1, 1)
-    run_test_list("boolean", 1, 1)
+    run_test_list("boolean", 1, 2)
     run_test_list("bugfix", 1, 1)
     run_test_list("byref", 1, 5)
     run_test_list("comments", 1, 1)
@@ -154,7 +154,7 @@ def main():
     run_test_list("write", 1, 1)
     run_test_list("writeln", 1, 3)
 
-    run_compilefail_test_list(1, 36)
+    run_compilefail_test_list(1, 37)
 
     # tests from old compiler not yet running in compiler2
     # dotest("tests/testconcat01.pas", "tests/testconcat01.out")

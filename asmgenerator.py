@@ -643,6 +643,11 @@ class AssemblyGenerator:
                     else:  # pragma: no cover
                         raise ASMGeneratorError("Invalid System Function: {}".format(node.label.name))
                 elif isinstance(node, TACBinaryNode):
+
+                    assert isinstance(node.result.pascaltype, pascaltypes.IntegerType) or \
+                            isinstance(node.result.pascaltype, pascaltypes.BooleanType) or \
+                            isinstance(node.result.pascaltype, pascaltypes.RealType)
+
                     comment = "{} := {} {} {}".format(node.result.name, node.arg1.name, node.operator, node.arg2.name)
 
                     if isinstance(node.result.pascaltype, pascaltypes.IntegerType):
@@ -702,72 +707,82 @@ class AssemblyGenerator:
                         self.emitcode("{} xmm0, xmm8".format(op))
                         self.emit_movtostack_fromxmmregister(node.result, "xmm0")
 
-                    elif isinstance(node.result.pascaltype, pascaltypes.BooleanType):
+                    else:
+                        assert isinstance(node.result.pascaltype, pascaltypes.BooleanType)
                         n1type = node.arg1.pascaltype
                         n2type = node.arg2.pascaltype
                         if type(n1type) != type(n2type):  # pragma: no cover
                             raise ASMGeneratorError("Cannot mix {} and {} with relational operator".format(str(n1type),
                                                                                                            str(n2type)))
 
-                        # TODO: Handling String types in relational operators
-
-                        if isinstance(n1type, pascaltypes.BooleanType) or isinstance(n1type, pascaltypes.IntegerType):
-                            # Boolean and Integer share same jump instructions
-                            if node.operator == TACOperator.EQUALS:
-                                jumpinstr = "JE"
-                            elif node.operator == TACOperator.NOTEQUAL:
-                                jumpinstr = "JNE"
-                            elif node.operator == TACOperator.GREATER:
-                                jumpinstr = "JG"
-                            elif node.operator == TACOperator.GREATEREQ:
-                                jumpinstr = "JGE"
-                            elif node.operator == TACOperator.LESS:
-                                jumpinstr = "JL"
-                            elif node.operator == TACOperator.LESSEQ:
-                                jumpinstr = "JLE"
-                            else:  # pragma: no cover
-                                raise ASMGeneratorError("Invalid Relational Operator {}".format(node.operator))
-                        else:
-                            assert isinstance(n1type, pascaltypes.RealType)
-                            if node.operator == TACOperator.EQUALS:
-                                jumpinstr = "JE"
-                            elif node.operator == TACOperator.NOTEQUAL:
-                                jumpinstr = "JNE"
-                            elif node.operator == TACOperator.GREATER:
-                                jumpinstr = "JA"
-                            elif node.operator == TACOperator.GREATEREQ:
-                                jumpinstr = "JAE"
-                            elif node.operator == TACOperator.LESS:
-                                jumpinstr = "JB"
-                            elif node.operator == TACOperator.LESSEQ:
-                                jumpinstr = "JBE"
-                            else:  # pragma: no cover
-                                raise ASMGeneratorError("Invalid Relational Operator {}".format(node.operator))
-
-                        if isinstance(n1type, pascaltypes.BooleanType):
+                        if node.operator in (TACOperator.AND, TACOperator.OR):
+                            assert isinstance(n1type, pascaltypes.BooleanType)
+                            assert isinstance(n2type, pascaltypes.BooleanType)
                             self.emit_movtoregister_fromstack("al", node.arg1, comment)
                             self.emit_movtoregister_fromstack("r11b", node.arg2)
-                            self.emitcode("cmp al, r11b")
-                        elif isinstance(n1type, pascaltypes.IntegerType):
-                            self.emit_movtoregister_fromstack("eax", node.arg1, comment)
-                            self.emit_movtoregister_fromstack("r11d", node.arg2)
-                            self.emitcode("cmp eax, r11d")
-                        else:  # has to be real; we errored above if any other type
-                            self.emit_movtoxmmregister_fromstack("xmm0", node.arg1)
-                            self.emit_movtoxmmregister_fromstack("xmm8", node.arg2)
-                            self.emitcode("ucomisd xmm0, xmm8")
+                            if node.operator == TACOperator.AND:
+                                self.emitcode("and al, r11b")
+                            else:
+                                self.emitcode("or al, r11b")
+                            self.emit_movtostack_fromregister(node.result, "AL")
+                        else:
+                            if isinstance(n1type, pascaltypes.BooleanType) or isinstance(n1type, pascaltypes.IntegerType):
+                                # TODO: Handling String types in relational operators
 
-                        labeltrue = self.getnextlabel()
-                        labeldone = self.getnextlabel()
-                        self.emitcode("{} {}".format(jumpinstr, labeltrue))
-                        self.emitcode("mov al, 0")
-                        self.emitcode("jmp {}".format(labeldone))
-                        self.emitlabel(labeltrue)
-                        self.emitcode("mov al, 1")
-                        self.emitlabel(labeldone)
-                        self.emit_movtostack_fromregister(node.result, "al")
-                    else:  # pragma: no cover
-                        raise ASMGeneratorError("Invalid Type {}".format(str(node.result.pascaltype)))
+                                # Boolean and Integer share same jump instructions
+                                if node.operator == TACOperator.EQUALS:
+                                    jumpinstr = "JE"
+                                elif node.operator == TACOperator.NOTEQUAL:
+                                    jumpinstr = "JNE"
+                                elif node.operator == TACOperator.GREATER:
+                                    jumpinstr = "JG"
+                                elif node.operator == TACOperator.GREATEREQ:
+                                    jumpinstr = "JGE"
+                                elif node.operator == TACOperator.LESS:
+                                    jumpinstr = "JL"
+                                elif node.operator == TACOperator.LESSEQ:
+                                    jumpinstr = "JLE"
+                                else:  # pragma: no cover
+                                    raise ASMGeneratorError("Invalid Relational Operator {}".format(node.operator))
+                            else:
+                                assert isinstance(n1type, pascaltypes.RealType)
+                                if node.operator == TACOperator.EQUALS:
+                                    jumpinstr = "JE"
+                                elif node.operator == TACOperator.NOTEQUAL:
+                                    jumpinstr = "JNE"
+                                elif node.operator == TACOperator.GREATER:
+                                    jumpinstr = "JA"
+                                elif node.operator == TACOperator.GREATEREQ:
+                                    jumpinstr = "JAE"
+                                elif node.operator == TACOperator.LESS:
+                                    jumpinstr = "JB"
+                                elif node.operator == TACOperator.LESSEQ:
+                                    jumpinstr = "JBE"
+                                else:  # pragma: no cover
+                                    raise ASMGeneratorError("Invalid Relational Operator {}".format(node.operator))
+
+                            if isinstance(n1type, pascaltypes.BooleanType):
+                                self.emit_movtoregister_fromstack("al", node.arg1, comment)
+                                self.emit_movtoregister_fromstack("r11b", node.arg2)
+                                self.emitcode("cmp al, r11b")
+                            elif isinstance(n1type, pascaltypes.IntegerType):
+                                self.emit_movtoregister_fromstack("eax", node.arg1, comment)
+                                self.emit_movtoregister_fromstack("r11d", node.arg2)
+                                self.emitcode("cmp eax, r11d")
+                            else:  # has to be real; we errored above if any other type
+                                self.emit_movtoxmmregister_fromstack("xmm0", node.arg1)
+                                self.emit_movtoxmmregister_fromstack("xmm8", node.arg2)
+                                self.emitcode("ucomisd xmm0, xmm8")
+
+                            labeltrue = self.getnextlabel()
+                            labeldone = self.getnextlabel()
+                            self.emitcode("{} {}".format(jumpinstr, labeltrue))
+                            self.emitcode("mov al, 0")
+                            self.emitcode("jmp {}".format(labeldone))
+                            self.emitlabel(labeltrue)
+                            self.emitcode("mov al, 1")
+                            self.emitlabel(labeldone)
+                            self.emit_movtostack_fromregister(node.result, "al")
                 else:  # pragma: no cover
                     raise ASMGeneratorError("Unknown TAC node type: {}".format(type(node)))
 

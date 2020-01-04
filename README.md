@@ -18,7 +18,7 @@ Compiler2 supports the following Pascal Language features:
         * ```abs()```, ```sqr()```, ```sin()```, ```cos()```, ```exp()```, ```ln()```, and ```sqrt()```
     * Supports following transfer functions required by ISO standard:
         * ``` trunc()``` and ```round()``` 
-* Logical operators: equal to, not equal, less than, less than or equal, greater than, greater than or equal
+* Logical operators: ```not```, ```and```, ```or```, ```=```, ```<>```, ```<```, ```<=```, ```>```, ```>=```
   * both Real and Integer; can compare integers to reals.
 * Procedures and Functions
   *  Parameters passed by value or by reference ("variable parameters" in Pascal-speak)
@@ -48,6 +48,7 @@ Compiler2 also has the following functionality that compiler1 did not:
 * REPEAT..UNTIL construct
 * Ability to do relational operations comparing Integer and Real types
 * abs(), sqr(), sin(), cos(), exp(), ln(), sqrt(), trunc(), and round()
+* relational operators not, or, and
 
 Compiler2 also uses the official BNF from the ISO standard, whereas Compiler1 used a BNF that I updated based on a variation I had downloaded from a random website.
 

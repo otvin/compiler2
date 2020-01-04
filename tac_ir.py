@@ -583,6 +583,7 @@ class TACBlock:
             self.processast(ast.children[1], generator)
             self.addnode(TACGotoNode(labelstart))
             self.addnode(TACLabelNode(labeldone))
+            return None
         elif tok.tokentype == TokenType.REPEAT:
             labelstart = generator.getlabel()
             self.addnode(TACLabelNode(labelstart))
@@ -591,6 +592,7 @@ class TACBlock:
                 self.processast(child, generator)
             condition = self.processast(ast.children[maxchild], generator)
             self.addnode(TACIFZNode(condition, labelstart))
+            return None
         elif tok.tokentype == TokenType.ASSIGNMENT:
             assert len(ast.children) == 2, "TACBlock.processast - Assignment ASTs must have 2 children."
             lval = self.symboltable.fetch(ast.children[0].token.value)
@@ -805,6 +807,18 @@ class TACBlock:
             ret = Symbol(generator.gettemporary(), tok.location, pascaltypes.BooleanType())
             self.symboltable.add(ret)
             self.addnode(TACBinaryNode(ret, op, newchild1, newchild2))
+            return ret
+        elif tok.tokentype in (TokenType.AND, TokenType.OR):
+            op = maptokentype_to_tacoperator(tok.tokentype)
+            child1 = self.processast(ast.children[0], generator)
+            child2 = self.processast(ast.children[1], generator)
+            if not isinstance(child1.pascaltype, pascaltypes.BooleanType) or \
+                    not isinstance(child2.pascaltype, pascaltypes.BooleanType):
+                errstr = "Both arguments to operator '{}' must be Boolean type".format(tok.value)
+                raise TACException(tac_errstr(errstr, tok))
+            ret = Symbol(generator.gettemporary(), tok.location, pascaltypes.BooleanType())
+            self.symboltable.add(ret)
+            self.addnode(TACBinaryNode(ret, op, child1, child2))
             return ret
         elif tok.tokentype == TokenType.NOT:
             child = self.processast(ast.children[0], generator)

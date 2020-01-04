@@ -1,0 +1,29 @@
+false correctly implies true
+true correctly implies true
+false correctly implies false
+true does not equal false
+true equals true
+false equals false
+couple more ways to write True: TRUE TRUE
+couple more ways to write False: FALSE FALSE
+True and (not False) is true!
+
+truth tables
+True and True = TRUE
+True and False = FALSE
+False and True = FALSE
+False and False = FALSE
+
+True or True = TRUE
+True or False = TRUE
+False or True = TRUE
+False or False = FALSE
+
+XOR is done with the <> operator
+True xor True = FALSE
+True xor False = TRUE
+False xor True = TRUE
+False xor False = FALSE
+
+False = True FALSE
+True = False FALSE
