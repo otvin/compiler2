@@ -198,7 +198,7 @@ class AssemblyGenerator:
                         raise ASMGeneratorError("String literal {} exceeds 255 char max length.".format(lit.value))
                     self.emitcode("{} db `{}`, 0".format(litname, lit.value.replace('`', '\\`')))
                     lit.memoryaddress = litname
-                elif isinstance(lit, NumericLiteral) and isinstance(lit.pascaltype, pascaltypes.RealType):
+                elif isinstance(lit, NumericLiteral) and isinstance(lit.typedef.basetype, pascaltypes.RealType):
                     litname = 'reallit_{}'.format(nextid)
                     nextid += 1
                     self.emitcode("{} dq {}".format(litname, lit.value))
@@ -272,7 +272,7 @@ class AssemblyGenerator:
                             paramreg = intparampos_to_register(numintparams)
                             self.emitcode("mov [{}], {}".format(localsym.memoryaddress, paramreg),
                                           "Copy variable parameter {} to stack".format(param.symbol.name))
-                        elif isinstance(param.symbol.pascaltype, pascaltypes.RealType):
+                        elif isinstance(param.symbol.typedef.basetype, pascaltypes.RealType):
                             paramreg = "xmm{}".format(numrealparams)
                             numrealparams += 1
                             # the param memory address is one of the xmm registers.
@@ -282,7 +282,7 @@ class AssemblyGenerator:
                             # the param memory address is a register
                             numintparams += 1
                             paramreg = intparampos_to_register(numintparams)
-                            regslice = get_register_slice_bybytes(paramreg, param.symbol.pascaltype.size)
+                            regslice = get_register_slice_bybytes(paramreg, param.symbol.typedef.basetype.size)
                             self.emitcode("mov [{}], {}".format(localsym.memoryaddress, regslice),
                                           "Copy parameter {} to stack".format(param.symbol.name))
                 else:
@@ -310,9 +310,9 @@ class AssemblyGenerator:
                     if isinstance(node.returnval, Symbol):
                         # do the function returning stuff here
                         # the "ret" itself is emitted below.
-                        if isinstance(node.returnval.pascaltype, pascaltypes.IntegerType):
+                        if isinstance(node.returnval.typedef.basetype, pascaltypes.IntegerType):
                             self.emitcode("mov EAX, [{}]".format(node.returnval.memoryaddress), "set up return value")
-                        elif isinstance(node.returnval.pascaltype, pascaltypes.BooleanType):
+                        elif isinstance(node.returnval.typedef.basetype, pascaltypes.BooleanType):
                             # whereas mov EAX, [{}] will zero out the high 32 bits of RAX, moving AL will not.
                             self.emitcode("movzx RAX, BYTE [{}]".format(node.returnval.memoryaddress),
                                           "set up return value")
@@ -320,10 +320,10 @@ class AssemblyGenerator:
                             self.emitcode("movsd XMM0, [{}]".format(node.returnval.memoryaddress), "set up return val")
                 elif isinstance(node, TACUnaryNode):
                     if node.operator == TACOperator.INTTOREAL:
-                        assert node.arg1.pascaltype.size in [1, 2, 4, 8]
-                        if node.arg1.pascaltype.size in (1, 2):
+                        assert node.arg1.typedef.basetype.size in [1, 2, 4, 8]
+                        if node.arg1.typedef.basetype.size in (1, 2):
                             raise ASMGeneratorError("Cannot handle 8- or 16-bit int convert to real")
-                        elif node.arg1.pascaltype.size == 4:
+                        elif node.arg1.typedef.basetype.size == 4:
                             # extend to 8 bytes
                             self.emitcode("mov eax, [{}]".format(node.arg1.memoryaddress))
                             self.emitcode("cdqe")
@@ -335,7 +335,7 @@ class AssemblyGenerator:
                         # now save the float into its location
                         self.emitcode("movsd [{}], xmm0".format(node.lval.memoryaddress))
                     elif node.operator == TACOperator.ASSIGN:
-                        reg = get_register_slice_bybytes("RAX", node.lval.pascaltype.size)
+                        reg = get_register_slice_bybytes("RAX", node.lval.typedef.basetype.size)
 
                         # first, get the arg1 into reg.  If arg1 is a byref parameter, we need to
                         # dereference the pointer.
@@ -347,8 +347,8 @@ class AssemblyGenerator:
                         self.emit_movtostack_fromregister(node.lval, reg)
 
                     elif node.operator == TACOperator.NOT:
-                        assert isinstance(node.arg1.pascaltype, pascaltypes.BooleanType)
-                        assert isinstance(node.lval.pascaltype, pascaltypes.BooleanType)
+                        assert isinstance(node.arg1.typedef.basetype, pascaltypes.BooleanType)
+                        assert isinstance(node.lval.typedef.basetype, pascaltypes.BooleanType)
                         self.emit_movtoregister_fromstack("AL", node.arg1)
                         self.emitcode("NOT AL")
                         self.emitcode("AND AL, 0x01")
@@ -360,14 +360,14 @@ class AssemblyGenerator:
                     if isinstance(node.literal1, StringLiteral):
                         # dealing with PEP8 line length
                         glt = self.tacgenerator.globalliteraltable
-                        litaddress = glt.fetch(node.literal1.value, pascaltypes.StringLiteralType()).memoryaddress
+                        litaddress = glt.fetch(node.literal1.value, pascaltypes.StringLiteralTypeDef()).memoryaddress
                         comment = "Move literal '{}' into {}".format(node.literal1.value, node.lval.name)
                         self.emitcode("lea rax, [rel {}]".format(litaddress), comment)
                         self.emit_movtostack_fromregister(node.lval, "rax")
-                    elif isinstance(node.literal1, NumericLiteral) and isinstance(node.literal1.pascaltype,
+                    elif isinstance(node.literal1, NumericLiteral) and isinstance(node.literal1.typedef.basetype,
                                                                                   pascaltypes.RealType):
                         glt = self.tacgenerator.globalliteraltable
-                        litaddress = glt.fetch(node.literal1.value, pascaltypes.RealType()).memoryaddress
+                        litaddress = glt.fetch(node.literal1.value, pascaltypes.RealLiteralTypeDef()).memoryaddress
                         comment = "Move literal {} into {}".format(node.literal1.value, node.lval.name)
                         self.emitcode("movsd xmm0, [rel {}]".format(litaddress), comment)
                         self.emit_movtostack_fromxmmregister(node.lval, "xmm0")
@@ -377,7 +377,7 @@ class AssemblyGenerator:
                             comment = "Move literal {} into {}".format(node.literal1.value, node.lval.name)
                             # putting the result into rax so I can use existing helper function vs.
                             # special casing this here.
-                            tmpreg = get_register_slice_bybytes("RAX", node.lval.pascaltype.size)
+                            tmpreg = get_register_slice_bybytes("RAX", node.lval.typedef.basetype.size)
                             self.emitcode("mov {}, {}".format(tmpreg, node.literal1.value), comment)
                             self.emit_movtostack_fromregister(node.lval, tmpreg)
 
@@ -405,11 +405,11 @@ class AssemblyGenerator:
                         if paramdef.is_byref:
                             comment = "Parameter {} for {} ({}, ByRef)".format(paramdef.symbol.name,
                                                                                act_symbol.name,
-                                                                               str(paramdef.symbol.pascaltype))
+                                                                               str(paramdef.symbol.typedef.denoter))
                         else:
                             comment = "Parameter {} for {} ({})".format(paramdef.symbol.name,
                                                                         act_symbol.name,
-                                                                        str(paramdef.symbol.pascaltype))
+                                                                        str(paramdef.symbol.typedef.denoter))
 
                         if paramdef.is_byref and actualparam.paramval.is_byref:
                             # if the formal parameter is byref and actual parameter is byref, then just pass the
@@ -423,14 +423,14 @@ class AssemblyGenerator:
                             assert numintparams <= 6
                             reg = intparampos_to_register(numintparams)  # we use all 64 bytes for pointers
                             self.emitcode("LEA {}, [{}]".format(reg, actualparam.paramval.memoryaddress), comment)
-                        elif isinstance(paramdef.symbol.pascaltype, pascaltypes.IntegerType) or \
-                                isinstance(paramdef.symbol.pascaltype, pascaltypes.BooleanType):
+                        elif isinstance(paramdef.symbol.typedef.basetype, pascaltypes.IntegerType) or \
+                                isinstance(paramdef.symbol.typedef.basetype, pascaltypes.BooleanType):
                             numintparams += 1
                             assert numintparams <= 6  # TODO - remove when we can handle more
                             fullreg = intparampos_to_register(numintparams)
-                            reg = get_register_slice_bybytes(fullreg, paramdef.symbol.pascaltype.size)
+                            reg = get_register_slice_bybytes(fullreg, paramdef.symbol.typedef.basetype.size)
                             self.emit_movtoregister_fromstack(reg, actualparam.paramval, comment)
-                        elif isinstance(paramdef.symbol.pascaltype, pascaltypes.RealType):
+                        elif isinstance(paramdef.symbol.typedef.basetype, pascaltypes.RealType):
                             reg = "xmm{}".format(numrealparams)
                             numrealparams += 1
                             assert numrealparams <= 8
@@ -438,12 +438,12 @@ class AssemblyGenerator:
                         else:
                             raise ASMGeneratorError("Invalid Parameter Type")
                     self.emitcode("call {}".format(node.label), "call {}()".format(node.funcname))
-                    if act_symbol.returnpascaltype is not None:
+                    if act_symbol.returntypedef is not None:
                         # return value is now in either RAX or XMM0 - need to store it in right place
                         comment = "assign return value of function to {}".format(node.lval.name)
-                        if isinstance(act_symbol.returnpascaltype, pascaltypes.IntegerType):
+                        if isinstance(act_symbol.returntypedef.basetype, pascaltypes.IntegerType):
                             self.emitcode("MOV [{}], EAX".format(node.lval.memoryaddress), comment)
-                        elif isinstance(act_symbol.returnpascaltype, pascaltypes.BooleanType):
+                        elif isinstance(act_symbol.returntypedef.basetype, pascaltypes.BooleanType):
                             self.emitcode("MOV [{}], AL".format(node.lval.memoryaddress), comment)
                         else:
                             self.emitcode("MOVSD [{}], XMM0".format(node.lval.memoryaddress), comment)
@@ -454,7 +454,7 @@ class AssemblyGenerator:
                             raise ASMGeneratorError("Invalid numparams to _WRITEI")
                         self.emitcode("mov rdi, _printf_intfmt")
                         param = params[-1]
-                        destregister = get_register_slice_bybytes("RSI", param.paramval.pascaltype.size)
+                        destregister = get_register_slice_bybytes("RSI", param.paramval.typedef.basetype.size)
                         self.emit_movtoregister_fromstack(destregister, param.paramval)
                         # must pass 0 (in rax) as number of floating point args since printf is variadic
                         self.emitcode("mov rax, 0")
@@ -565,8 +565,8 @@ class AssemblyGenerator:
                         self.emitcode("movsd [{}], xmm0".format(node.lval.memoryaddress),
                                       "use {} to move value to FPU".format(node.lval.name))
                         self.emitcode("FLDL2E")  # loads log base 2 of e into ST0
-                        assert node.lval.pascaltype.size in (4, 8)
-                        if node.lval.pascaltype.size == 4:
+                        assert node.lval.typedef.basetype.size in (4, 8)
+                        if node.lval.typedef.basetype.size == 4:
                             opsize = "DWORD"
                         else:
                             opsize = "QWORD"
@@ -630,8 +630,8 @@ class AssemblyGenerator:
                     elif node.label.name in ("_ROUNDR", "_TRUNCR"):
                         comment = "parameter {} for {}()".format(str(params[-1].paramval), node.label.name[1:6].lower())
                         self.emit_movtoxmmregister_fromstack("xmm0", params[-1].paramval, comment)
-                        assert node.lval.pascaltype.size in (4, 8)  # can't round into 1 or 2 bytes
-                        destreg = get_register_slice_bybytes("RAX", node.lval.pascaltype.size)
+                        assert node.lval.typedef.basetype.size in (4, 8)  # can't round into 1 or 2 bytes
+                        destreg = get_register_slice_bybytes("RAX", node.lval.typedef.basetype.size)
                         if node.label.name == "_ROUNDR":
                             instruction = "CVTSD2SI"
                         else:
@@ -644,13 +644,13 @@ class AssemblyGenerator:
                         raise ASMGeneratorError("Invalid System Function: {}".format(node.label.name))
                 elif isinstance(node, TACBinaryNode):
 
-                    assert isinstance(node.result.pascaltype, pascaltypes.IntegerType) or \
-                            isinstance(node.result.pascaltype, pascaltypes.BooleanType) or \
-                            isinstance(node.result.pascaltype, pascaltypes.RealType)
+                    assert isinstance(node.result.typedef.basetype, pascaltypes.IntegerType) or \
+                            isinstance(node.result.typedef.basetype, pascaltypes.BooleanType) or \
+                            isinstance(node.result.typedef.basetype, pascaltypes.RealType)
 
                     comment = "{} := {} {} {}".format(node.result.name, node.arg1.name, node.operator, node.arg2.name)
 
-                    if isinstance(node.result.pascaltype, pascaltypes.IntegerType):
+                    if isinstance(node.result.typedef.basetype, pascaltypes.IntegerType):
                         # TODO - handle something other than 4-byte integers
                         if node.operator in (TACOperator.MULTIPLY, TACOperator.ADD, TACOperator.SUBTRACT):
                             if node.operator == TACOperator.MULTIPLY:
@@ -691,7 +691,7 @@ class AssemblyGenerator:
                             self.emit_movtostack_fromregister(node.result, "eax")
                         else:  # pragma: no cover
                             raise ASMGeneratorError("Unrecognized operator: {}".format(node.operator))
-                    elif isinstance(node.result.pascaltype, pascaltypes.RealType):
+                    elif isinstance(node.result.typedef.basetype, pascaltypes.RealType):
                         if node.operator == TACOperator.MULTIPLY:
                             op = "mulsd"
                         elif node.operator == TACOperator.ADD:
@@ -708,9 +708,9 @@ class AssemblyGenerator:
                         self.emit_movtostack_fromxmmregister(node.result, "xmm0")
 
                     else:
-                        assert isinstance(node.result.pascaltype, pascaltypes.BooleanType)
-                        n1type = node.arg1.pascaltype
-                        n2type = node.arg2.pascaltype
+                        assert isinstance(node.result.typedef.basetype, pascaltypes.BooleanType)
+                        n1type = node.arg1.typedef.basetype
+                        n2type = node.arg2.typedef.basetype
                         if type(n1type) != type(n2type):  # pragma: no cover
                             raise ASMGeneratorError("Cannot mix {} and {} with relational operator".format(str(n1type),
                                                                                                            str(n2type)))
@@ -842,7 +842,8 @@ class AssemblyGenerator:
                         label = "_globalvar_{}".format(str(varseq))
                         varseq += 1
                         sym.memoryaddress = "rel {}".format(label)
-                        self.emitcode("{} resb {}".format(label, sym.pascaltype.size), "global variable {}".format(symname))
+                        self.emitcode("{} resb {}".format(label, sym.typedef.basetype.size),
+                                      "global variable {}".format(symname))
 
     def generate(self, objfilename, exefilename):
         self.generate_externs()

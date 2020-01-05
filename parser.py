@@ -224,9 +224,10 @@ class Parser:
                         tokval = "-" + realtok.value
                     else:
                         tokval = realtok.value
-                    self.literaltable.add(NumericLiteral(tokval, realtok.location, pascaltypes.RealType()))
+                    self.literaltable.add(NumericLiteral(tokval, realtok.location,
+                                                         pascaltypes.RealLiteralTypeDef()))
                     parent_ast.symboltable.add(ConstantSymbol(const_id.value, const_id.location,
-                                                              pascaltypes.RealType(), tokval))
+                                                              pascaltypes.RealLiteralTypeDef(), tokval))
                 elif self.tokenstream.peektokentype() == TokenType.UNSIGNED_INT:
                     inttok = self.getexpectedtoken(TokenType.UNSIGNED_INT)
                     if isneg:
@@ -234,7 +235,7 @@ class Parser:
                     else:
                         tokval = inttok.value
                     parent_ast.symboltable.add(ConstantSymbol(const_id.value, const_id.location,
-                                                              pascaltypes.IntegerType(), tokval))
+                                                              pascaltypes.IntegerLiteralTypeDef(), tokval))
                 elif self.tokenstream.peektokentype() == TokenType.MAXINT:
                     self.getexpectedtoken(TokenType.MAXINT)
                     if isneg:
@@ -242,14 +243,15 @@ class Parser:
                     else:
                         tokval = pascaltypes.STRMAXINT
                     parent_ast.symboltable.add(ConstantSymbol(const_id.value, const_id.location,
-                                                              pascaltypes.IntegerType(), tokval))
+                                                              pascaltypes.IntegerLiteralTypeDef(), tokval))
                 elif self.tokenstream.peektokentype() in (TokenType.TRUE, TokenType.FALSE):
                     if sawsign:
                         errstr = "Cannot have a sign before a Boolean constant in {}".format(const_id.location)
                         raise ParseException(errstr)
                     booltok = self.tokenstream.eattoken()
                     parent_ast.symboltable.add(ConstantSymbol(const_id.value, const_id.location,
-                                                              pascaltypes.BooleanType(), booltok.value))
+                                                              pascaltypes.BooleanLiteralTypeDef(),
+                                                              booltok.value))
                 elif self.tokenstream.peektokentype() == TokenType.CHARSTRING:
                     if sawsign:
                         errstr = "Cannot have a sign before a string constant in {}".format(const_id.location)
@@ -257,7 +259,8 @@ class Parser:
                     charstrtok = self.getexpectedtoken(TokenType.CHARSTRING)
                     self.literaltable.add(StringLiteral(charstrtok.value, charstrtok.location))
                     parent_ast.symboltable.add(ConstantSymbol(const_id.value, const_id.location,
-                                                              pascaltypes.StringLiteralType(), charstrtok.value))
+                                                              pascaltypes.StringLiteralTypeDef(),
+                                                              charstrtok.value))
                 elif self.tokenstream.peektokentype() == TokenType.IDENTIFIER:
                     ident_token = self.getexpectedtoken(TokenType.IDENTIFIER)
                     if not parent_ast.symboltable.existsanywhere(ident_token.value):
@@ -273,8 +276,8 @@ class Parser:
                         errstr = errstr.format(const_id.value, ident_token.value, ident_token.location)
                         raise ParseException(errstr)
                     if sawsign:
-                        if isinstance(sym.pascaltype, pascaltypes.RealType) or \
-                                isinstance(sym.pascaltype, pascaltypes.IntegerType):
+                        if isinstance(sym.typedef.basetype, pascaltypes.RealType) or \
+                                isinstance(sym.typedef.basetype, pascaltypes.IntegerType):
                             if isneg:
                                 if sym.value[0] == "-":
                                     tokval = sym.value[1:]  # remove the negative
@@ -283,9 +286,9 @@ class Parser:
                                 # If we define a constant as negative another constant, we need to ensure the
                                 # literal value is in the literals table if it's a real constant.
                                 # LiteralTable.add() allows adding duplicates and filters them out.
-                                if isinstance(sym.pascaltype, pascaltypes.RealType):
+                                if isinstance(sym.typedef.basetype, pascaltypes.RealType):
                                     self.literaltable.add(NumericLiteral(tokval, ident_token.location,
-                                                                         pascaltypes.RealType()))
+                                                                         pascaltypes.RealLiteralTypeDef()))
                             else:
                                 tokval = sym.value
                         else:
@@ -298,7 +301,7 @@ class Parser:
                         tokval = sym.value
 
                     parent_ast.symboltable.add(ConstantSymbol(const_id.value, const_id.location,
-                                                              sym.pascaltype, tokval))
+                                                              sym.typedef, tokval))
                 else:
                     nexttok = self.tokenstream.eattoken()
                     errstr = "Unexpected token {} in {}.".format(str(nexttok.value), nexttok.location)
@@ -313,22 +316,23 @@ class Parser:
     def parse_typedefinitionpart(self, parent_ast):
         return None
 
-    def parse_typeidentifier(self):
+    def parse_typeidentifier(self, parent_ast):
         # Types can be very flexibile due to user-defined types, which we do not support now.  For now, we will use
-        # <type-identifier> ::= "integer" | "real" | "boolean"
+        # <type-identifier> ::= "integer" | "real" | "boolean" | "char"
         #
-        # This function returns the type itself.
+        # This function returns the typedef itself.
+
+        # this next line will be updated when we can have more complex types
+        if self.tokenstream.peektokentype() not in (TokenType.INTEGER, TokenType.REAL, TokenType.BOOLEAN,
+                                                    TokenType.CHAR):
+            tok = self.tokenstream.peektoken()
+            errstr = "Invalid type identifier '{}'".format(tok.value)
+            raise ParseException(token_errstr(tok, errstr))
 
         type_token = self.tokenstream.eattoken()
-        if type_token.tokentype == TokenType.INTEGER:
-            symboltype = pascaltypes.IntegerType()
-        elif type_token.tokentype == TokenType.REAL:
-            symboltype = pascaltypes.RealType()
-        elif type_token.tokentype == TokenType.BOOLEAN:
-            symboltype = pascaltypes.BooleanType()
-        else:
-            raise ParseException("Invalid type denoter: {}".format(str(type_token)))
-        return symboltype
+        symboltypedef = parent_ast.symboltable.fetch(str(type_token.tokentype))
+        assert isinstance(symboltypedef, pascaltypes.TypeDef)
+        return symboltypedef
 
     def parse_identifierlist(self):
         # 6.4.2.3 <identifier-list> ::= <identifier> { "," <identifier> }
@@ -357,7 +361,7 @@ class Parser:
             while not done:
                 identifier_list = self.parse_identifierlist()
                 self.getexpectedtoken(TokenType.COLON)
-                symboltype = self.parse_typeidentifier()
+                symboltype = self.parse_typeidentifier(parent_ast)
                 self.getexpectedtoken(TokenType.SEMICOLON)
                 for identifier_token in identifier_list:
                     parent_ast.symboltable.add(VariableSymbol(identifier_token.value,
@@ -366,7 +370,7 @@ class Parser:
                     done = True
         return None
 
-    def parse_formalparameterlist(self, paramlist):
+    def parse_formalparameterlist(self, paramlist, parent_ast):
         # 6.6.3.1 - <formal-parameter-list> ::= "(" <formal-parameter-section> {";" <formal-parameter-section>} ")"
         # 6.6.3.1 - <formal-parameter-section> ::= <value-parameter-specification> | <variable-parameter-specification>
         #                                           | <procedural-parameter-specification>
@@ -388,7 +392,7 @@ class Parser:
                 is_byref = False
             identifier_list = self.parse_identifierlist()
             self.getexpectedtoken(TokenType.COLON)
-            symboltype = self.parse_typeidentifier()
+            symboltype = self.parse_typeidentifier(parent_ast)
             for identifier_token in identifier_list:
                 vsym = VariableSymbol(identifier_token.value, identifier_token.location, symboltype)
                 vsym.is_byref = is_byref
@@ -432,7 +436,7 @@ class Parser:
             ast_procfunc.children.append(AST(tok_procfuncname, ast_procfunc))
             assert isinstance(tok_procfuncname, Token)
             if self.tokenstream.peektokentype() == TokenType.LPAREN:
-                self.parse_formalparameterlist(ast_procfunc.paramlist)
+                self.parse_formalparameterlist(ast_procfunc.paramlist, ast_procfunc)
 
             if tok_procfunc.tokentype == TokenType.FUNCTION:
                 if self.tokenstream.peektokentype() != TokenType.COLON:
@@ -440,7 +444,7 @@ class Parser:
                     tmp_symboltype = None
                     tmp_token = self.tokenstream.peektoken()
                     try:
-                        tmp_symboltype = self.parse_typeidentifier()
+                        tmp_symboltype = self.parse_typeidentifier(ast_procfunc)
                     except ParseException:
                         pass  # errors' are ok here.
 
@@ -451,26 +455,26 @@ class Parser:
                         errstr = "Expected ':' but saw '{}' in {}".format(tmp_token.value, tmp_token.location)
                     raise ParseException(errstr)
                 self.getexpectedtoken(TokenType.COLON)
-                resulttype = self.parse_typeidentifier()
+                resulttypedef = self.parse_typeidentifier(ast_procfunc)
                 # 6.6.2 - functions can only return simple types or pointers
-                if not (isinstance(resulttype, pascaltypes.SimpleType) or
-                        isinstance(resulttype, pascaltypes.PointerType)):
+                if not (isinstance(resulttypedef.basetype, pascaltypes.SimpleType) or
+                        isinstance(resulttypedef.basetype, pascaltypes.PointerType)):
                     errstr = "Function {} has invalid return type: {} at {}".format(tok_procfuncname.value,
-                                                                                    str(resulttype),
+                                                                                    str(resulttypedef),
                                                                                     str(tok_procfunc.location))
                     raise ParseException(errstr)
                 ast_procfunc.symboltable.add(FunctionResultVariableSymbol(tok_procfuncname.value,
                                                                           tok_procfuncname.location,
-                                                                          resulttype))
-                activationtype = pascaltypes.FunctionType()
+                                                                          resulttypedef))
+                activationtypedef = pascaltypes.FunctionTypeDef()
             else:
-                resulttype = None
-                activationtype = pascaltypes.ProcedureType()
+                resulttypedef = None
+                activationtypedef = pascaltypes.ProcedureTypeDef()
 
             # Procedures and Functions can only be declared in Program scope, or in the scope of other procedures
             # or functions.  So the parent of the procfunc here has to have a symbol table.
             parent_ast.symboltable.add(ActivationSymbol(tok_procfuncname.value, tok_procfuncname.location,
-                                                        activationtype, ast_procfunc.paramlist, resulttype))
+                                                        activationtypedef, ast_procfunc.paramlist, resulttypedef))
 
             self.getexpectedtoken(TokenType.SEMICOLON)
             ast_procfunc.children.extend(self.parse_block(ast_procfunc))
@@ -495,7 +499,8 @@ class Parser:
         else:
             if self.tokenstream.peektokentype() == TokenType.UNSIGNED_REAL:
                 realtok = self.getexpectedtoken(TokenType.UNSIGNED_REAL)
-                self.literaltable.add(NumericLiteral(realtok.value, realtok.location, pascaltypes.RealType()))
+                self.literaltable.add(NumericLiteral(realtok.value, realtok.location,
+                                                     pascaltypes.RealLiteralTypeDef()))
                 ret = AST(realtok, parent_ast)
             elif self.tokenstream.peektokentype() in (TokenType.UNSIGNED_INT, TokenType.TRUE,
                                                       TokenType.MAXINT, TokenType.FALSE):
@@ -532,7 +537,7 @@ class Parser:
                     # activation symbol that we can test.
                     actsym = ret.nearest_symboltable().fetch(str_procfuncname)
                     if isinstance(actsym, ActivationSymbol):
-                        if actsym.returnpascaltype is None:
+                        if actsym.returntypedef is None:
                             errstr = "Procedure {} cannot be used as parameter to {}() in {}"
                             errstr = errstr.format(str_procfuncname, parent_ast.token.value, ret.token.location)
                             raise ParseException(errstr)

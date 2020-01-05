@@ -256,18 +256,74 @@ class FunctionType(ActivationType):
         self.typename = "function activation"
 
 
-class TypeDefinition:
-    def __init__(self, identifier, denoter):
-        assert isinstance(denoter, TypeDefinition) or isinstance(denoter, BaseType)
+class TypeDef:
+    # Denoter may be a basetype but doesn't have to be.  For example:
+    # type
+    #   i=integer;
+    #   c=i;
+    #
+    # the typedefinition for i would be identifier = 'i', denoter = IntegerType()
+    # and basetype = IntegerType().
+    # the typedefinition for j would be identifier = 'j' denoter = the TypeDefinition of i,
+    # and basetype = IngeterType().
+
+    def __init__(self, identifier, denoter, basetype):
+        assert isinstance(denoter, TypeDef) or isinstance(denoter, BaseType)
+        assert isinstance(basetype, BaseType)
         self.identifier = identifier.lower()
         self.denoter = denoter
+        self.basetype = basetype
 
-    # allows us to use TypeDefinitions in Symbol tables, and yet keep the vocabluary in the TypeDefinition
+    # allows us to use TypeDefs in Symbol tables, and yet keep the vocabluary in the TypeDef
     # such that matches the terminology in the ISO standard
     @property
     def name(self):
         return self.identifier
 
+    def __str__(self):
+        return "TypeDef '{}'".format(self.name)
+
     def __repr__(self):
-        ret = "TypeDefinition '{}' with denoter: {}".format(self.name, str(self.denoter))
+        ret = "TypeDef '{}' with denoter {} and basetype {}"
+        ret = ret.format(self.name, str(self.denoter), str(self.basetype))
         return ret
+
+
+SIMPLETYPEDEF_INTEGER = TypeDef("integer", IntegerType(), IntegerType())
+SIMPLETYPEDEF_BOOLEAN = TypeDef("boolean", BooleanType(), BooleanType())
+SIMPLETYPEDEF_REAL = TypeDef("real", RealType(), RealType())
+SIMPLETYPEDEF_CHAR = TypeDef("char", CharacterType(), CharacterType())
+
+
+class StringLiteralTypeDef(TypeDef):
+    def __init__(self):
+        super().__init__('n/a', StringLiteralType(), StringLiteralType())
+
+
+class RealLiteralTypeDef(TypeDef):
+    def __init__(self):
+        super().__init__('n/a', RealType(), RealType())
+
+
+class IntegerLiteralTypeDef(TypeDef):
+    def __init__(self):
+        super().__init__('n/a', IntegerType(), IntegerType())
+
+
+class BooleanLiteralTypeDef(TypeDef):
+    def __init__(self):
+        super().__init__('n/a', BooleanType(), BooleanType())
+
+
+class ActivationTypeDef(TypeDef):
+    pass
+
+
+class ProcedureTypeDef(ActivationTypeDef):
+    def __init__(self):
+        super().__init__('n/a', ProcedureType(), ProcedureType())
+
+
+class FunctionTypeDef(ActivationTypeDef):
+    def __init__(self):
+        super().__init__('n/a', FunctionType(), FunctionType())

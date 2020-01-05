@@ -13,12 +13,12 @@ class SymbolRedefinedException(SymbolException):
 class Literal:
     # Literals are similar to symbols, but do not have names, and are always going to be
     # declared in global scope, regardless of where in the program they are found.
-    def __init__(self, value, location, pascaltype):
+    def __init__(self, value, location, typedef):
         assert isinstance(location, FileLocation)
-        assert isinstance(pascaltype, pascaltypes.BaseType)
+        assert isinstance(typedef, pascaltypes.TypeDef)
         self.value = value
         self.location = location
-        self.pascaltype = pascaltype
+        self.typedef = typedef
         self.memoryaddress = None
 
     @property
@@ -36,20 +36,20 @@ class Literal:
 class StringLiteral(Literal):
     def __init__(self, value, location):
         assert isinstance(value, str)
-        super().__init__(value, location, pascaltypes.StringLiteralType())
+        super().__init__(value, location, pascaltypes.StringLiteralTypeDef())
 
 
 class NumericLiteral(Literal):
-    def __init__(self, value, location, pascaltype):
-        assert (isinstance(pascaltype, pascaltypes.RealType) or isinstance(pascaltype, pascaltypes.IntegerType))
-        super().__init__(value, location, pascaltype)
-        self.pascaltype = pascaltype
+    def __init__(self, value, location, typedef):
+        assert (isinstance(typedef, pascaltypes.RealLiteralTypeDef) or
+                isinstance(typedef, pascaltypes.IntegerLiteralTypeDef))
+        super().__init__(value, location, typedef)
 
 
 class BooleanLiteral(Literal):
     def __init__(self, value, location):
         assert value == 0 or value == 1
-        super().__init__(value, location, pascaltypes.BooleanType())
+        super().__init__(value, location, pascaltypes.BooleanLiteralTypeDef())
 
     def __str__(self):
         if self.value == 0:
@@ -66,22 +66,22 @@ class LiteralTable:
     def add(self, lit):
         if not isinstance(lit, Literal):
             raise SymbolException("Can only add Literals to LiteralTables")
-        if isinstance(lit.pascaltype, pascaltypes.StringLiteralType):
+        if isinstance(lit.typedef, pascaltypes.StringLiteralTypeDef):
             if lit.value not in self.stringliterals.keys():
                 self.stringliterals[lit.value] = lit
         else:
             if lit.value not in self.numericliterals.keys():
                 self.numericliterals[lit.value] = lit
 
-    def fetch(self, value, pascaltype):
-        assert isinstance(pascaltype, pascaltypes.BaseType)
+    def fetch(self, value, typedef):
+        assert isinstance(typedef, pascaltypes.TypeDef)
         try:
-            if isinstance(pascaltype, pascaltypes.StringLiteralType):
+            if isinstance(typedef, pascaltypes.StringLiteralTypeDef):
                 ret = self.stringliterals[value]
             else:
                 ret = self.numericliterals[value]
         except KeyError:
-            errstr = "Literal not found: {}.{}".format(str(value), pascaltype)
+            errstr = "Literal not found: {}.{}".format(str(value), typedef)
             raise SymbolException(errstr)
         return ret
 
@@ -96,11 +96,12 @@ class LiteralTable:
 
 
 class Symbol:
-    def __init__(self, name, location, pascaltype):
-        assert (isinstance(pascaltype, pascaltypes.BaseType))
+    def __init__(self, name, location, typedef):
+        assert isinstance(typedef, pascaltypes.TypeDef)
+        assert isinstance(location, FileLocation)
         self.name = name
         self.location = location
-        self.pascaltype = pascaltype
+        self.typedef = typedef
         self.memoryaddress = None
         self.is_byref = False
 
@@ -125,26 +126,27 @@ class Symbol:
         return self.name
 
     def __repr__(self):
-        return "{} ({}): {} @{}".format(self.name, self.location, self.pascaltype.typename, self.memoryaddress)
+        return "{} ({}): {} @{}".format(self.name, self.location, self.typedef.name, self.memoryaddress)
 
 
 class VariableSymbol(Symbol):
-    def __init__(self, name, location, pascaltype):
-        super().__init__(name, location, pascaltype)
+    def __init__(self, name, location, typedef):
+        super().__init__(name, location, typedef)
 
 
 class FunctionResultVariableSymbol(VariableSymbol):
-    def __init__(self, name, location, pascaltype):
-        super().__init__(name, location, pascaltype)
+    def __init__(self, name, location, typedef):
+        super().__init__(name, location, typedef)
 
 
 class ConstantSymbol(Symbol):
-    def __init__(self, name, location, pascaltype, value):
+    def __init__(self, name, location, typedef, value):
         # only valid constants are maxint, integers, character strings, booleans, and reals per 6.3 of the iso standard
-        assert (isinstance(pascaltype, pascaltypes.OrdinalType)
-                or isinstance(pascaltype, pascaltypes.RealType)
-                or isinstance(pascaltype, pascaltypes.StringLiteralType))
-        super().__init__(name, location, pascaltype)
+        assert isinstance(typedef, pascaltypes.TypeDef)
+        assert (isinstance(typedef.basetype, pascaltypes.OrdinalType)
+                or isinstance(typedef.basetype, pascaltypes.RealType)
+                or isinstance(typedef.basetype, pascaltypes.StringLiteralType))
+        super().__init__(name, location, typedef)
         self.value = value
 
     def __repr__(self):
@@ -154,16 +156,17 @@ class ConstantSymbol(Symbol):
 
 
 class ActivationSymbol(Symbol):
-    def __init__(self, name, location, pascaltype, paramlist, returnpascaltype=None):
-        assert isinstance(pascaltype, pascaltypes.ActivationType)
+    def __init__(self, name, location, typedef, paramlist, returntypedef=None):
+        assert isinstance(typedef, pascaltypes.TypeDef)
         assert isinstance(paramlist, ParameterList)
         # per 6.6.2 of the standard, only value return types from Functions are simple types and pointers.
         # Procedures are ActivationSymbols with no return type, so None is valid as well.
-        assert (returnpascaltype is None or isinstance(returnpascaltype, pascaltypes.SimpleType)
-                or isinstance(returnpascaltype, pascaltypes.PointerType))
-        super().__init__(name, location, pascaltype)
+        assert (returntypedef is None
+                or isinstance(returntypedef.basetype, pascaltypes.SimpleType)
+                or isinstance(returntypedef.basetype, pascaltypes.PointerType))
+        super().__init__(name, location, typedef)
         self.paramlist = paramlist
-        self.returnpascaltype = returnpascaltype
+        self.returntypedef = returntypedef
         self.label = None
 
     @property
@@ -235,7 +238,8 @@ class Label:
         return self.name
 
 
-# The information on the enumerated types will be stored in the type table, but
+# The information on the enumerated types will be stored in the type table, but we will need symbols
+# for these.  These are placeholder classes until we figure out the design.
 class EnumeratedTypeName:
     def __init__(self, typename):
         self.typename = typename
@@ -254,8 +258,8 @@ class SymbolTable:
 
     def add(self, sym):
         assert isinstance(sym, Symbol) or isinstance(sym, Label) or \
-               isinstance(sym, pascaltypes.TypeDefinition) or isinstance(sym, pascaltypes.EnumeratedTypeValue), \
-               "Can only add Symbols, Labels, and type definitions to SymbolTables"
+               isinstance(sym, pascaltypes.TypeDef) or isinstance(sym, pascaltypes.EnumeratedTypeValue), \
+               "Can only add Symbols, Labels, and type defs to SymbolTables"
         if sym.name in self.symbols.keys():
             current_sym = self.fetch(sym.name)
             if isinstance(sym, ConstantSymbol) and isinstance(current_sym, ConstantSymbol):
@@ -282,7 +286,7 @@ class SymbolTable:
         if not foundit:
             raise SymbolException("Identifier not found: '{}'".format(name))
         assert isinstance(ret, Symbol) or isinstance(ret, Label) or \
-            isinstance(ret, pascaltypes.TypeDefinition) or isinstance(ret, pascaltypes.EnumeratedTypeValue)
+            isinstance(ret, pascaltypes.TypeDef) or isinstance(ret, pascaltypes.EnumeratedTypeValue)
         return ret
 
     def exists(self, name):
@@ -306,13 +310,13 @@ class SymbolTable:
 
     def addsimpletypes(self):
         # the root of the program has the required types in it
-        self.add(pascaltypes.TypeDefinition("integer", pascaltypes.IntegerType()))
-        self.add(pascaltypes.TypeDefinition("boolean", pascaltypes.BooleanType()))
-        self.add(pascaltypes.TypeDefinition("real", pascaltypes.RealType()))
-        self.add(pascaltypes.TypeDefinition("char", pascaltypes.CharacterType()))
+        self.add(pascaltypes.SIMPLETYPEDEF_INTEGER)
+        self.add(pascaltypes.SIMPLETYPEDEF_BOOLEAN)
+        self.add(pascaltypes.SIMPLETYPEDEF_REAL)
+        self.add(pascaltypes.SIMPLETYPEDEF_CHAR)
 
     def are_same_type(self, t1_identifier, t2_identifier):
-        # Two type definitions are the same, if they can be traced back to the same type identifier.
+        # Two type defs are the same, if they can be traced back to the same type identifier.
         # Per 6.4.7 of the ISO standard, 'integer,' 'count,' and 'range' in this example are the same type:
         #
         # type
@@ -426,9 +430,9 @@ class ParameterList:
     def __str__(self):
         ret = ""
         if len(self.paramlist) > 0:
-            ret = "{}:{}".format(str(self.paramlist[0]), self.paramlist[0].symbol.pascaltype.typename)
+            ret = "{}:{}".format(str(self.paramlist[0]), self.paramlist[0].symbol.typedef.basetype.typename)
         for param in self.paramlist[1:]:
-            ret += ", " + "{}:{}".format(str(param), param.symbol.pascaltype.typename)
+            ret += ", " + "{}:{}".format(str(param), param.symbol.typedef.basetype.typename)
         return ret
 
     def __len__(self):
