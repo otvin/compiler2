@@ -1,7 +1,11 @@
+class PascalTypeException(Exception):
+    pass
+
+
 class BaseType:
     def __init__(self):
         self.size = 0
-        self.typename = ""
+        self.typename = None
 
     def __str__(self):
         return self.typename
@@ -20,7 +24,18 @@ class SimpleType(BaseType):
 
 
 class OrdinalType(SimpleType):
-    pass
+    def __init__(self):
+        super().__init__()
+
+    def __getitem__(self, n):  # pragma: no cover
+        # this is a pure virtual function
+        # returns the item in the Nth position in the sequence defined by the ordinal type.
+        raise NotImplementedError("__getitem__() not implemented")
+
+    def position(self, s):  # pragma: no cover
+        # this is a pure virtual function
+        # returns the position where item S is in the sequence defined by the ordinal type
+        raise NotImplementedError("position() not implemented)")
 
 
 # Putting these constants here because if we change the size of the Integer, we would need to change
@@ -30,18 +45,42 @@ NEGMAXINT = -1 * MAXINT
 STRMAXINT = str(MAXINT)
 STRNEGMAXINT = str(NEGMAXINT)
 
+
 class IntegerType(OrdinalType):
     def __init__(self):
         super().__init__()
         self.typename = "integer"
         self.size = 4
 
+    def __getitem__(self, n):
+        assert isinstance(n, int)
+        assert n <= MAXINT
+        assert n >= NEGMAXINT
+        return n
+
+    def position(self, s):
+        assert isinstance(s, int)
+        assert s <= MAXINT
+        assert s >= NEGMAXINT
+        return s
+
 
 class CharacterType(OrdinalType):
     def __init__(self):
         super().__init__()
         self.typename = "char"
-        self.size = 2
+        self.size = 1
+
+    def __getitem__(self, n):
+        assert isinstance(n, int)
+        assert n >= 0
+        assert n <= 255
+        return chr(n)
+
+    def position(self, s):
+        assert isinstance(s, str)
+        assert len(s) == 1
+        return ord(s)
 
 
 class BooleanType(OrdinalType):
@@ -49,6 +88,94 @@ class BooleanType(OrdinalType):
         super().__init__()
         self.typename = "Boolean"
         self.size = 1
+
+    def __getitem__(self, n):
+        assert n in (0, 1)
+        return n
+
+    def position(self, s):
+        assert s in (0, 1)
+        return s
+
+
+class EnumeratedTypeValue:
+    # needed so that the values can go into the symbol table
+    def __init__(self, identifier):
+        self.identifier = identifier
+
+    # allows us to use TypeDefinitions in Symbol tables, and yet keep the vocabluary in the TypeDefinition
+    # such that matches the terminology in the ISO standard
+    @property
+    def name(self):
+        return self.identifier
+
+
+class EnumeratedType(OrdinalType):
+    def __init__(self, typename, identifier_list):
+        for i in identifier_list:
+            assert isinstance(i, str)  # TODO - should these be identifiers?
+
+        super().__init__()
+        if len(identifier_list) > 255:
+            errstr = "Enumerated type '{}' has {} identifiers.  Maximum is 255."
+            errstr = errstr.format(typename, str(len(identifier_list)))
+            raise PascalTypeException(errstr)
+        self.typename = typename
+        self.size = 1
+        self.identifier_list = identifier_list
+
+    def __str__(self):
+        ret = "Enumerated type: {} with values (".format(self.typename)
+        for i in self.identifier_list:
+            ret = ret + i + ', '
+        ret = ret[:-2] + ')'
+        return ret
+
+    def __getitem__(self, n):
+        assert isinstance(n, int)
+        assert n >= 0
+        assert n < len(self.identifier_list)
+        return self.identifier_list[n]
+
+    def position(self, s):
+        assert isinstance(s, str)  # EnumeratedTypes contain list of strings
+        i = 0
+        foundit = False
+        while i < len(self.identifier_list) and not foundit:
+            if self.identifier_list[s].lower() == s.lower():
+                foundit = True
+            else:
+                i += 1
+        if not foundit:
+            errstr = "'{}' is not a valid value for enumerated type '{}'"
+            errstr = errstr.format(s, self.typename)
+            raise PascalTypeException(errstr)
+        return i
+
+
+class SubrangeType(OrdinalType):
+    def __init__(self, typename, hosttype, rangemin, rangemax):
+        assert isinstance(hosttype, OrdinalType)
+        super().__init__()
+        self.typename = typename
+        self.size = 4
+        self.hosttype = hosttype
+        self.rangemin = rangemin  # min/max will be int for Integer, Char, Boolean, and strings for EnumeratedTypes
+        self.rangemax = rangemax
+
+    def __getitem__(self, n):
+        min_inhosttype = self.hosttype.position(self.rangemin)
+        max_inhosttype = self.hosttype.position(self.rangemax)
+        assert min_inhosttype + n <= max_inhosttype
+        return self.hosttype[n - min_inhosttype]
+
+    def position(self, s):
+        host_position = self.hosttype.position(s)
+        min_inhosttype = self.hosttype.position(self.rangemin)
+        max_inhosttype = self.hosttype.position(self.rangemax)
+        assert host_position >= min_inhosttype
+        assert host_position <= max_inhosttype
+        return host_position - min_inhosttype
 
 
 class RealType(SimpleType):
@@ -68,25 +195,49 @@ class PointerType(BaseType):
 
 
 class StructuredType(BaseType):
-    pass
+    def __init__(self):
+        super().__init__()
+        self.ispacked = False  # TODO handle packed structures
 
 
 class ArrayType(StructuredType):
     # TODO: minindex and maxindex can be values of any OrdinalType, not just integers
     # Do we convert those values to integers during compilation?  Probably?
-    def __init__(self, arrayoftype, minindex, maxindex):
+    def __init__(self, typename, arrayoftype, dimensionlist):
         assert isinstance(arrayoftype, BaseType)
+
         super().__init__()
-        self.typename = "array of {}".format(str(arrayoftype))
-        self.minindex = minindex
-        self.maxindex = maxindex
-        self.size = (maxindex-minindex+1) * arrayoftype.size
+        self.typename = typename
+        self.arrayoftype = arrayoftype
+        self.dimensionlist = dimensionlist
+
+        numitemsinarray = 1
+        for i in dimensionlist:
+            assert isinstance(i, SubrangeType)
+            numitemsindimension = i.position(i.rangemax) - i.position(i.rangemin)
+            numitemsinarray *= numitemsindimension
+
+        self.size = numitemsinarray * arrayoftype.size
 
 
 class StringType(ArrayType):
-    def __init__(self, maxindex):
-        super().__init__(CharacterType(), 1, maxindex)
-        self.typename = "string"
+    # def __init__(self, maxindex):
+    #    # super().__init__(CharacterType(), 1, maxindex)
+    #    # self.ispacked = True
+    #    # self.typename = "string"
+    pass
+
+
+class RecordType(StructuredType):
+    pass
+
+
+class SetType(StructuredType):
+    pass
+
+
+class FileType(StructuredType):
+    pass
 
 
 class ActivationType(BaseType):
@@ -103,3 +254,20 @@ class FunctionType(ActivationType):
     def __init__(self):
         super().__init__()
         self.typename = "function activation"
+
+
+class TypeDefinition:
+    def __init__(self, identifier, denoter):
+        assert isinstance(denoter, TypeDefinition) or isinstance(denoter, BaseType)
+        self.identifier = identifier.lower()
+        self.denoter = denoter
+
+    # allows us to use TypeDefinitions in Symbol tables, and yet keep the vocabluary in the TypeDefinition
+    # such that matches the terminology in the ISO standard
+    @property
+    def name(self):
+        return self.identifier
+
+    def __repr__(self):
+        ret = "TypeDefinition '{}' with denoter: {}".format(self.name, str(self.denoter))
+        return ret

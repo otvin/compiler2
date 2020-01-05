@@ -837,12 +837,12 @@ class AssemblyGenerator:
             varseq = 0
             for symname in self.tacgenerator.globalsymboltable.symbols.keys():
                 sym = self.tacgenerator.globalsymboltable.fetch(symname)
-                assert isinstance(sym, Symbol)
-                if not isinstance(sym, ActivationSymbol):
-                    label = "_globalvar_{}".format(str(varseq))
-                    varseq += 1
-                    sym.memoryaddress = "rel {}".format(label)
-                    self.emitcode("{} resb {}".format(label, sym.pascaltype.size), "global variable {}".format(symname))
+                if isinstance(sym, Symbol):
+                    if not isinstance(sym, ActivationSymbol):
+                        label = "_globalvar_{}".format(str(varseq))
+                        varseq += 1
+                        sym.memoryaddress = "rel {}".format(label)
+                        self.emitcode("{} resb {}".format(label, sym.pascaltype.size), "global variable {}".format(symname))
 
     def generate(self, objfilename, exefilename):
         self.generate_externs()

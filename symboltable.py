@@ -235,6 +235,137 @@ class Label:
         return self.name
 
 
+# The information on the enumerated types will be stored in the type table, but
+class EnumeratedTypeName:
+    def __init__(self, typename):
+        self.typename = typename
+
+
+class EnumeratedTypeValue:
+    def __init__(self, value, enumeratedtypename):
+        assert isinstance(enumeratedtypename, EnumeratedTypeName)
+        self.value = value
+
+
+class SymbolTable:
+    def __init__(self):
+        self.symbols = {}
+        self.parent = None
+
+    def add(self, sym):
+        assert isinstance(sym, Symbol) or isinstance(sym, Label) or \
+               isinstance(sym, pascaltypes.TypeDefinition) or isinstance(sym, pascaltypes.EnumeratedTypeValue), \
+               "Can only add Symbols, Labels, and type definitions to SymbolTables"
+        if sym.name in self.symbols.keys():
+            current_sym = self.fetch(sym.name)
+            if isinstance(sym, ConstantSymbol) and isinstance(current_sym, ConstantSymbol):
+                errstr = "Constant Redefined: {}".format(sym.name)
+            else:
+                errstr = "Symbol Redefined: {}".format(sym.name)
+            if isinstance(sym, Symbol):
+                errstr += " in {}".format(sym.location)
+            raise SymbolRedefinedException(errstr)
+        # Unlike literals, where case matters ('abc' is different from 'aBc'), symbols in Pascal are
+        # case-insensitive.  So, store them in our symbol table as lower-case.
+        self.symbols[sym.name.lower()] = sym
+
+    def fetch(self, name):
+        curtable = self
+        foundit = False
+        ret = None
+        while (not foundit) and (curtable is not None):
+            if name.lower() in curtable.symbols.keys():
+                ret = curtable.symbols[name.lower()]
+                foundit = True
+            else:
+                curtable = curtable.parent
+        if not foundit:
+            raise SymbolException("Identifier not found: '{}'".format(name))
+        assert isinstance(ret, Symbol) or isinstance(ret, Label) or \
+            isinstance(ret, pascaltypes.TypeDefinition) or isinstance(ret, pascaltypes.EnumeratedTypeValue)
+        return ret
+
+    def exists(self, name):
+        # only looks in the current symbol table
+        return name.lower() in self.symbols.keys()
+
+    def existsanywhere(self, name):
+        # looks in current symbol table and parents
+        ret = False
+        ptr = self
+        while (not ret) and (ptr is not None):
+            ret = ptr.exists(name)
+            ptr = ptr.parent
+        return ret
+
+    def __str__(self):
+        ret = ""
+        for key in self.symbols.keys():
+            ret += repr(self.symbols[key]) + "\n"
+        return ret
+
+    def addsimpletypes(self):
+        # the root of the program has the required types in it
+        self.add(pascaltypes.TypeDefinition("integer", pascaltypes.IntegerType()))
+        self.add(pascaltypes.TypeDefinition("boolean", pascaltypes.BooleanType()))
+        self.add(pascaltypes.TypeDefinition("real", pascaltypes.RealType()))
+        self.add(pascaltypes.TypeDefinition("char", pascaltypes.CharacterType()))
+
+    def are_same_type(self, t1_identifier, t2_identifier):
+        # Two type definitions are the same, if they can be traced back to the same type identifier.
+        # Per 6.4.7 of the ISO standard, 'integer,' 'count,' and 'range' in this example are the same type:
+        #
+        # type
+        #   count = integer;
+        #   range = integer;
+        #
+        # However, as clarified in Cooper on p.11, if two types share the same structure, but different type identifiers
+        # then they are different types.  So in this example:
+        #
+        # type
+        #   Coordinates = record
+        #       x,y: real
+        #       end;
+        #   Coords = record
+        #       x,y: real
+        #       end;
+        #   MoreCoords = Coords
+        #
+        # Coordinates is not the same type as Coords, even though they share the same structure.  MoreCoords is the
+        # same type as MoreCoords because they share the same type identifier.
+        #
+        # Additionally, the "same type identifier" has to take scope into account.  Consider the following:
+        #
+        # Program foo(output);
+        # type
+        #   z = integer;
+        #   i = z;
+        # procedure bar();
+        #   type
+        #       z = char;
+        #       c = z;
+        #   procedure nested();
+        #       type
+        #           z = real
+        #           r = z
+        #           i2 = i
+        #
+        # i, c, and r are both defined in terms of 'z', but they are different z's.  However i2 and i are both
+        # the same type.
+        pass
+
+    def are_compatiable(self, t1_identifier, t2_identifier):
+        pass
+
+    def are_assignment_compatible(self, t1_identifier, t2_identifier):
+        # As explained on p10 of Cooper, 6.4.6 of the ISO Standard  states that type T2 is "assignment-compatible"
+        # with type T1 if :
+        # 1) T1 and T2 are the same type, but not a file type or type with file components
+        # 2) T1 is real and T2 is integer
+        # 3) T1 and T2 are compatible ordinal types, and
+        pass
+
+
 class Parameter:
     def __init__(self, symbol, is_byref):
         assert isinstance(symbol, Symbol)
@@ -305,58 +436,3 @@ class ParameterList:
 
     def __getitem__(self, item):
         return self.paramlist[item]
-
-
-class SymbolTable:
-    def __init__(self):
-        self.symbols = {}
-        self.parent = None
-
-    def add(self, sym):
-        assert isinstance(sym, Symbol) or isinstance(sym, Label), "Can only add Symbols and Labels to SymbolTables"
-        if sym.name in self.symbols.keys():
-            current_sym = self.fetch(sym.name)
-            if isinstance(sym, ConstantSymbol) and isinstance(current_sym, ConstantSymbol):
-                errstr = "Constant Redefined: {}".format(sym.name)
-            else:
-                errstr = "Symbol Redefined: {}".format(sym.name)
-            if isinstance(sym, Symbol):
-                errstr += " in {}".format(sym.location)
-            raise SymbolRedefinedException(errstr)
-        # Unlike literals, where case matters ('abc' is different from 'aBc'), symbols in Pascal are
-        # case-insensitive.  So, store them in our symbol table as lower-case.
-        self.symbols[sym.name.lower()] = sym
-
-    def fetch(self, name):
-        curtable = self
-        foundit = False
-        ret = None
-        while (not foundit) and (curtable is not None):
-            if name.lower() in curtable.symbols.keys():
-                ret = curtable.symbols[name.lower()]
-                foundit = True
-            else:
-                curtable = curtable.parent
-        if not foundit:
-            raise SymbolException("Identifier not found: {}".format(name))
-        assert isinstance(ret, Symbol)
-        return ret
-
-    def exists(self, name):
-        # only looks in the current symbol table
-        return name.lower() in self.symbols.keys()
-
-    def existsanywhere(self, name):
-        # looks in current symbol table and parents
-        ret = False
-        ptr = self
-        while (not ret) and (ptr is not None):
-            ret = ptr.exists(name)
-            ptr = ptr.parent
-        return ret
-
-    def __str__(self):
-        ret = ""
-        for key in self.symbols.keys():
-            ret += repr(self.symbols[key]) + "\n"
-        return ret

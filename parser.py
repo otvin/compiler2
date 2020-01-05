@@ -108,14 +108,19 @@ class AST:
 
     def initsymboltable(self):
         self.symboltable = SymbolTable()
-        # only go forward if not the root of the AST, else leave the parent of the SymbolTable as None
-        if self.parent is not None:
+
+        if self.parent is None:
+            # root of the tree gets the type identifiers for the required types
+            self.symboltable.addsimpletypes()
+        else:
+            # every other symbol table has to have a pointer to its parent, and there must be a parent
+            # since the root has a symboltable and this is not the root.
             ptr = self.parent
             while ptr.symboltable is None:
                 ptr = ptr.parent
                 # the root of the AST has a symboltable for globals, so since this node is not the root
                 # it should never get to None.
-                assert ptr is not None, "AST.nearest_symboltable: No symboltable in AST ancestry"
+                assert ptr is not None, "AST.initsymboltable: No symboltable in AST ancestry"
             assert isinstance(ptr.symboltable, SymbolTable)
             self.symboltable.parent = ptr.symboltable
 
