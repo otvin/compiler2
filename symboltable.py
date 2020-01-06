@@ -289,6 +289,58 @@ class SymbolTable:
             isinstance(ret, pascaltypes.TypeDef) or isinstance(ret, pascaltypes.EnumeratedTypeValue)
         return ret
 
+    def fetch_originaltypedef(self, type_identifier):
+        # Original typedef:
+        #
+        # type
+        #   a = integer;
+        #   b = a;
+        #   c = b;
+        #
+        # The original typedef for all of these is the integer definition.  However c will be stored
+        # with both a reference to b as well as a reference to the integer type definition.  Most of the
+        # code will care only about the BaseType.  However, when inserting a new typedef into the symbol
+        # table, we need to find the BaseType (using this function), and when determining whether two
+        # types are the same, we need not only the identifier that points to the BaseType
+        # but also the specific symbol table to determine if the identifier is the same for the two
+        # types being compared.
+        #
+        # Logic similar to fetch(), but returns a tuple containing the original typedef itself, as well as a
+        # reference to the symboltable that contains it.
+        #
+
+        ret_symtable = self
+        ret_typedef = None
+
+        # First, we get the typedef that corresponds to the t1_identifier and t2_identifier, keeping track
+        # of which symbol table contains the record.
+        done = False
+        while not done:
+            if ret_symtable.exists(type_identifier):
+                ret_typedef = ret_symtable.symbols[type_identifier.lower()]
+                done = True
+            else:
+                ret_symtable = ret_symtable.parent
+
+        # Now we work through any aliases.  If we have the original typdef, which has a BaseType as
+        # the denoter, then we stop.  Else, the denoter is another identifier, so we need to then find
+        # the symbol table in which that idenfifier was defined, and what the typedef corresponds to.
+        outerdone = False
+        innerdone = False
+        while not outerdone:
+            if isinstance(ret_typedef.denoter, pascaltypes.BaseType):
+                outerdone = True
+            else:
+                ret_typedef = ret_typedef.denoter
+                while not innerdone:
+                    if ret_symtable.exists(ret_typedef.identifier):
+                        ret_typedef = ret_symtable.symbols[ret_typedef.identifier.lower()]
+                        innerdone = True
+                    else:
+                        ret_symtable = ret_symtable.parent
+
+        return ret_symtable, ret_typedef
+
     def exists(self, name):
         # only looks in the current symbol table
         return name.lower() in self.symbols.keys()
@@ -316,6 +368,10 @@ class SymbolTable:
         self.add(pascaltypes.SIMPLETYPEDEF_CHAR)
 
     def are_same_type(self, t1_identifier, t2_identifier):
+        # Most of the code that works with types only cares about the base type itself - how the type is laid out
+        # in memory, what the identifiers are for enumerated types, etc.  However, the ISO standard is particular
+        # about what types can be assigned to other types.
+        #
         # Two type defs are the same, if they can be traced back to the same type identifier.
         # Per 6.4.7 of the ISO standard, 'integer,' 'count,' and 'range' in this example are the same type:
         #
@@ -356,9 +412,57 @@ class SymbolTable:
         #
         # i, c, and r are both defined in terms of 'z', but they are different z's.  However i2 and i are both
         # the same type.
-        pass
+        #
+        # So, for the purpose of this function, we need to determine whether the types specified by the identifiers
+        # passed into this function can be traced back to the same type identifier.  For this, we find not only the
+        # original type identifier that defines each type, but if those are themselves identifiers and not type
+        # definitions, then keep following back until we get to the identifier that is mapped to the base type.
+        # If both t1 and t2 map back to the same string identifier *in the same symboltable* then they are the same
+        # type.  In the second example above, type r and type i both map to the string identifier z, but that's not
+        # a base type.  So one step further and we find that r maps to real and i maps to integer, so they are not
+        # the same type.
+        #
+        # Program foo2(output);
+        # type
+        #   Coordinates = record x,y:real;
+        #   c1 = Coordinates;
+        #   end;
+        # Procedure bar2()
+        #   type
+        #       Coordinates = record x,y,z,a,b:real;
+        #       c2 = Coordinates;
+        #   Procedure nested2()
+        #       type
+        #           Coordinates = record x,y:real;
+        #           c3 = Coordinates
+        #       var
+        #           q1:c1;
+        #           q2:c2;
+        #
+        # In this example, q1 is of type c1, which is of type Coordinates, which is a record with two real
+        # fields: x and y.  q2 is of type c2, which is also of a type named Coordinates, which is also a record
+        # with two real fields x and y.  However, you can NOT assign q1 to q2 or vice-versa.
 
-    def are_compatiable(self, t1_identifier, t2_identifier):
+        t1_originaltypedef = self.fetch_originaltypedef(t1_identifier)
+        t2_originaltypedef = self.fetch_originaltypedef(t2_identifier)
+
+        # fetch_originaltypedef returns a tuple (symtable, typdef)
+
+        if t1_originaltypedef[0] != t2_originaltypedef[0]:
+            ret = False
+        else:
+            # None for typename would mean that we have a bug and didn't name the type we created,
+            # as None is assigned at the BaseType level
+            assert t1_originaltypedef[1].denoter.typename is not None
+            assert t2_originaltypedef[1].denoter.typename is not None
+            if t1_originaltypedef[1].denoter.typename.lower() == t2_originaltypedef[1].denoter.typename.lower():
+                ret = True
+            else:
+                ret = False
+
+        return ret
+
+    def are_compatible(self, t1_identifier, t2_identifier):
         pass
 
     def are_assignment_compatible(self, t1_identifier, t2_identifier):

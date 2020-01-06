@@ -314,8 +314,54 @@ class Parser:
         return None
 
     def parse_typedefinitionpart(self, parent_ast):
-        return None
+        # 6.2.1 <type-definition-part> ::= ["type" <type-definition> ";" {<type-definition> ";"} ]
+        # 6.4.1 <type-definition> ::= <identifier> "=" <type-denoter>
+        # 6.4.1 <type-denoter> ::= <type-identifier> | <new-type>
+        # 6.4.1 <type-identifier> ::= <identifier>
+        #
+        # The valid type-identifiers are the simple types (integer, char, boolean, real) and identifiers
+        # that have already been defined for other types.
 
+        # In this iteration, we will now allowe new types to be defined, just aliases for existing types.
+        if self.tokenstream.peektokentype() == TokenType.TYPE:
+            assert isinstance(parent_ast.symboltable, SymbolTable), \
+                "Parser.parse_typedeclarationpart: missing symboltable"
+            self.getexpectedtoken(TokenType.TYPE)
+            done = False
+            while not done:
+                identifier = self.getexpectedtoken(TokenType.IDENTIFIER)
+                self.getexpectedtoken(TokenType.EQUALS)
+                denoter_token = self.tokenstream.eattoken()
+                assert isinstance(denoter_token, Token)
+
+                if denoter_token.tokentype not in (TokenType.INTEGER, TokenType.REAL, TokenType.CHAR,
+                                                   TokenType.BOOLEAN, TokenType.IDENTIFIER):
+                    raise ParseException(token_errstr(denoter_token, "Invalid type denoter"))
+
+                if denoter_token.tokentype == TokenType.INTEGER:
+                    denoter = pascaltypes.IntegerType()
+                    basetype = denoter
+                elif denoter_token.tokentype == TokenType.REAL:
+                    denoter = pascaltypes.RealType()
+                    basetype = denoter
+                elif denoter_token.tokentype == TokenType.CHAR:
+                    denoter = pascaltypes.CharacterType()
+                    basetype = denoter
+                elif denoter_token.tokentype == TokenType.BOOLEAN:
+                    denoter = pascaltypes.BooleanType()
+                    basetype = denoter
+                else:
+                    # denoter_token.tokentype == TokenType.IDENTIFIER
+                    denoter = parent_ast.symboltable.fetch(denoter_token.value)
+                    # fetch_originaltypedef returns a tuple (symboltable, basetype)
+                    basetype = parent_ast.symboltable.fetch_originaltypedef(denoter_token.value)[1].basetype
+
+                parent_ast.symboltable.add(pascaltypes.TypeDef(identifier.value, denoter, basetype))
+
+                self.getexpectedtoken(TokenType.SEMICOLON)
+                if self.tokenstream.peektokentype() != TokenType.IDENTIFIER:
+                    done = True
+        
     def parse_typeidentifier(self, parent_ast):
         # Types can be very flexibile due to user-defined types, which we do not support now.  For now, we will use
         # <type-identifier> ::= "integer" | "real" | "boolean" | "char"
@@ -324,13 +370,16 @@ class Parser:
 
         # this next line will be updated when we can have more complex types
         if self.tokenstream.peektokentype() not in (TokenType.INTEGER, TokenType.REAL, TokenType.BOOLEAN,
-                                                    TokenType.CHAR):
+                                                    TokenType.CHAR, TokenType.IDENTIFIER):
             tok = self.tokenstream.peektoken()
             errstr = "Invalid type identifier '{}'".format(tok.value)
             raise ParseException(token_errstr(tok, errstr))
 
         type_token = self.tokenstream.eattoken()
-        symboltypedef = parent_ast.symboltable.fetch(str(type_token.tokentype))
+        if type_token.tokentype == TokenType.IDENTIFIER:
+            symboltypedef = parent_ast.symboltable.fetch(type_token.value)
+        else:
+            symboltypedef = parent_ast.symboltable.fetch(str(type_token.tokentype))
         assert isinstance(symboltypedef, pascaltypes.TypeDef)
         return symboltypedef
 
@@ -368,7 +417,6 @@ class Parser:
                                                               identifier_token.location, symboltype))
                 if self.tokenstream.peektokentype() != TokenType.IDENTIFIER:
                     done = True
-        return None
 
     def parse_formalparameterlist(self, paramlist, parent_ast):
         # 6.6.3.1 - <formal-parameter-list> ::= "(" <formal-parameter-section> {";" <formal-parameter-section>} ")"
@@ -974,9 +1022,8 @@ class Parser:
         # parse_constantdefinitionpart updates the literal and symbol tables, does not return anything to add to AST.
         self.parse_constantdefinitionpart(parent_ast)
 
-        a = self.parse_typedefinitionpart(parent_ast)
-        if a is not None:
-            ret.extend(a)
+        # parse_typedefinitionpart updates the symbol table, does not return anything to be added to the AST
+        self.parse_typedefinitionpart(parent_ast)
 
         # parse_variabledeclarationpart updates the symbol table, it does not return anything to be added to the AST.
         self.parse_variabledeclarationpart(parent_ast)

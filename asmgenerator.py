@@ -225,12 +225,12 @@ class AssemblyGenerator:
 
             for symname in block.symboltable.symbols.keys():
                 sym = block.symboltable.fetch(symname)
-                assert isinstance(sym, Symbol)
-                if sym.memoryaddress is None:
-                    # to ensure stack alignment, we subract 8 bytes from the stack even if we're putting in a 1, 2, or 4
-                    # byte value.
-                    totalstorageneeded += 8
-                    sym.memoryaddress = "RBP-{}".format(str(totalstorageneeded))
+                if isinstance(sym, Symbol):
+                    if sym.memoryaddress is None:
+                        # to ensure stack alignment, we subract 8 bytes from the stack even if we're putting in
+                        # a 1, 2, or 4 byte value.
+                        totalstorageneeded += 8
+                        sym.memoryaddress = "RBP-{}".format(str(totalstorageneeded))
 
             if totalstorageneeded > 0:
                 self.emitcode("PUSH RBP")  # ABI requires callee to preserve RBP
@@ -257,11 +257,12 @@ class AssemblyGenerator:
                     for symname in block.symboltable.symbols.keys():
                         if block.paramlist.fetch(symname) is None:
                             localsym = block.symboltable.symbols[symname]
-                            if isinstance(localsym, FunctionResultVariableSymbol):
-                                self.emitcomment("Function Result - [{}]".format(localsym.memoryaddress), True)
-                            else:
-                                self.emitcomment("Local Variable {} - [{}]".format(symname,
-                                                                                   localsym.memoryaddress), True)
+                            if isinstance(localsym, Symbol):
+                                if isinstance(localsym, FunctionResultVariableSymbol):
+                                    self.emitcomment("Function Result - [{}]".format(localsym.memoryaddress), True)
+                                else:
+                                    self.emitcomment("Local Variable {} - [{}]".format(symname,
+                                                                                       localsym.memoryaddress), True)
 
                     for param in block.paramlist:
                         localsym = block.symboltable.fetch(param.symbol.name)
@@ -726,7 +727,8 @@ class AssemblyGenerator:
                                 self.emitcode("or al, r11b")
                             self.emit_movtostack_fromregister(node.result, "AL")
                         else:
-                            if isinstance(n1type, pascaltypes.BooleanType) or isinstance(n1type, pascaltypes.IntegerType):
+                            if isinstance(n1type, pascaltypes.BooleanType) or \
+                                    isinstance(n1type, pascaltypes.IntegerType):
                                 # TODO: Handling String types in relational operators
 
                                 # Boolean and Integer share same jump instructions

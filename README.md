@@ -30,6 +30,8 @@ Compiler2 supports the following Pascal Language features:
     * Signed Real variables and literals (64-bit)
     * Signed Integer variables and literals (32-bit)
     * Boolean variables and literals (8-bit)
+* Type Definitions
+  *  Limited - can create a new type that is an alias for Real, Integer, or Boolean, or one that is defined as one of a previously-defined alias.
 * Global and local constants
     * Signed Real, Signed Integer, or String
     * the required constants ```true```, ```false```, and ```maxint```
@@ -68,7 +70,7 @@ will make it easier to surpass the functionality of my previous attempt.
 
 ### Unit tests
 
-Compiler2 currently passes 126 unit tests, including 46 of the 60 unit tests created for Compiler, plus an additional test which represented the one known bug from Compiler.  You can execute the unit test suite by running:
+Compiler2 currently passes 128 unit tests, including 46 of the 60 unit tests created for Compiler, plus an additional test which represented the one known bug from Compiler.  You can execute the unit test suite by running:
 
 ```python3 compiler_test.py```
 
