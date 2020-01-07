@@ -129,6 +129,7 @@ def main():
     run_test_list("bugfix", 1, 1)
     # note testbyref06 in Compiler2 was "known_bug1.pas" in the old Compiler suite
     run_test_list("byref", 1, 6)
+    run_test_list("char", 1, 2)
     run_test_list("comments", 1, 1)
     run_test_list("const", 1, 4)
     run_test_list("divide", 1, 1)

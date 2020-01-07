@@ -72,7 +72,7 @@ from copy import deepcopy
 from parser import AST, isrelationaloperator, is_isorequiredfunction
 from symboltable import Symbol, Label, Literal, NumericLiteral, StringLiteral, BooleanLiteral,\
     SymbolTable, LiteralTable, ParameterList, ActivationSymbol, Parameter, VariableSymbol,\
-    FunctionResultVariableSymbol, ConstantSymbol
+    FunctionResultVariableSymbol, ConstantSymbol, CharacterLiteral
 from lexer import TokenType, Token
 import pascaltypes
 
@@ -752,14 +752,24 @@ class TACBlock:
         self.addnode(TACUnaryLiteralNode(ret, TACOperator.ASSIGN, BooleanLiteral(tokval, tok.location)))
         return ret
 
-    def processast_stringliteral(self, ast):
+    def processast_characterstring(self, ast):
         assert isinstance(ast, AST)
         assert ast.token.tokentype == TokenType.CHARSTRING
 
         tok = ast.token
-        ret = Symbol(self.gettemporary(), tok.location, pascaltypes.StringLiteralTypeDef())
+
+        litval = tok.value
+        # string of length 1 is a character.  String of any other length is a string literal
+        if len(litval) != 1:
+            littypedef = pascaltypes.StringLiteralTypeDef()
+            lit = StringLiteral(litval, tok.location)
+        else:
+            littypedef = pascaltypes.SIMPLETYPEDEF_CHAR
+            lit = CharacterLiteral(litval, tok.location)
+
+        ret = Symbol(self.gettemporary(), tok.location, littypedef)
         self.symboltable.add(ret)
-        self.addnode(TACUnaryLiteralNode(ret, TACOperator.ASSIGN, StringLiteral(tok.value, tok.location)))
+        self.addnode(TACUnaryLiteralNode(ret, TACOperator.ASSIGN, lit))
         return ret
 
     def processast_assignment(self, ast):
@@ -864,6 +874,8 @@ class TACBlock:
         # types, or one operand shall be of real-type and the other of integer-type.  Table 6, has
         # simple-types, pointer-types, and string-types allowed in the comparisons..
 
+        # TODO - REPLACE WITH COMPATIBILITY TEST
+
         if isinstance(c1type, pascaltypes.BooleanType) and not isinstance(c2type, pascaltypes.BooleanType):
             raise TACException(tac_errstr("Cannot compare Boolean to non-Boolean", tok))
         if isinstance(c2type, pascaltypes.BooleanType) and not isinstance(c1type, pascaltypes.BooleanType):
@@ -945,7 +957,7 @@ class TACBlock:
         elif tok.tokentype in [TokenType.TRUE, TokenType.FALSE]:
             return self.processast_booleanliteral(ast)
         elif tok.tokentype == TokenType.CHARSTRING:
-            return self.processast_stringliteral(ast)
+            return self.processast_characterstring(ast)
         elif tok.tokentype in (TokenType.MULTIPLY, TokenType.PLUS, TokenType.MINUS, TokenType.DIVIDE,
                                TokenType.IDIV, TokenType.MOD):
             return self.processast_arithmeticoperator(ast)

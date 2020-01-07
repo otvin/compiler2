@@ -305,14 +305,26 @@ class RealLiteralTypeDef(TypeDef):
         super().__init__('n/a', RealType(), RealType())
 
 
-class IntegerLiteralTypeDef(TypeDef):
+class OrdinalLiteralTypeDef(TypeDef):
+    def __init__(self, identifier, denoter, basetype):
+        assert isinstance(basetype, OrdinalType)
+        assert isinstance(denoter, OrdinalType)
+        super().__init__(identifier, denoter, basetype)
+
+
+class IntegerLiteralTypeDef(OrdinalLiteralTypeDef):
     def __init__(self):
         super().__init__('n/a', IntegerType(), IntegerType())
 
 
-class BooleanLiteralTypeDef(TypeDef):
+class BooleanLiteralTypeDef(OrdinalLiteralTypeDef):
     def __init__(self):
         super().__init__('n/a', BooleanType(), BooleanType())
+
+
+class CharacterLiteralTypeDef(OrdinalLiteralTypeDef):
+    def __init__(selfself):
+        super().__init__('n/a', CharacterType(), CharacterType())
 
 
 class ActivationTypeDef(TypeDef):

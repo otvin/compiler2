@@ -39,6 +39,12 @@ class StringLiteral(Literal):
         super().__init__(value, location, pascaltypes.StringLiteralTypeDef())
 
 
+class OrdinalLiteral(Literal):
+    def __init__(self, value, location, typedef):
+        assert(isinstance(typedef, pascaltypes.OrdinalLiteralTypeDef))
+        super().__init__(value, location, typedef)
+
+
 class NumericLiteral(Literal):
     def __init__(self, value, location, typedef):
         assert (isinstance(typedef, pascaltypes.RealLiteralTypeDef) or
@@ -46,7 +52,7 @@ class NumericLiteral(Literal):
         super().__init__(value, location, typedef)
 
 
-class BooleanLiteral(Literal):
+class BooleanLiteral(OrdinalLiteral):
     def __init__(self, value, location):
         assert value == 0 or value == 1
         super().__init__(value, location, pascaltypes.BooleanLiteralTypeDef())
@@ -58,6 +64,15 @@ class BooleanLiteral(Literal):
             return "TRUE"
 
 
+class CharacterLiteral(OrdinalLiteral):
+    def __init__(self, value, location):
+        assert isinstance(value, str)
+        if len(value) != 1:
+            print('*' + value + '*')
+        assert len(value) == 1
+        super().__init__(value, location, pascaltypes.CharacterLiteralTypeDef())
+
+
 class LiteralTable:
     def __init__(self):
         self.stringliterals = {}
@@ -66,6 +81,7 @@ class LiteralTable:
     def add(self, lit):
         if not isinstance(lit, Literal):
             raise SymbolException("Can only add Literals to LiteralTables")
+        # character literals are treated like numbers, not string literals
         if isinstance(lit.typedef, pascaltypes.StringLiteralTypeDef):
             if lit.value not in self.stringliterals.keys():
                 self.stringliterals[lit.value] = lit

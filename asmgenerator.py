@@ -2,7 +2,8 @@ import os
 from tac_ir import TACBlock, TACLabelNode, TACParamNode, TACCallSystemFunctionNode, TACUnaryLiteralNode, \
     TACOperator, TACGenerator, TACCommentNode, TACBinaryNode, TACUnaryNode, TACGotoNode, TACIFZNode, \
     TACFunctionReturnNode, TACCallFunctionNode
-from symboltable import StringLiteral, NumericLiteral, Symbol, Parameter, ActivationSymbol, FunctionResultVariableSymbol
+from symboltable import StringLiteral, NumericLiteral, Symbol, Parameter, ActivationSymbol, \
+    FunctionResultVariableSymbol, CharacterLiteral
 from editor_settings import NUM_SPACES_IN_TAB, NUM_TABS_FOR_COMMENT
 import pascaltypes
 
@@ -169,6 +170,7 @@ class AssemblyGenerator:
 
     def generate_externs(self):
         self.emitcode("extern printf")
+        self.emitcode("extern putchar")
         self.emitcode("extern fflush")
 
     def generate_datasection(self):
@@ -375,11 +377,15 @@ class AssemblyGenerator:
                     else:
                         # TODO is node.operator ever anything other than ASSIGN?
                         if node.operator == TACOperator.ASSIGN:
-                            comment = "Move literal {} into {}".format(node.literal1.value, node.lval.name)
+                            comment = "Move literal '{}' into {}".format(node.literal1.value, node.lval.name)
                             # putting the result into rax so I can use existing helper function vs.
                             # special casing this here.
+                            if isinstance(node.literal1, CharacterLiteral):
+                                val = ord(node.literal1.value)
+                            else:
+                                val = node.literal1.value
                             tmpreg = get_register_slice_bybytes("RAX", node.lval.typedef.basetype.size)
-                            self.emitcode("mov {}, {}".format(tmpreg, node.literal1.value), comment)
+                            self.emitcode("mov {}, {}".format(tmpreg, val), comment)
                             self.emit_movtostack_fromregister(node.lval, tmpreg)
 
                 elif isinstance(node, TACCallFunctionNode) and \
@@ -425,7 +431,8 @@ class AssemblyGenerator:
                             reg = intparampos_to_register(numintparams)  # we use all 64 bytes for pointers
                             self.emitcode("LEA {}, [{}]".format(reg, actualparam.paramval.memoryaddress), comment)
                         elif isinstance(paramdef.symbol.typedef.basetype, pascaltypes.IntegerType) or \
-                                isinstance(paramdef.symbol.typedef.basetype, pascaltypes.BooleanType):
+                                isinstance(paramdef.symbol.typedef.basetype, pascaltypes.BooleanType) or \
+                                isinstance(paramdef.symbol.typedef.basetype, pascaltypes.CharacterType):
                             numintparams += 1
                             assert numintparams <= 6  # TODO - remove when we can handle more
                             fullreg = intparampos_to_register(numintparams)
@@ -474,6 +481,10 @@ class AssemblyGenerator:
                         self.emit_movtoregister_fromstack("RSI", params[-1].paramval)
                         self.emitcode("mov rax, 0")
                         self.emitcode("call printf wrt ..plt")
+                        del params[-1]
+                    elif node.label.name == "_WRITEC":
+                        self.emit_movtoregister_fromstack("RDI", params[-1].paramval)
+                        self.emitcode("call putchar wrt ..plt")
                         del params[-1]
                     elif node.label.name == "_WRITEB":
                         self.emitcode("mov rdi, _printf_strfmt")

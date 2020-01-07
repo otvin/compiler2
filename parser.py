@@ -256,6 +256,8 @@ class Parser:
                     if sawsign:
                         errstr = "Cannot have a sign before a string constant in {}".format(const_id.location)
                         raise ParseException(errstr)
+
+                    # TODO - THIS WILL BARF ON SINGLE-CHARACTER CONSTANTS
                     charstrtok = self.getexpectedtoken(TokenType.CHARSTRING)
                     self.literaltable.add(StringLiteral(charstrtok.value, charstrtok.location))
                     parent_ast.symboltable.add(ConstantSymbol(const_id.value, const_id.location,
@@ -554,9 +556,11 @@ class Parser:
                                                       TokenType.MAXINT, TokenType.FALSE):
                 ret = AST(self.tokenstream.eattoken(), parent_ast)
             elif self.tokenstream.peektokentype() == TokenType.CHARSTRING:
-                # literalTable.add() allows adding duplicates
                 tok_charstr = self.getexpectedtoken(TokenType.CHARSTRING)
-                self.literaltable.add(StringLiteral(tok_charstr.value, tok_charstr.location))
+                # a string of length one is a character; a string of any other length is a string literal
+                if len(tok_charstr.value) != 1:
+                    # literalTable.add() allows adding duplicates
+                    self.literaltable.add(StringLiteral(tok_charstr.value, tok_charstr.location))
                 ret = AST(tok_charstr, parent_ast)
             elif self.tokenstream.peektokentype() == TokenType.NOT:
                 nottok = self.getexpectedtoken(TokenType.NOT)
