@@ -297,12 +297,14 @@ SIMPLETYPEDEF_CHAR = TypeDef("char", CharacterType(), CharacterType())
 
 class StringLiteralTypeDef(TypeDef):
     def __init__(self):
-        super().__init__('n/a', StringLiteralType(), StringLiteralType())
+        # pascal literals never have spaces, so the user can never create a type
+        # named "string literal" to cause an issue with this type.
+        super().__init__('string literal', StringLiteralType(), StringLiteralType())
 
 
 class RealLiteralTypeDef(TypeDef):
     def __init__(self):
-        super().__init__('n/a', RealType(), RealType())
+        super().__init__('real literal', RealType(), RealType())
 
 
 class OrdinalLiteralTypeDef(TypeDef):
@@ -314,17 +316,17 @@ class OrdinalLiteralTypeDef(TypeDef):
 
 class IntegerLiteralTypeDef(OrdinalLiteralTypeDef):
     def __init__(self):
-        super().__init__('n/a', IntegerType(), IntegerType())
+        super().__init__('integer literal', IntegerType(), IntegerType())
 
 
 class BooleanLiteralTypeDef(OrdinalLiteralTypeDef):
     def __init__(self):
-        super().__init__('n/a', BooleanType(), BooleanType())
+        super().__init__('boolean literal', BooleanType(), BooleanType())
 
 
 class CharacterLiteralTypeDef(OrdinalLiteralTypeDef):
     def __init__(selfself):
-        super().__init__('n/a', CharacterType(), CharacterType())
+        super().__init__('character literal', CharacterType(), CharacterType())
 
 
 class ActivationTypeDef(TypeDef):

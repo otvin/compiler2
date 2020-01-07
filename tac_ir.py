@@ -689,8 +689,10 @@ class TACBlock:
                         errstr = errstr.format(sym.paramlist[i].symbol.name, sym.name, child.token.location)
                         raise TACException(errstr)
 
-                    # TODO - THIS NEEDS TO BE REPLACED WITH THE NEW SAME TYPE FUNCTION
-                    if tmp.typedef.basetype.typename != sym.paramlist[i].symbol.typedef.basetype.typename:
+                    # TODO - THIS NEEDS TO BE REPLACED WITH THE RULES ON PARAMETERS NOT JUST "SAME TYPE"
+                    if not ast.nearest_symboltable().are_same_type(tmp.typedef.identifier,
+                                                                   sym.paramlist[i].symbol.typedef.identifier):
+                        # if tmp.typedef.basetype.typename != sym.paramlist[i].symbol.typedef.basetype.typename:
                         errstr = "Type Mismatch - parameter {} of {}() must be type {} in {}"
                         errstr = errstr.format(sym.paramlist[i].symbol.name, sym.name,
                                                str(sym.paramlist[i].symbol.typedef.denoter), child.token.location)
@@ -785,8 +787,8 @@ class TACBlock:
 
         rval = self.processast(ast.children[1])
         # TODO - THIS NEEDS TO BE REPLACED WITH THE TEST FOR ASSIGNMENT COMPATIBILITY
-        if isinstance(lval.typedef.basetype, pascaltypes.IntegerType) and \
-                isinstance(rval.typedef.basetype, pascaltypes.RealType):
+
+        if not ast.nearest_symboltable().are_assignment_compatible(lval.typedef.identifier, rval.typedef.identifier):
             raise TACException(tac_errstr("Cannot assign real type to integer", tok))
         if isinstance(lval.typedef.basetype, pascaltypes.RealType) and \
                 isinstance(rval.typedef.basetype, pascaltypes.IntegerType):

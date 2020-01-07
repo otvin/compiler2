@@ -328,6 +328,11 @@ class SymbolTable:
         ret_symtable = self
         ret_typedef = None
 
+        # HACK - due to the way I defined literals.
+        if type_identifier[-7:] == "literal":
+            type_identifier = type_identifier[:-8]
+
+
         # First, we get the typedef that corresponds to the t1_identifier and t2_identifier, keeping track
         # of which symbol table contains the record.
         done = False
@@ -479,15 +484,44 @@ class SymbolTable:
         return ret
 
     def are_compatible(self, t1_identifier, t2_identifier):
-        pass
+        # per 6.4.5 of the ISO standard, as explained on p.10 of Cooper, two types are compatible if:
+        # 1) T1 and T2 are the same type
+        # 2) T1 and T2 are both Ordinal Types and one is subrange of the other, or both are subranges of the
+        #    same host type
+        # 3) T1 and T2 are sets, the base types of T1 and T2 are compatible, and either both T1 and T2 are packed
+        #    or neither are packed
+        # 4) T1 and T2 are string types with same number of components.
+
+        # Today we only support the first condition, so it's simple.
+        return self.are_same_type(t1_identifier, t2_identifier)
 
     def are_assignment_compatible(self, t1_identifier, t2_identifier):
         # As explained on p10 of Cooper, 6.4.6 of the ISO Standard  states that type T2 is "assignment-compatible"
         # with type T1 if :
         # 1) T1 and T2 are the same type, but not a file type or type with file components
         # 2) T1 is real and T2 is integer
-        # 3) T1 and T2 are compatible ordinal types, and
-        pass
+        # 3) T1 and T2 are compatible ordinal types, and the value with type T2 falls in the range of T1.  Note
+        #    the "value" piece is a run-time check, not a compile-time check.  At compile-time we can only check
+        #    that some piece of T2's range falls in the range of T1.
+        # 4) T1 and T2 are compatible set types, with all members of T2 belonging to the base type of T1.  Again
+        #    like condition 3, at compile type we can check that at least one member of T2 belongs in the base
+        #    type of T1, but the rest is a run-time check.
+        # 5) T1 and T2 are compatible string types
+        #
+
+        t1type = self.fetch_originaltypedef(t1_identifier)[1].basetype
+        t2type = self.fetch_originaltypedef(t2_identifier)[1].basetype
+
+        # File Types, or types with file components are never assignment-compatible
+        if isinstance(t1type, pascaltypes.FileType) or isinstance(t2type, pascaltypes.FileType):
+            ret = False
+        elif self.are_same_type(t1_identifier, t2_identifier):
+            ret = True
+        elif isinstance(t1type, pascaltypes.RealType) and isinstance(t2type, pascaltypes.IntegerType):
+            ret = True
+        else:
+            ret = False
+        return ret
 
 
 class Parameter:
