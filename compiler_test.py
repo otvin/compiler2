@@ -129,9 +129,9 @@ def main():
     run_test_list("bugfix", 1, 1)
     # note testbyref06 in Compiler2 was "known_bug1.pas" in the old Compiler suite
     run_test_list("byref", 1, 6)
-    run_test_list("char", 1, 2)
+    run_test_list("char", 1, 3)
     run_test_list("comments", 1, 1)
-    run_test_list("const", 1, 4)
+    run_test_list("const", 1, 5)
     run_test_list("divide", 1, 1)
     run_test_list("fpmath", 1, 7)
     run_test_list("functions", 1, 11)
@@ -143,6 +143,7 @@ def main():
     run_test_list("math", 1, 6)
     run_test_list("misc", 1, 1)
     run_test_list("mod", 1, 2)
+    run_test_list("ord", 1, 2)
     # note testprocedure02 was "proc01" in the old Compiler suite
     run_test_list("procedure", 1, 7)
     run_test_list("real", 1, 8)

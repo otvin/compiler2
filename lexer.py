@@ -177,7 +177,7 @@ class TokenType(Enum):
 TOKENTYPE_LOOKUP = {
     'abs': TokenType.ABS, 'and': TokenType.AND,
     'arctan': TokenType.ARCTAN, 'array': TokenType.ARRAY, 'begin': TokenType.BEGIN,
-    'boolean': TokenType.BOOLEAN, 'case': TokenType.CASE, 'char': TokenType.CHAR,
+    'boolean': TokenType.BOOLEAN, 'case': TokenType.CASE, 'chr': TokenType.CHR, 'char': TokenType.CHAR,
     'const': TokenType.CONST, 'cos': TokenType.COS,
     'dispose': TokenType.DISPOSE, 'div': TokenType.IDIV, 'do': TokenType.DO, 'downto': TokenType.DOWNTO,
     'else': TokenType.ELSE, 'end': TokenType.END, 'eof': TokenType.EOF, 'eoln': TokenType.EOLN,

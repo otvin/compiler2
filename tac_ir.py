@@ -216,6 +216,8 @@ def requiredfunction_returntype(tokentype, paramtypedef):
         ret = pascaltypes.SIMPLETYPEDEF_REAL
     elif tokentype in (TokenType.TRUNC, TokenType.ROUND, TokenType.ORD):
         ret = pascaltypes.SIMPLETYPEDEF_INTEGER
+    elif tokentype == TokenType.CHR:
+        ret = pascaltypes.SIMPLETYPEDEF_CHAR
     else:
         assert tokentype in (TokenType.ODD, TokenType.EOF, TokenType.EOLN)
         ret = pascaltypes.SIMPLETYPEDEF_BOOLEAN
@@ -339,7 +341,7 @@ class TACUnaryLiteralNode(TACNode):
         self.literal1 = literal1
 
     def __str__(self):
-        if isinstance(self.literal1, StringLiteral):
+        if isinstance(self.literal1, StringLiteral) or isinstance(self.literal1, CharacterLiteral):
             litval = '"{}"'.format(str(self.literal1).replace('"', '\"'))
         else:
             litval = str(self.literal1)
@@ -653,6 +655,8 @@ class TACBlock:
                 lit = BooleanLiteral(tokval, tok.location)
             elif isinstance(sym.typedef.basetype, pascaltypes.StringLiteralType):
                 lit = StringLiteral(sym.value, tok.location)
+            elif isinstance(sym.typedef.basetype, pascaltypes.CharacterType):
+                lit = CharacterLiteral(sym.value, tok.location)
             elif isinstance(sym.typedef.basetype, pascaltypes.RealType):
                 lit = RealLiteral(sym.value, tok.location)
             else:

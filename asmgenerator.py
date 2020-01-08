@@ -181,6 +181,7 @@ class AssemblyGenerator:
         self.emitcode('_stringerr_2 db `Error: Divisor in Mod must be positive`, 0')
         self.emitcode('_stringerr_3 db `Error: Cannot take sqrt() of negative number`, 0')
         self.emitcode('_stringerr_4 db `Error: Cannot take ln() of number less than or equal to zero`, 0')
+        self.emitcode('_stringerr_5 db `Error: value to chr() exceeds 0-255 range for Char type`, 0')
         self.emitcomment("support for write() commands")
         self.emitcode('_printf_intfmt db "%d",0')
         self.emitcode('_printf_strfmt db "%s",0')
@@ -193,7 +194,10 @@ class AssemblyGenerator:
         if len(self.tacgenerator.globalliteraltable) > 0:
             nextid = 0
             for lit in self.tacgenerator.globalliteraltable:
-                if isinstance(lit, StringLiteral):
+                if isinstance(lit, IntegerLiteral) or isinstance(lit, CharacterLiteral):
+                    # these can be defined as part of the instruction where they are loaded
+                    pass
+                elif isinstance(lit, StringLiteral):
                     litname = 'stringlit_{}'.format(nextid)
                     nextid += 1
                     if len(lit.value) > 255:
@@ -638,6 +642,33 @@ class AssemblyGenerator:
                         self.emitcode("jo _PASCAL_OVERFLOW_ERROR")
                         comment = "assign return value of function to {}".format(node.lval.name)
                         self.emit_movtostack_fromregister(node.lval, "EAX", comment)
+                    elif node.label.name == "_CHRI":
+                        comment = "parameter {} for chr()".format(str(params[-1].paramval))
+                        self.emit_movtoregister_fromstack("R11D", params[-1].paramval, comment)
+                        self.emitcode("CMP R11D, 0")
+                        self.emitcode("JL _PASCAL_CHR_ERROR")
+                        self.emitcode("CMP R11D, 255")
+                        self.emitcode("JG _PASCAL_CHR_ERROR")
+                        self.emitcode("MOV AL, R11B", "take least significant 8 bits")
+                        comment = "assign return value of function to {}".format(node.lval.name)
+                        self.emit_movtostack_fromregister(node.lval, "AL", comment)
+                    elif node.label.name == "_ORDO":
+                        # Returns the integer representation of the ordinal type.  Since under the covers,
+                        # ordinal types are stored as integers, this is just returning itself.
+                        # Trick is that the ordinal type may be 1 byte (boolean, character, or user-defined ordinal)
+                        # or 4 bytes (integer).  If it's one byte, we need to zero-extend it.
+                        assert params[-1].paramval.typedef.basetype.size in (1,4)
+
+                        comment = "parameter {} for ord()".format(str(params[-1].paramval))
+                        if params[-1].paramval.typedef.basetype.size == 1:
+                            # TODO - this can easily be done in a single mov statement
+                            self.emit_movtoregister_fromstack("R11B", params[-1].paramval)
+                            self.emitcode("MOVZX EAX, R11B")
+                        else:
+                            self.emit_movtoregister_fromstack("EAX", params[-1].paramval)
+                        comment = "assign return value of function to {}".format(node.lval.name)
+                        self.emit_movtostack_fromregister(node.lval, "EAX", comment)
+
                     elif node.label.name in ("_ROUNDR", "_TRUNCR"):
                         comment = "parameter {} for {}()".format(str(params[-1].paramval), node.label.name[1:6].lower())
                         self.emit_movtoxmmregister_fromstack("xmm0", params[-1].paramval, comment)
@@ -821,6 +852,9 @@ class AssemblyGenerator:
         self.emitcode("jmp _PASCAL_PRINT_ERROR")
         self.emitlabel("_PASCAL_LN_ERROR")
         self.emitcode("mov rdi, _stringerr_4")
+        self.emitcode("jmp _PASCAL_PRINT_ERROR")
+        self.emitlabel("_PASCAL_CHR_ERROR")
+        self.emitcode("mov rdi, _stringerr_5")
         self.emitcode("jmp _PASCAL_PRINT_ERROR")
 
         self.emitlabel("_PASCAL_PRINT_ERROR")

@@ -1,7 +1,8 @@
 from enum import Enum, unique, auto
 from lexer import TokenType, Token, TokenStream, LexerException
 from symboltable import StringLiteral, LiteralTable, SymbolTable, VariableSymbol, ParameterList, \
-    ActivationSymbol, FunctionResultVariableSymbol, Parameter, SymbolException, ConstantSymbol, RealLiteral
+    ActivationSymbol, FunctionResultVariableSymbol, Parameter, SymbolException, ConstantSymbol, RealLiteral, \
+    CharacterLiteral
 import pascaltypes
 
 '''
@@ -256,12 +257,17 @@ class Parser:
                         errstr = "Cannot have a sign before a string constant in {}".format(const_id.location)
                         raise ParseException(errstr)
 
-                    # TODO - THIS WILL BARF ON SINGLE-CHARACTER CONSTANTS
                     charstrtok = self.getexpectedtoken(TokenType.CHARSTRING)
-                    self.literaltable.add(StringLiteral(charstrtok.value, charstrtok.location))
-                    parent_ast.symboltable.add(ConstantSymbol(const_id.value, const_id.location,
-                                                              pascaltypes.StringLiteralTypeDef(),
-                                                              charstrtok.value))
+                    if len(charstrtok.value) == 1:
+                        self.literaltable.add(CharacterLiteral(charstrtok.value, charstrtok.location))
+                        newstrsym = ConstantSymbol(const_id.value, const_id.location, pascaltypes.SIMPLETYPEDEF_CHAR,
+                                                   charstrtok.value)
+                    else:
+                        self.literaltable.add(StringLiteral(charstrtok.value, charstrtok.location))
+                        newstrsym = ConstantSymbol(const_id.value, const_id.location,
+                                                   pascaltypes.StringLiteralTypeDef(),
+                                                   charstrtok.value)
+                    parent_ast.symboltable.add(newstrsym)
                 elif self.tokenstream.peektokentype() == TokenType.IDENTIFIER:
                     ident_token = self.getexpectedtoken(TokenType.IDENTIFIER)
                     if not parent_ast.symboltable.existsanywhere(ident_token.value):

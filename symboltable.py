@@ -69,8 +69,6 @@ class BooleanLiteral(OrdinalLiteral):
 class CharacterLiteral(OrdinalLiteral):
     def __init__(self, value, location):
         assert isinstance(value, str)
-        if len(value) != 1:
-            print('*' + value + '*')
         assert len(value) == 1
         super().__init__(value, location, pascaltypes.CharacterLiteralTypeDef())
 

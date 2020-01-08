@@ -17,26 +17,30 @@ Compiler2 supports the following Pascal Language features:
     * Supports following arithmetic functions required by ISO standard: 
         * ```abs()```, ```sqr()```, ```sin()```, ```cos()```, ```exp()```, ```ln()```, and ```sqrt()```
     * Supports following transfer functions required by ISO standard:
-        * ``` trunc()``` and ```round()``` 
-* Logical operators: ```not```, ```and```, ```or```, ```=```, ```<>```, ```<```, ```<=```, ```>```, ```>=```
+        * ```trunc()``` and ```round()``` 
+    * Supports following ordinal functions required by ISO standard:
+        * ```chr()``` and ```ord()```
+* Relational operators: ```=```, ```<>```, ```<```, ```<=```, ```>```, ```>=```
   * both Real and Integer; can compare integers to reals.
+* Boolean operators: ```not```, ```and```, and ```or```
 * Procedures and Functions
   *  Parameters passed by value or by reference ("variable parameters" in Pascal-speak)
-  *  Functions can return integers, Booleans, or reals
-  *  Up to 8 Real parameters by value, up to a combined 6 Integer/Boolean or by reference parameters
+  *  Functions can return integers, chars, Booleans, or reals
+  *  Up to 8 Real parameters by value, up to a combined 6 Integer/Boolean/Character or by reference parameters
   *  Integers passed in byval to Real parameters get converted to Real
   *  Recursion
 * Global and local variables
     * Signed Real variables and literals (64-bit)
     * Signed Integer variables and literals (32-bit)
     * Boolean variables and literals (8-bit)
+    * Character variables and literals (8-bit)
 * Type Definitions
-  *  Limited - can create a new type that is an alias for Real, Integer, or Boolean, or one that is defined as one of a previously-defined alias.
+  *  Limited - can create a new type that is an alias for Real, Integer, Char, or Boolean, or one that is defined as one of a previously-defined alias.
 * Global and local constants
-    * Signed Real, Signed Integer, or String
+    * Signed Real, Signed Integer, Character, or String
     * the required constants ```true```, ```false```, and ```maxint```
 * Write() and Writeln() to stdout
-    * each take a comma-separated list of one or more parameters, with each parameter a variable, a math expression, a numeric literal, a string literal, or a constant.'
+    * each take a comma-separated list of one or more parameters, with each parameter a variable, a math expression, a numeric literal, a character literal, a string literal, or a constant.'
 * Comments
 
  
@@ -45,12 +49,12 @@ Compiler2 supports the following Pascal Language features:
 At this point, Compiler2 has all features from Compiler1 except for String support.
 
 Compiler2 also has the following functionality that compiler1 did not:
-* Boolean type
+* Boolean and Character types
 * Constants
 * REPEAT..UNTIL construct
 * Ability to do relational operations comparing Integer and Real types
-* abs(), sqr(), sin(), cos(), exp(), ln(), sqrt(), trunc(), and round()
-* relational operators not, or, and
+* abs(), sqr(), sin(), cos(), exp(), ln(), sqrt(), trunc(), round(), chr(), and ord()
+* Boolean operators not, or, and
 
 Compiler2 also uses the official BNF from the ISO standard, whereas Compiler1 used a BNF that I updated based on a variation I had downloaded from a random website.
 
@@ -61,7 +65,7 @@ The TAC is then converted into ASM.  Each variable in the TAC gets its own space
 there are many register-allocation algorithms that can be applied to the TAC in future versions.  With the first compiler I wrote, it got very difficult
 to determine where different symbols lived in memory.  In Compiler2 everything lives on the stack.  GCC does the same thing if optimizations are all turned off; you will
 notice that, for example, after a function is invoked, GCC copies all function parameters to the stack.  My opinion is that this design
-will make it easier to surpass the functionality of my previous attempt. 
+has made it easier to surpass the functionality of my previous attempt. 
  
  
 ### To run it:
@@ -70,7 +74,7 @@ will make it easier to surpass the functionality of my previous attempt.
 
 ### Unit tests
 
-Compiler2 currently passes 128 unit tests, including 46 of the 60 unit tests created for Compiler, plus an additional test which represented the one known bug from Compiler.  You can execute the unit test suite by running:
+Compiler2 currently passes 134 unit tests, including 46 of the 60 unit tests created for Compiler, plus an additional test which represented the one known bug from Compiler.  You can execute the unit test suite by running:
 
 ```python3 compiler_test.py```
 
