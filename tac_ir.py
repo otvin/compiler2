@@ -70,7 +70,7 @@
 from enum import Enum, unique
 from copy import deepcopy
 from parser import AST, isrelationaloperator, is_isorequiredfunction
-from symboltable import Symbol, Label, Literal, NumericLiteral, StringLiteral, BooleanLiteral,\
+from symboltable import Symbol, Label, Literal, IntegerLiteral, RealLiteral, StringLiteral, BooleanLiteral,\
     SymbolTable, LiteralTable, ParameterList, ActivationSymbol, Parameter, VariableSymbol,\
     FunctionResultVariableSymbol, ConstantSymbol, CharacterLiteral
 from lexer import TokenType, Token
@@ -339,11 +339,10 @@ class TACUnaryLiteralNode(TACNode):
         self.literal1 = literal1
 
     def __str__(self):
-        litval = ""
-        if isinstance(self.literal1, NumericLiteral) or isinstance(self.literal1, BooleanLiteral):
-            litval = str(self.literal1)
-        elif isinstance(self.literal1, StringLiteral):
+        if isinstance(self.literal1, StringLiteral):
             litval = '"{}"'.format(str(self.literal1).replace('"', '\"'))
+        else:
+            litval = str(self.literal1)
         return "{} {} {}".format(str(self.lval), str(self.operator), litval)
 
 
@@ -648,17 +647,17 @@ class TACBlock:
                 # the value of the symbol will always be a string
                 assert sym.value.lower() in ("true", "false")
                 if sym.value.lower() == 'true':
-                    tokval = 1
+                    tokval = "1"
                 else:
-                    tokval = 0
+                    tokval = "0"
                 lit = BooleanLiteral(tokval, tok.location)
             elif isinstance(sym.typedef.basetype, pascaltypes.StringLiteralType):
                 lit = StringLiteral(sym.value, tok.location)
             elif isinstance(sym.typedef.basetype, pascaltypes.RealType):
-                lit = NumericLiteral(sym.value, tok.location, pascaltypes.RealLiteralTypeDef())
+                lit = RealLiteral(sym.value, tok.location)
             else:
                 assert isinstance(sym.typedef.basetype, pascaltypes.IntegerType)
-                lit = NumericLiteral(sym.value, tok.location, pascaltypes.IntegerLiteralTypeDef())
+                lit = IntegerLiteral(sym.value, tok.location)
             self.addnode(TACUnaryLiteralNode(ret, TACOperator.ASSIGN, lit))
         elif not isinstance(sym, ActivationSymbol):
             # just return the identifier itself
@@ -723,17 +722,16 @@ class TACBlock:
 
         tok = ast.token
         if tok.tokentype in (TokenType.UNSIGNED_INT, TokenType.SIGNED_INT):
-            litval = tok.value
+            lit = IntegerLiteral(tok.value, tok.location)
             littypedef = pascaltypes.IntegerLiteralTypeDef()
         elif tok.tokentype == TokenType.MAXINT:
-            litval = pascaltypes.MAXINT
+            lit = IntegerLiteral(pascaltypes.STRMAXINT, tok.location)
             littypedef = pascaltypes.IntegerLiteralTypeDef()
         else:  # tok.tokentype in (TokenType.UNSIGNED_REAL, TokenType.SIGNED_REAL)
-            litval = tok.value
+            lit = RealLiteral(tok.value, tok.location)
             littypedef = pascaltypes.RealLiteralTypeDef()
 
         ret = Symbol(self.gettemporary(), tok.location, littypedef)
-        lit = NumericLiteral(litval, tok.location, littypedef)
 
         self.symboltable.add(ret)
         self.addnode(TACUnaryLiteralNode(ret, TACOperator.ASSIGN, lit))
@@ -748,9 +746,9 @@ class TACBlock:
         ret = Symbol(self.gettemporary(), tok.location, pascaltypes.SIMPLETYPEDEF_BOOLEAN)
         self.symboltable.add(ret)
         if tok.tokentype == TokenType.TRUE:
-            tokval = 1  # 6.4.2.2 of ISO standard - Booleans are stored as 0 or 1 in memory
+            tokval = "1"  # 6.4.2.2 of ISO standard - Booleans are stored as 0 or 1 in memory
         else:
-            tokval = 0
+            tokval = "0"
         self.addnode(TACUnaryLiteralNode(ret, TACOperator.ASSIGN, BooleanLiteral(tokval, tok.location)))
         return ret
 

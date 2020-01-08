@@ -1,7 +1,7 @@
 from enum import Enum, unique, auto
 from lexer import TokenType, Token, TokenStream, LexerException
-from symboltable import StringLiteral, NumericLiteral, LiteralTable, SymbolTable, VariableSymbol, ParameterList, \
-    ActivationSymbol, FunctionResultVariableSymbol, Parameter, SymbolException, ConstantSymbol
+from symboltable import StringLiteral, LiteralTable, SymbolTable, VariableSymbol, ParameterList, \
+    ActivationSymbol, FunctionResultVariableSymbol, Parameter, SymbolException, ConstantSymbol, RealLiteral
 import pascaltypes
 
 '''
@@ -224,8 +224,7 @@ class Parser:
                         tokval = "-" + realtok.value
                     else:
                         tokval = realtok.value
-                    self.literaltable.add(NumericLiteral(tokval, realtok.location,
-                                                         pascaltypes.RealLiteralTypeDef()))
+                    self.literaltable.add(RealLiteral(tokval, realtok.location))
                     parent_ast.symboltable.add(ConstantSymbol(const_id.value, const_id.location,
                                                               pascaltypes.RealLiteralTypeDef(), tokval))
                 elif self.tokenstream.peektokentype() == TokenType.UNSIGNED_INT:
@@ -289,8 +288,7 @@ class Parser:
                                 # literal value is in the literals table if it's a real constant.
                                 # LiteralTable.add() allows adding duplicates and filters them out.
                                 if isinstance(sym.typedef.basetype, pascaltypes.RealType):
-                                    self.literaltable.add(NumericLiteral(tokval, ident_token.location,
-                                                                         pascaltypes.RealLiteralTypeDef()))
+                                    self.literaltable.add(RealLiteral(tokval, ident_token.location))
                             else:
                                 tokval = sym.value
                         else:
@@ -549,8 +547,7 @@ class Parser:
         else:
             if self.tokenstream.peektokentype() == TokenType.UNSIGNED_REAL:
                 realtok = self.getexpectedtoken(TokenType.UNSIGNED_REAL)
-                self.literaltable.add(NumericLiteral(realtok.value, realtok.location,
-                                                     pascaltypes.RealLiteralTypeDef()))
+                self.literaltable.add(RealLiteral(realtok.value, realtok.location))
                 ret = AST(realtok, parent_ast)
             elif self.tokenstream.peektokentype() in (TokenType.UNSIGNED_INT, TokenType.TRUE,
                                                       TokenType.MAXINT, TokenType.FALSE):

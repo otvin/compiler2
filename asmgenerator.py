@@ -2,7 +2,7 @@ import os
 from tac_ir import TACBlock, TACLabelNode, TACParamNode, TACCallSystemFunctionNode, TACUnaryLiteralNode, \
     TACOperator, TACGenerator, TACCommentNode, TACBinaryNode, TACUnaryNode, TACGotoNode, TACIFZNode, \
     TACFunctionReturnNode, TACCallFunctionNode
-from symboltable import StringLiteral, NumericLiteral, Symbol, Parameter, ActivationSymbol, \
+from symboltable import StringLiteral, IntegerLiteral, Symbol, Parameter, ActivationSymbol, RealLiteral, \
     FunctionResultVariableSymbol, CharacterLiteral
 from editor_settings import NUM_SPACES_IN_TAB, NUM_TABS_FOR_COMMENT
 import pascaltypes
@@ -200,7 +200,7 @@ class AssemblyGenerator:
                         raise ASMGeneratorError("String literal {} exceeds 255 char max length.".format(lit.value))
                     self.emitcode("{} db `{}`, 0".format(litname, lit.value.replace('`', '\\`')))
                     lit.memoryaddress = litname
-                elif isinstance(lit, NumericLiteral) and isinstance(lit.typedef.basetype, pascaltypes.RealType):
+                elif isinstance(lit, RealLiteral):
                     litname = 'reallit_{}'.format(nextid)
                     nextid += 1
                     self.emitcode("{} dq {}".format(litname, lit.value))
@@ -367,8 +367,7 @@ class AssemblyGenerator:
                         comment = "Move literal '{}' into {}".format(node.literal1.value, node.lval.name)
                         self.emitcode("lea rax, [rel {}]".format(litaddress), comment)
                         self.emit_movtostack_fromregister(node.lval, "rax")
-                    elif isinstance(node.literal1, NumericLiteral) and isinstance(node.literal1.typedef.basetype,
-                                                                                  pascaltypes.RealType):
+                    elif isinstance(node.literal1, RealLiteral):
                         glt = self.tacgenerator.globalliteraltable
                         litaddress = glt.fetch(node.literal1.value, pascaltypes.RealLiteralTypeDef()).memoryaddress
                         comment = "Move literal {} into {}".format(node.literal1.value, node.lval.name)

@@ -13,9 +13,13 @@ class SymbolRedefinedException(SymbolException):
 class Literal:
     # Literals are similar to symbols, but do not have names, and are always going to be
     # declared in global scope, regardless of where in the program they are found.
+    # The value of a literal is always a string, because most times it comes in from parsing
+    # tokens, and tokens are strings.  Having a mix of strings and numbers might cause problems
+    # later so we keep it a string.
     def __init__(self, value, location, typedef):
         assert isinstance(location, FileLocation)
         assert isinstance(typedef, pascaltypes.TypeDef)
+        assert isinstance(value, str)
         self.value = value
         self.location = location
         self.typedef = typedef
@@ -45,16 +49,14 @@ class OrdinalLiteral(Literal):
         super().__init__(value, location, typedef)
 
 
-class NumericLiteral(Literal):
-    def __init__(self, value, location, typedef):
-        assert (isinstance(typedef, pascaltypes.RealLiteralTypeDef) or
-                isinstance(typedef, pascaltypes.IntegerLiteralTypeDef))
-        super().__init__(value, location, typedef)
+class IntegerLiteral(OrdinalLiteral):
+    def __init__(self, value, location):
+        super().__init__(value, location, pascaltypes.IntegerLiteralTypeDef())
 
 
 class BooleanLiteral(OrdinalLiteral):
     def __init__(self, value, location):
-        assert value == 0 or value == 1
+        assert value in ('0', '1')
         super().__init__(value, location, pascaltypes.BooleanLiteralTypeDef())
 
     def __str__(self):
@@ -71,6 +73,11 @@ class CharacterLiteral(OrdinalLiteral):
             print('*' + value + '*')
         assert len(value) == 1
         super().__init__(value, location, pascaltypes.CharacterLiteralTypeDef())
+
+
+class RealLiteral(Literal):
+    def __init__(self, value, location):
+        super().__init__(value, location, pascaltypes.RealLiteralTypeDef())
 
 
 class LiteralTable:
@@ -332,7 +339,6 @@ class SymbolTable:
         # I can find the type by removind the " literal" from the end.
         if type_identifier[-7:] == "literal":
             type_identifier = type_identifier[:-8]
-
 
         # First, we get the typedef that corresponds to the t1_identifier and t2_identifier, keeping track
         # of which symbol table contains the record.
