@@ -355,8 +355,8 @@ class Parser:
                 else:
                     # denoter_token.tokentype == TokenType.IDENTIFIER
                     denoter = parent_ast.symboltable.fetch(denoter_token.value)
-                    # fetch_originaltypedef returns a tuple (symboltable, basetype)
-                    basetype = parent_ast.symboltable.fetch_originaltypedef(denoter_token.value)[1].basetype
+                    # fetch_originalsymtable_andtypedef returns a tuple (symboltable, basetype)
+                    basetype = parent_ast.symboltable.fetch_originalsymtable_andtypedef(denoter_token.value)[1].basetype
 
                 parent_ast.symboltable.add(pascaltypes.TypeDef(identifier.value, denoter, basetype))
 

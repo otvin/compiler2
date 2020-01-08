@@ -305,7 +305,7 @@ class SymbolTable:
             isinstance(ret, pascaltypes.TypeDef) or isinstance(ret, pascaltypes.EnumeratedTypeValue)
         return ret
 
-    def fetch_originaltypedef(self, type_identifier):
+    def fetch_originalsymtable_andtypedef(self, type_identifier):
         # Original typedef:
         #
         # type
@@ -328,7 +328,8 @@ class SymbolTable:
         ret_symtable = self
         ret_typedef = None
 
-        # HACK - due to the way I defined literals.
+        # HACK - due to the way I defined literals with type name "integer literal" "real literal" etc,
+        # I can find the type by removind the " literal" from the end.
         if type_identifier[-7:] == "literal":
             type_identifier = type_identifier[:-8]
 
@@ -464,10 +465,10 @@ class SymbolTable:
         # fields: x and y.  q2 is of type c2, which is also of a type named Coordinates, which is also a record
         # with two real fields x and y.  However, you can NOT assign q1 to q2 or vice-versa.
 
-        t1_originaltypedef = self.fetch_originaltypedef(t1_identifier)
-        t2_originaltypedef = self.fetch_originaltypedef(t2_identifier)
+        t1_originaltypedef = self.fetch_originalsymtable_andtypedef(t1_identifier)
+        t2_originaltypedef = self.fetch_originalsymtable_andtypedef(t2_identifier)
 
-        # fetch_originaltypedef returns a tuple (symtable, typdef)
+        # fetch_originalsymtable_andtypedef returns a tuple (symtable, typdef)
 
         if t1_originaltypedef[0] != t2_originaltypedef[0]:
             ret = False
@@ -509,8 +510,8 @@ class SymbolTable:
         # 5) T1 and T2 are compatible string types
         #
 
-        t1type = self.fetch_originaltypedef(t1_identifier)[1].basetype
-        t2type = self.fetch_originaltypedef(t2_identifier)[1].basetype
+        t1type = self.fetch_originalsymtable_andtypedef(t1_identifier)[1].basetype
+        t2type = self.fetch_originalsymtable_andtypedef(t2_identifier)[1].basetype
 
         # File Types, or types with file components are never assignment-compatible
         if isinstance(t1type, pascaltypes.FileType) or isinstance(t2type, pascaltypes.FileType):
