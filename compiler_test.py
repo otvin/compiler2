@@ -148,7 +148,7 @@ def main():
     run_test_list("procedure", 1, 7)
     run_test_list("real", 1, 8)
     run_test_list("recursion", 1, 1)
-    run_test_list("relop", 1, 4)
+    run_test_list("relop", 1, 6)
     run_test_list("repeat", 1, 2)
     run_test_list("scope", 1, 1)
     run_test_list("scope", 3, 3)
@@ -158,7 +158,7 @@ def main():
     run_test_list("write", 1, 1)
     run_test_list("writeln", 1, 3)
 
-    run_compilefail_test_list(1, 39)
+    run_compilefail_test_list(1, 40)
 
     # tests from old compiler not yet running in compiler2
     # dotest("tests/testconcat01.pas", "tests/testconcat01.out")

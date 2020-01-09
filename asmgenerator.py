@@ -823,7 +823,9 @@ class AssemblyGenerator:
                                 else:  # pragma: no cover
                                     raise ASMGeneratorError("Invalid Relational Operator {}".format(node.operator))
                             else:
-                                assert isinstance(n1type, pascaltypes.RealType)
+                                assert isinstance(n1type, pascaltypes.RealType) or \
+                                    isinstance(n1type, pascaltypes.CharacterType) or \
+                                    isinstance(n1type, pascaltypes.EnumeratedType)
                                 if node.operator == TACOperator.EQUALS:
                                     jumpinstr = "JE"
                                 elif node.operator == TACOperator.NOTEQUAL:
@@ -839,7 +841,9 @@ class AssemblyGenerator:
                                 else:  # pragma: no cover
                                     raise ASMGeneratorError("Invalid Relational Operator {}".format(node.operator))
 
-                            if isinstance(n1type, pascaltypes.BooleanType):
+                            if isinstance(n1type, pascaltypes.BooleanType) or \
+                                    isinstance(n1type, pascaltypes.CharacterType) or \
+                                    isinstance(n1type, pascaltypes.EnumeratedType):
                                 self.emit_movtoregister_fromstack("al", node.arg1, comment)
                                 self.emit_movtoregister_fromstack("r11b", node.arg2)
                                 self.emitcode("cmp al, r11b")
