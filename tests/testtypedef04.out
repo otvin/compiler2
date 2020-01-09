@@ -1,0 +1,6 @@
+it's cherry
+now it's banana
+now it's pear
+now it's apple
+next line should fail with an error
+Error: succ() or pred() exceeds range for enumerated type

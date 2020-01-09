@@ -324,6 +324,9 @@ class Parser:
         # 6.4.1 <type-definition> ::= <identifier> "=" <type-denoter>
         # 6.4.1 <type-denoter> ::= <type-identifier> | <new-type>
         # 6.4.1 <type-identifier> ::= <identifier>
+        # 6.4.1 <new-type> ::= <new-ordinal-type> | <new-structured-type> | <new-pointer-type>
+        # 6.4.2.1 <new-ordinal-type> ::= <enumerated-type> | <subrange-type>
+        # 6.4.2.3 <enumerated-type> ::= "(" <identifier-list> ")"
         #
         # The valid type-identifiers are the simple types (integer, char, boolean, real) and identifiers
         # that have already been defined for other types.
@@ -332,6 +335,9 @@ class Parser:
         if self.tokenstream.peektokentype() == TokenType.TYPE:
             assert isinstance(parent_ast.symboltable, SymbolTable), \
                 "Parser.parse_typedeclarationpart: missing symboltable"
+
+            symtab = parent_ast.symboltable
+
             self.getexpectedtoken(TokenType.TYPE)
             done = False
             while not done:
@@ -340,29 +346,45 @@ class Parser:
                 denoter_token = self.tokenstream.eattoken()
                 assert isinstance(denoter_token, Token)
 
-                if denoter_token.tokentype not in (TokenType.INTEGER, TokenType.REAL, TokenType.CHAR,
-                                                   TokenType.BOOLEAN, TokenType.IDENTIFIER):
-                    raise ParseException(token_errstr(denoter_token, "Invalid type denoter"))
+                if denoter_token.tokentype == TokenType.LPAREN:
+                    idlist = self.parse_identifierlist()
+                    etvlist = []
+                    for idtoken in idlist:
+                        newetv = pascaltypes.EnumeratedTypeValue(idtoken.value, identifier.value, len(etvlist))
+                        etvlist.append(newetv)
+                        try:
+                            symtab.add(newetv)
+                        except SymbolException:
+                            errstr = token_errstr(idtoken, "Identifier redefined: '{}'".format(idtoken.value))
+                            raise ParseException(errstr)
+                    newbasetype = pascaltypes.EnumeratedType(identifier.value, etvlist)
+                    symtab.add(pascaltypes.TypeDef(identifier.value, newbasetype, newbasetype))
+                    self.getexpectedtoken(TokenType.RPAREN)
 
-                if denoter_token.tokentype == TokenType.INTEGER:
-                    denoter = pascaltypes.IntegerType()
-                    basetype = denoter
-                elif denoter_token.tokentype == TokenType.REAL:
-                    denoter = pascaltypes.RealType()
-                    basetype = denoter
-                elif denoter_token.tokentype == TokenType.CHAR:
-                    denoter = pascaltypes.CharacterType()
-                    basetype = denoter
-                elif denoter_token.tokentype == TokenType.BOOLEAN:
-                    denoter = pascaltypes.BooleanType()
-                    basetype = denoter
                 else:
-                    # denoter_token.tokentype == TokenType.IDENTIFIER
-                    denoter = parent_ast.symboltable.fetch(denoter_token.value)
-                    # fetch_originalsymtable_andtypedef returns a tuple (symboltable, basetype)
-                    basetype = parent_ast.symboltable.fetch_originalsymtable_andtypedef(denoter_token.value)[1].basetype
+                    if denoter_token.tokentype not in (TokenType.INTEGER, TokenType.REAL, TokenType.CHAR,
+                                                       TokenType.BOOLEAN, TokenType.IDENTIFIER):
+                        raise ParseException(token_errstr(denoter_token, "Invalid type denoter"))
 
-                parent_ast.symboltable.add(pascaltypes.TypeDef(identifier.value, denoter, basetype))
+                    if denoter_token.tokentype == TokenType.INTEGER:
+                        denoter = pascaltypes.IntegerType()
+                        basetype = denoter
+                    elif denoter_token.tokentype == TokenType.REAL:
+                        denoter = pascaltypes.RealType()
+                        basetype = denoter
+                    elif denoter_token.tokentype == TokenType.CHAR:
+                        denoter = pascaltypes.CharacterType()
+                        basetype = denoter
+                    elif denoter_token.tokentype == TokenType.BOOLEAN:
+                        denoter = pascaltypes.BooleanType()
+                        basetype = denoter
+                    else:
+                        # denoter_token.tokentype == TokenType.IDENTIFIER
+                        denoter = symtab.fetch(denoter_token.value)
+                        # fetch_originalsymtable_andtypedef returns a tuple (symboltable, basetype)
+                        basetype = symtab.fetch_originalsymtable_andtypedef(denoter_token.value)[1].basetype
+
+                    symtab.add(pascaltypes.TypeDef(identifier.value, denoter, basetype))
 
                 self.getexpectedtoken(TokenType.SEMICOLON)
                 if self.tokenstream.peektokentype() != TokenType.IDENTIFIER:

@@ -19,7 +19,7 @@ Compiler2 supports the following Pascal Language features:
     * Supports following transfer functions required by ISO standard:
         * ```trunc()``` and ```round()``` 
     * Supports following ordinal functions required by ISO standard:
-        * ```chr()``` and ```ord()```
+        * ```chr()```, ```ord()```, ```pred()```, and ```succ()```
 * Relational operators: ```=```, ```<>```, ```<```, ```<=```, ```>```, ```>=```
   * both Real and Integer; can compare integers to reals.
 * Boolean operators: ```not```, ```and```, and ```or```
@@ -35,7 +35,8 @@ Compiler2 supports the following Pascal Language features:
     * Boolean variables and literals (8-bit)
     * Character variables and literals (8-bit)
 * Type Definitions
-  *  Limited - can create a new type that is an alias for Real, Integer, Char, or Boolean, or one that is defined as one of a previously-defined alias.
+  *  Can create a new type that is an alias for Real, Integer, Char, or Boolean, or one that is defined as one of a previously-defined alias.
+  *  Can create a new user-defined enumerated type
 * Global and local constants
     * Signed Real, Signed Integer, Character, or String
     * the required constants ```true```, ```false```, and ```maxint```
@@ -46,15 +47,16 @@ Compiler2 supports the following Pascal Language features:
  
 ### Commentary
 
-At this point, Compiler2 has all features from Compiler1 except for String support.
+At this point, Compiler2 has all features from Compiler1 except for String support.  However, the String type in the original compiler is not ISO standard, it was modeled after Turbo Pascal.
 
 Compiler2 also has the following functionality that compiler1 did not:
 * Boolean and Character types
 * Constants
 * REPEAT..UNTIL construct
 * Ability to do relational operations comparing Integer and Real types
-* abs(), sqr(), sin(), cos(), exp(), ln(), sqrt(), trunc(), round(), chr(), and ord()
+* abs(), sqr(), sin(), cos(), exp(), ln(), sqrt(), trunc(), round(), chr(), ord(), succ(), and pred()
 * Boolean operators not, or, and
+* Type Definitions and Enumerated Types
 
 Compiler2 also uses the official BNF from the ISO standard, whereas Compiler1 used a BNF that I updated based on a variation I had downloaded from a random website.
 
@@ -74,7 +76,7 @@ has made it easier to surpass the functionality of my previous attempt.
 
 ### Unit tests
 
-Compiler2 currently passes 134 unit tests, including 46 of the 60 unit tests created for Compiler, plus an additional test which represented the one known bug from Compiler.  You can execute the unit test suite by running:
+Compiler2 currently passes 139 unit tests, including 46 of the 60 unit tests created for Compiler, plus an additional test which represented the one known bug from Compiler.  You can execute the unit test suite by running:
 
 ```python3 compiler_test.py```
 

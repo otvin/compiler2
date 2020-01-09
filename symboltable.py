@@ -259,19 +259,6 @@ class Label:
         return self.name
 
 
-# The information on the enumerated types will be stored in the type table, but we will need symbols
-# for these.  These are placeholder classes until we figure out the design.
-class EnumeratedTypeName:
-    def __init__(self, typename):
-        self.typename = typename
-
-
-class EnumeratedTypeValue:
-    def __init__(self, value, enumeratedtypename):
-        assert isinstance(enumeratedtypename, EnumeratedTypeName)
-        self.value = value
-
-
 class SymbolTable:
     def __init__(self):
         self.symbols = {}

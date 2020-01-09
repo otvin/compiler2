@@ -143,7 +143,7 @@ def main():
     run_test_list("math", 1, 6)
     run_test_list("misc", 1, 1)
     run_test_list("mod", 1, 2)
-    run_test_list("ord", 1, 2)
+    run_test_list("ord", 1, 3)
     # note testprocedure02 was "proc01" in the old Compiler suite
     run_test_list("procedure", 1, 7)
     run_test_list("real", 1, 8)
@@ -153,12 +153,12 @@ def main():
     run_test_list("scope", 1, 1)
     run_test_list("scope", 3, 3)
     run_test_list("sqrt", 1, 2)
-    run_test_list("typedef", 1, 2)
+    run_test_list("typedef", 1, 4)
     run_test_list("while", 1, 3)
     run_test_list("write", 1, 1)
     run_test_list("writeln", 1, 3)
 
-    run_compilefail_test_list(1, 37)
+    run_compilefail_test_list(1, 39)
 
     # tests from old compiler not yet running in compiler2
     # dotest("tests/testconcat01.pas", "tests/testconcat01.out")

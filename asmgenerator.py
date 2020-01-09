@@ -182,6 +182,7 @@ class AssemblyGenerator:
         self.emitcode('_stringerr_3 db `Error: Cannot take sqrt() of negative number`, 0')
         self.emitcode('_stringerr_4 db `Error: Cannot take ln() of number less than or equal to zero`, 0')
         self.emitcode('_stringerr_5 db `Error: value to chr() exceeds 0-255 range for Char type`, 0')
+        self.emitcode('_stringerr_6 db `Error: succ() or pred() exceeds range for enumerated type`, 0')
         self.emitcomment("support for write() commands")
         self.emitcode('_printf_intfmt db "%d",0')
         self.emitcode('_printf_strfmt db "%s",0')
@@ -657,18 +658,52 @@ class AssemblyGenerator:
                         # ordinal types are stored as integers, this is just returning itself.
                         # Trick is that the ordinal type may be 1 byte (boolean, character, or user-defined ordinal)
                         # or 4 bytes (integer).  If it's one byte, we need to zero-extend it.
-                        assert params[-1].paramval.typedef.basetype.size in (1,4)
+                        assert params[-1].paramval.typedef.basetype.size in (1, 4)
 
                         comment = "parameter {} for ord()".format(str(params[-1].paramval))
                         if params[-1].paramval.typedef.basetype.size == 1:
                             # TODO - this can easily be done in a single mov statement
-                            self.emit_movtoregister_fromstack("R11B", params[-1].paramval)
+                            self.emit_movtoregister_fromstack("R11B", params[-1].paramval, comment)
                             self.emitcode("MOVZX EAX, R11B")
                         else:
                             self.emit_movtoregister_fromstack("EAX", params[-1].paramval)
                         comment = "assign return value of function to {}".format(node.lval.name)
                         self.emit_movtostack_fromregister(node.lval, "EAX", comment)
+                    elif node.label.name == "_SUCCO":
+                        assert params[-1].paramval.typedef.basetype.size in (1, 4)
+                        assert node.lval.typedef.basetype.size == params[-1].paramval.typedef.basetype.size
+                        comment = "parameter {} for succ()".format(str(params[-1].paramval))
+                        reg = get_register_slice_bybytes("RAX", node.lval.typedef.basetype.size)
 
+                        self.emit_movtoregister_fromstack(reg, params[-1].paramval, comment)
+                        self.emitcode("INC {}".format(reg))
+                        bt = params[-1].paramval.typedef.basetype
+                        if isinstance(bt, pascaltypes.IntegerType):
+                            self.emitcode("jo _PASCAL_SUCC_ORD_ERROR")
+                        elif isinstance(bt, pascaltypes.BooleanType):
+                            self.emitcode("CMP {}, 1".format(reg))
+                            self.emitcode("JG _PASCAL_SUCC_ORD_ERROR")
+                        else:
+                            assert isinstance(bt, pascaltypes.EnumeratedType)
+                            self.emitcode("CMP {}, {}".format(reg, str(len(bt.value_list))))
+                            self.emitcode("JGE _PASCAL_SUCC_ORD_ERROR")
+                        comment = "assign return value of function to {}".format(node.lval.name)
+                        self.emit_movtostack_fromregister(node.lval, reg, comment)
+                    elif node.label.name == "_PREDO":
+                        assert params[-1].paramval.typedef.basetype.size in (1, 4)
+                        assert node.lval.typedef.basetype.size == params[-1].paramval.typedef.basetype.size
+                        comment = "parameter {} for pred()".format(str(params[-1].paramval))
+                        reg = get_register_slice_bybytes("RAX", node.lval.typedef.basetype.size)
+
+                        self.emit_movtoregister_fromstack(reg, params[-1].paramval, comment)
+                        self.emitcode("DEC {}".format(reg))
+                        if isinstance(params[-1].paramval.typedef.basetype, pascaltypes.IntegerType):
+                            self.emitcode("jo _PASCAL_SUCC_ORD_ERROR")
+                        else:
+                            self.emitcode("CMP {}, 0".format(reg))
+                            self.emitcode("JL _PASCAL_SUCC_ORD_ERROR")
+                        comment = "assign return value of function to {}".format(node.lval.name)
+                        self.emit_movtostack_fromregister(node.lval, reg, comment)
                     elif node.label.name in ("_ROUNDR", "_TRUNCR"):
                         comment = "parameter {} for {}()".format(str(params[-1].paramval), node.label.name[1:6].lower())
                         self.emit_movtoxmmregister_fromstack("xmm0", params[-1].paramval, comment)
@@ -855,6 +890,9 @@ class AssemblyGenerator:
         self.emitcode("jmp _PASCAL_PRINT_ERROR")
         self.emitlabel("_PASCAL_CHR_ERROR")
         self.emitcode("mov rdi, _stringerr_5")
+        self.emitcode("jmp _PASCAL_PRINT_ERROR")
+        self.emitlabel("_PASCAL_SUCC_ORD_ERROR")
+        self.emitcode("mov rdi, _stringerr_6")
         self.emitcode("jmp _PASCAL_PRINT_ERROR")
 
         self.emitlabel("_PASCAL_PRINT_ERROR")

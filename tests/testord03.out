@@ -1,0 +1,6 @@
+should be 439: 439
+should be -2: -2
+should be True: TRUE
+should be False: FALSE
+next line should fail:
+Error: succ() or pred() exceeds range for enumerated type

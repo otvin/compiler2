@@ -100,8 +100,14 @@ class BooleanType(OrdinalType):
 
 class EnumeratedTypeValue:
     # needed so that the values can go into the symbol table
-    def __init__(self, identifier):
+    def __init__(self, identifier, typename, value):
+        assert isinstance(identifier, str)
+        assert isinstance(typename, str)
+        assert isinstance(value, int)
+        assert value >= 0
         self.identifier = identifier
+        self.typename = typename
+        self.value = value
 
     # allows us to use TypeDefinitions in Symbol tables, and yet keep the vocabluary in the TypeDefinition
     # such that matches the terminology in the ISO standard
@@ -109,40 +115,54 @@ class EnumeratedTypeValue:
     def name(self):
         return self.identifier
 
+    def __str__(self):
+        return self.identifier
+
+    def __repr__(self):
+        return "ID:{} for Type:{} with value:{}".format(self.identifier, self.typename, self.value)
+
 
 class EnumeratedType(OrdinalType):
-    def __init__(self, typename, identifier_list):
-        for i in identifier_list:
-            assert isinstance(i, str)  # TODO - should these be identifiers?
+    def __init__(self, typename, value_list):
+        i = 0
+        value_identifier_list = []
+        while i < len(value_list):
+            assert isinstance(value_list[i], EnumeratedTypeValue)
+            assert value_list[i].typename == typename
+            assert value_list[i].value == i
+            # cannot define the same constant multiple times in the same type
+            assert value_list[i].identifier not in value_identifier_list
+            value_identifier_list.append(value_list[i].identifier)
+            i += 1
 
         super().__init__()
-        if len(identifier_list) > 255:
+        if len(value_list) > 255:
             errstr = "Enumerated type '{}' has {} identifiers.  Maximum is 255."
-            errstr = errstr.format(typename, str(len(identifier_list)))
+            errstr = errstr.format(typename, str(len(value_list)))
             raise PascalTypeException(errstr)
         self.typename = typename
         self.size = 1
-        self.identifier_list = identifier_list
+        self.value_list = value_list
 
     def __str__(self):
         ret = "Enumerated type: {} with values (".format(self.typename)
-        for i in self.identifier_list:
-            ret = ret + i + ', '
+        for i in self.value_list:
+            ret = ret + str(i) + ', '
         ret = ret[:-2] + ')'
         return ret
 
     def __getitem__(self, n):
         assert isinstance(n, int)
         assert n >= 0
-        assert n < len(self.identifier_list)
-        return self.identifier_list[n]
+        assert n < len(self.value_list)
+        return self.value_list[n]
 
     def position(self, s):
         assert isinstance(s, str)  # EnumeratedTypes contain list of strings
         i = 0
         foundit = False
-        while i < len(self.identifier_list) and not foundit:
-            if self.identifier_list[s].lower() == s.lower():
+        while i < len(self.value_list) and not foundit:
+            if self.value_list[s].identifier.lower() == s.lower():
                 foundit = True
             else:
                 i += 1

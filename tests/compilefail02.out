@@ -1,1 +1,1 @@
-Cannot assign real type to integer in file:tests/compilefail02.pas line:5     column:6  
+Cannot assign real literal type to integer in file:tests/compilefail02.pas line:5     column:6  

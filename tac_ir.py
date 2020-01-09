@@ -557,6 +557,11 @@ class TACBlock:
             tmp = self.processast(child)
             bt = tmp.typedef.basetype
 
+            # p.98 of Cooper states that the constants of enumerated ordinal types (pascaltypes.EnumeratedType)
+            # "don't have external character representations, and can't be read or written to or from
+            # textfiles - in particular, from the standard input and output."  It would be very easy to
+            # display the string representation of the constant when trying to print it out, but we will
+            # stick to Cooper for now.  The ISO standard is silent on the topic, per my reading.
             if not (isinstance(bt, pascaltypes.StringLiteralType) or isinstance(bt, pascaltypes.RealType) or
                     isinstance(bt, pascaltypes.BooleanType) or isinstance(bt, pascaltypes.IntegerType) or
                     isinstance(bt, pascaltypes.CharacterType)):
@@ -788,17 +793,21 @@ class TACBlock:
             raise TACException(tac_errstr("Cannot assign a value to a constant", tok))
 
         rval = self.processast(ast.children[1])
-        # TODO - THIS NEEDS TO BE REPLACED WITH THE TEST FOR ASSIGNMENT COMPATIBILITY
 
-        if not ast.nearest_symboltable().are_assignment_compatible(lval.typedef.identifier, rval.typedef.identifier):
-            raise TACException(tac_errstr("Cannot assign real type to integer", tok))
-        if isinstance(lval.typedef.basetype, pascaltypes.RealType) and \
-                isinstance(rval.typedef.basetype, pascaltypes.IntegerType):
-            newrval = self.process_sym_inttoreal(rval)
+        if isinstance(rval, pascaltypes.EnumeratedTypeValue):
+            self.addnode(TACUnaryLiteralNode(lval, TACOperator.ASSIGN, IntegerLiteral(str(rval.value), tok.location)))
         else:
-            newrval = rval
+            if not ast.nearest_symboltable().are_assignment_compatible(lval.typedef.identifier,
+                                                                       rval.typedef.identifier):
+                errstr = "Cannot assign {} type to {}".format(rval.typedef.identifier, lval.typedef.identifier)
+                raise TACException(tac_errstr(errstr, tok))
+            if isinstance(lval.typedef.basetype, pascaltypes.RealType) and \
+                    isinstance(rval.typedef.basetype, pascaltypes.IntegerType):
+                newrval = self.process_sym_inttoreal(rval)
+            else:
+                newrval = rval
 
-        self.addnode(TACUnaryNode(lval, TACOperator.ASSIGN, newrval))
+            self.addnode(TACUnaryNode(lval, TACOperator.ASSIGN, newrval))
         return lval
 
     def process_sym_inttoreal(self, sym):
