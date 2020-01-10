@@ -511,6 +511,7 @@ class TACBlock:
                 errstr = "Function {}() requires parameter of ordinal type in {}".format(tok.tokentype,
                                                                                          tok.location)
                 raise TACException(errstr)
+
         elif requiredfunction_acceptsinteger_or_real(tok.tokentype):
             if isinstance(tmp.typedef.basetype, pascaltypes.IntegerType):
                 self.addnode(TACParamNode(tmp))
@@ -668,6 +669,15 @@ class TACBlock:
                 assert isinstance(sym.typedef.basetype, pascaltypes.IntegerType)
                 lit = IntegerLiteral(sym.value, tok.location)
             self.addnode(TACUnaryLiteralNode(ret, TACOperator.ASSIGN, lit))
+        elif isinstance(sym, pascaltypes.EnumeratedTypeValue):
+            # need to return a symbol.
+            tmptypedef = self.symboltable.fetch(sym.typename)
+            tmpsym = Symbol(self.gettemporary(), tok.location, tmptypedef)
+            self.symboltable.add(tmpsym)
+            comment = "Convert literal '{}' to integer value {}".format(sym.identifier, sym.value)
+            self.addnode(TACCommentNode(comment))
+            self.addnode(TACUnaryLiteralNode(tmpsym, TACOperator.ASSIGN, IntegerLiteral(str(sym.value), tok.location)))
+            return tmpsym
         elif not isinstance(sym, ActivationSymbol):
             # just return the identifier itself
             ret = sym
@@ -795,6 +805,8 @@ class TACBlock:
         rval = self.processast(ast.children[1])
 
         if isinstance(rval, pascaltypes.EnumeratedTypeValue):
+            comment = "Convert literal {} to integer value {}".format(rval.identifier, rval.value)
+            self.addnode(TACCommentNode(comment))
             self.addnode(TACUnaryLiteralNode(lval, TACOperator.ASSIGN, IntegerLiteral(str(rval.value), tok.location)))
         else:
             if not ast.nearest_symboltable().are_assignment_compatible(lval.typedef.identifier,
@@ -948,6 +960,8 @@ class TACBlock:
         # do not return anything.  Identifiers generally do, unless they are procedure calls.  Everything else
         # returns a symbol.
 
+        ret = None
+
         if toktype == TokenType.BEGIN:
             self.processast_begin(ast)
         elif toktype in (TokenType.PROCEDURE, TokenType.FUNCTION):
@@ -959,27 +973,30 @@ class TACBlock:
         elif toktype in (TokenType.WHILE, TokenType.REPEAT):
             self.processast_repetitivestatement(ast)
         elif is_isorequiredfunction(tok.tokentype):
-            return self.processast_isorequiredfunction(ast)
+            ret = self.processast_isorequiredfunction(ast)
         elif toktype == TokenType.ASSIGNMENT:
-            return self.processast_assignment(ast)
+            ret = self.processast_assignment(ast)
         elif toktype == TokenType.IDENTIFIER:
-            return self.processast_identifier(ast)
+            ret = self.processast_identifier(ast)
         elif tok.tokentype in (TokenType.UNSIGNED_INT, TokenType.SIGNED_INT, TokenType.MAXINT,
                                TokenType.UNSIGNED_REAL, TokenType.SIGNED_REAL):
-            return self.processast_numericliteral(ast)
+            ret = self.processast_numericliteral(ast)
         elif tok.tokentype in [TokenType.TRUE, TokenType.FALSE]:
-            return self.processast_booleanliteral(ast)
+            ret = self.processast_booleanliteral(ast)
         elif tok.tokentype == TokenType.CHARSTRING:
-            return self.processast_characterstring(ast)
+            ret = self.processast_characterstring(ast)
         elif tok.tokentype in (TokenType.MULTIPLY, TokenType.PLUS, TokenType.MINUS, TokenType.DIVIDE,
                                TokenType.IDIV, TokenType.MOD):
-            return self.processast_arithmeticoperator(ast)
+            ret = self.processast_arithmeticoperator(ast)
         elif isrelationaloperator(tok.tokentype):
-            return self.processast_relationaloperator(ast)
+            ret = self.processast_relationaloperator(ast)
         elif tok.tokentype in (TokenType.AND, TokenType.OR, TokenType.NOT):
-            return self.processast_booleanoperator(ast)
+            ret = self.processast_booleanoperator(ast)
         else:  # pragma: no cover
             raise TACException("TACBlock.processast - cannot process token:", str(tok))
+
+        assert ret is None or isinstance(ret, Symbol)
+        return ret
 
 
 class TACGenerator:

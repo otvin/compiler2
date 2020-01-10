@@ -21,12 +21,12 @@ Compiler2 supports the following Pascal Language features:
     * Supports following ordinal functions required by ISO standard:
         * ```chr()```, ```ord()```, ```pred()```, and ```succ()```
 * Relational operators: ```=```, ```<>```, ```<```, ```<=```, ```>```, ```>=```
-  * both Real and Integer; can compare integers to reals.
+  * for real, integer, and user-defined enumerated types; can compare integers to reals.
 * Boolean operators: ```not```, ```and```, and ```or```
 * Procedures and Functions
   *  Parameters passed by value or by reference ("variable parameters" in Pascal-speak)
-  *  Functions can return integers, chars, Booleans, or reals
-  *  Up to 8 Real parameters by value, up to a combined 6 Integer/Boolean/Character or by reference parameters
+  *  Functions can return integers, chars, Booleans, user-defined enumerated types, or reals
+  *  Up to 8 Real parameters by value, up to a combined 6 Integer/Boolean/Character/Enumerated Type or by reference parameters
   *  Integers passed in byval to Real parameters get converted to Real
   *  Recursion
 * Global and local variables
@@ -53,7 +53,7 @@ Compiler2 also has the following functionality that compiler1 did not:
 * Boolean and Character types
 * Constants
 * REPEAT..UNTIL construct
-* Ability to do relational operations comparing Integer and Real types
+* Ability to do relational operations comparing Integer and Real types, and relational operations involving enumerated types.
 * abs(), sqr(), sin(), cos(), exp(), ln(), sqrt(), trunc(), round(), chr(), ord(), succ(), and pred()
 * Boolean operators not, or, and
 * Type Definitions and Enumerated Types
@@ -76,7 +76,7 @@ has made it easier to surpass the functionality of my previous attempt.
 
 ### Unit tests
 
-Compiler2 currently passes 139 unit tests, including 46 of the 60 unit tests created for Compiler, plus an additional test which represented the one known bug from Compiler.  You can execute the unit test suite by running:
+Compiler2 currently passes 144 unit tests, including 46 of the 60 unit tests created for Compiler, plus an additional test which represented the one known bug from Compiler.  You can execute the unit test suite by running:
 
 ```python3 compiler_test.py```
 
@@ -88,9 +88,9 @@ Current code coverage:
 |filelocation.py|100%|
 |lexer.py|88%|
 |parser.py|94%|
-|pascaltypes.py|76%|
-|symboltable.py|92%|
-|tac_ir.py|89%|
+|pascaltypes.py|68%|
+|symboltable.py|93%|
+|tac_ir.py|91%|
 
 _Code for exceptions that should never occur are excluded.  Regular compiler errors e.g. syntax errors in Pascal code are covered via "compilefail" tests.  Code written for future features, e.g. the code that handles 64-bit integers in spots, does count against code coverage, so I do not forget to add them back to the code to be tested._
  

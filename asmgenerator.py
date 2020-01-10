@@ -436,7 +436,8 @@ class AssemblyGenerator:
                             self.emitcode("LEA {}, [{}]".format(reg, actualparam.paramval.memoryaddress), comment)
                         elif isinstance(paramdef.symbol.typedef.basetype, pascaltypes.IntegerType) or \
                                 isinstance(paramdef.symbol.typedef.basetype, pascaltypes.BooleanType) or \
-                                isinstance(paramdef.symbol.typedef.basetype, pascaltypes.CharacterType):
+                                isinstance(paramdef.symbol.typedef.basetype, pascaltypes.CharacterType) or \
+                                isinstance(paramdef.symbol.typedef.basetype, pascaltypes.EnumeratedType):
                             numintparams += 1
                             assert numintparams <= 6  # TODO - remove when we can handle more
                             fullreg = intparampos_to_register(numintparams)
