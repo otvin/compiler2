@@ -334,6 +334,7 @@ class SymbolTable:
                 done = True
             else:
                 ret_symtable = ret_symtable.parent
+                assert ret_symtable is not None, "Cannot find {}".format(type_identifier)
 
         # Now we work through any aliases.  If we have the original typdef, which has a BaseType as
         # the denoter, then we stop.  Else, the denoter is another identifier, so we need to then find

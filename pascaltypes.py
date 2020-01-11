@@ -174,25 +174,26 @@ class EnumeratedType(OrdinalType):
 
 
 class SubrangeType(OrdinalType):
-    def __init__(self, typename, hosttype, rangemin, rangemax):
-        assert isinstance(hosttype, OrdinalType)
+    def __init__(self, typename, hosttypedef, rangemin, rangemax):
+        assert isinstance(hosttypedef, TypeDef)
+        assert isinstance(hosttypedef.basetype, OrdinalType)
         super().__init__()
         self.typename = typename
         self.size = 4
-        self.hosttype = hosttype
+        self.hosttypedef = hosttypedef
         self.rangemin = rangemin  # min/max will be int for Integer, Char, Boolean, and strings for EnumeratedTypes
         self.rangemax = rangemax
 
     def __getitem__(self, n):
-        min_inhosttype = self.hosttype.position(self.rangemin)
-        max_inhosttype = self.hosttype.position(self.rangemax)
+        min_inhosttype = self.hosttypedef.basetype.position(self.rangemin)
+        max_inhosttype = self.hosttypedef.basetype.position(self.rangemax)
         assert min_inhosttype + n <= max_inhosttype
-        return self.hosttype[n - min_inhosttype]
+        return self.hosttypedef.basetype[n - min_inhosttype]
 
     def position(self, s):
-        host_position = self.hosttype.position(s)
-        min_inhosttype = self.hosttype.position(self.rangemin)
-        max_inhosttype = self.hosttype.position(self.rangemax)
+        host_position = self.hosttypedef.basetype.position(s)
+        min_inhosttype = self.hosttypedef.basetype.position(self.rangemin)
+        max_inhosttype = self.hosttypedef.basetype.position(self.rangemax)
         assert host_position >= min_inhosttype
         assert host_position <= max_inhosttype
         return host_position - min_inhosttype
@@ -346,7 +347,7 @@ class BooleanLiteralTypeDef(OrdinalLiteralTypeDef):
 
 class CharacterLiteralTypeDef(OrdinalLiteralTypeDef):
     def __init__(selfself):
-        super().__init__('character literal', CharacterType(), CharacterType())
+        super().__init__('char literal', CharacterType(), CharacterType())
 
 
 class ActivationTypeDef(TypeDef):
