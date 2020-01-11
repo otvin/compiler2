@@ -1,0 +1,9 @@
+T
+U
+V
+W
+X
+Y
+Z
+and now we should fail with an error.
+Error: value exceeds range for subrange type

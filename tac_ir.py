@@ -563,6 +563,9 @@ class TACBlock:
             # textfiles - in particular, from the standard input and output."  It would be very easy to
             # display the string representation of the constant when trying to print it out, but we will
             # stick to Cooper for now.  The ISO standard is silent on the topic, per my reading.
+            if isinstance(bt, pascaltypes.SubrangeType):
+                bt = bt.hosttypedef.basetype
+
             if not (isinstance(bt, pascaltypes.StringLiteralType) or isinstance(bt, pascaltypes.RealType) or
                     isinstance(bt, pascaltypes.BooleanType) or isinstance(bt, pascaltypes.IntegerType) or
                     isinstance(bt, pascaltypes.CharacterType)):
@@ -570,13 +573,13 @@ class TACBlock:
                 raise TACException(errstr)
 
             self.addnode(TACParamNode(tmp))
-            if isinstance(tmp.typedef.basetype, pascaltypes.StringLiteralType):
+            if isinstance(bt, pascaltypes.StringLiteralType):
                 self.addnode(TACCallSystemFunctionNode(Label("_WRITES"), 1))
-            elif isinstance(tmp.typedef.basetype, pascaltypes.RealType):
+            elif isinstance(bt, pascaltypes.RealType):
                 self.addnode(TACCallSystemFunctionNode(Label("_WRITER"), 1))
-            elif isinstance(tmp.typedef.basetype, pascaltypes.BooleanType):
+            elif isinstance(bt, pascaltypes.BooleanType):
                 self.addnode(TACCallSystemFunctionNode(Label("_WRITEB"), 1))
-            elif isinstance(tmp.typedef.basetype, pascaltypes.IntegerType):
+            elif isinstance(bt, pascaltypes.IntegerType):
                 self.addnode(TACCallSystemFunctionNode(Label("_WRITEI"), 1))
             else:
                 self.addnode(TACCallSystemFunctionNode(Label("_WRITEC"), 1))
@@ -750,7 +753,7 @@ class TACBlock:
             lit = RealLiteral(tok.value, tok.location)
             littypedef = pascaltypes.RealLiteralTypeDef()
 
-        ret = Symbol(self.gettemporary(), tok.location, littypedef)
+        ret = ConstantSymbol(self.gettemporary(), tok.location, littypedef, tok.value)
 
         self.symboltable.add(ret)
         self.addnode(TACUnaryLiteralNode(ret, TACOperator.ASSIGN, lit))
@@ -762,7 +765,7 @@ class TACBlock:
         assert ast.token.tokentype in (TokenType.TRUE, TokenType.FALSE)
 
         tok = ast.token
-        ret = Symbol(self.gettemporary(), tok.location, pascaltypes.SIMPLETYPEDEF_BOOLEAN)
+        ret = ConstantSymbol(self.gettemporary(), tok.location, pascaltypes.SIMPLETYPEDEF_BOOLEAN, tok.value)
         self.symboltable.add(ret)
         if tok.tokentype == TokenType.TRUE:
             tokval = "1"  # 6.4.2.2 of ISO standard - Booleans are stored as 0 or 1 in memory
@@ -786,7 +789,7 @@ class TACBlock:
             littypedef = pascaltypes.SIMPLETYPEDEF_CHAR
             lit = CharacterLiteral(litval, tok.location)
 
-        ret = Symbol(self.gettemporary(), tok.location, littypedef)
+        ret = ConstantSymbol(self.gettemporary(), tok.location, littypedef, litval)
         self.symboltable.add(ret)
         self.addnode(TACUnaryLiteralNode(ret, TACOperator.ASSIGN, lit))
         return ret
@@ -809,10 +812,19 @@ class TACBlock:
             self.addnode(TACCommentNode(comment))
             self.addnode(TACUnaryLiteralNode(lval, TACOperator.ASSIGN, IntegerLiteral(str(rval.value), tok.location)))
         else:
+            if isinstance(rval, ConstantSymbol):
+                t2value = rval.value
+            else:
+                t2value = None
+
             if not ast.nearest_symboltable().are_assignment_compatible(lval.typedef.identifier,
-                                                                       rval.typedef.identifier):
-                errstr = "Cannot assign {} type to {}".format(rval.typedef.identifier, lval.typedef.identifier)
-                raise TACException(tac_errstr(errstr, tok))
+                                                                       rval.typedef.identifier, t2value):
+                if t2value is not None:
+                    errstr = "Cannot assign value '{}' of type {} to type {}"
+                    errstr = errstr.format(t2value, rval.typedef.identifier, lval.typedef.identifier)
+                else:
+                    errstr = "Cannot assign {} type to {}".format(rval.typedef.identifier, lval.typedef.identifier)
+                raise TACException(tac_errstr(errstr, ast.children[1].token))
             if isinstance(lval.typedef.basetype, pascaltypes.RealType) and \
                     isinstance(rval.typedef.basetype, pascaltypes.IntegerType):
                 newrval = self.process_sym_inttoreal(rval)

@@ -1,1 +1,1 @@
-Cannot mix char and Enumerated type: car with values (van, sedan, taxi, scooter) with relational operator
+Cannot mix char and Enumerated type: car with relational operator

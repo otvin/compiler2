@@ -1,0 +1,1 @@
+Cannot assign value '7' of type integer literal to type myrange in file:tests/compilefail41.pas line:12    column:10 

@@ -485,10 +485,43 @@ class SymbolTable:
         #    or neither are packed
         # 4) T1 and T2 are string types with same number of components.
 
-        # Today we only support the first condition, so it's simple.
-        return self.are_same_type(t1_identifier, t2_identifier)
+        # Today we only support the first two conditions.
 
-    def are_assignment_compatible(self, t1_identifier, t2_identifier):
+        if self.are_same_type(t1_identifier, t2_identifier):
+            return True
+        else:
+            t1_symtab, t1_typedef = self.fetch_originalsymtable_andtypedef(t1_identifier)
+            t2_symtab, t2_typedef = self.fetch_originalsymtable_andtypedef(t2_identifier)
+
+            if isinstance(t1_typedef.basetype, pascaltypes.OrdinalType) and \
+                    isinstance(t2_typedef.basetype, pascaltypes.OrdinalType):
+                # return true if:
+                # t1 is a subrange of t2, t2 is a subrange of t1, or both are subranges of same host type
+                if isinstance(t1_typedef.basetype, pascaltypes.SubrangeType):
+
+                    if isinstance(t2_typedef.basetype, pascaltypes.SubrangeType):
+                        print('b')
+                        if self.are_same_type(t1_typedef.hosttypedef.identifier, t2_typedef.hosttypedef.identifier):
+                            return True
+                        else:
+                            return False
+                    else:
+                        if self.are_same_type(t1_typedef.basetype.hosttypedef.identifier, t2_typedef.identifier):
+                            return True
+                        else:
+                            return False
+                else:
+                    if isinstance(t2_typedef.basetype, pascaltypes.SubrangeType):
+                        if self.are_same_type(t1_typedef.identifier, t2_typedef.basetype.hosttypedef.identifier):
+                            return True
+                        else:
+                            return False
+                    else:
+                        return False
+            else:
+                return False
+
+    def are_assignment_compatible(self, t1_identifier, t2_identifier, optional_t2_value=None):
         # As explained on p10 of Cooper, 6.4.6 of the ISO Standard  states that type T2 is "assignment-compatible"
         # with type T1 if :
         # 1) T1 and T2 are the same type, but not a file type or type with file components
@@ -510,6 +543,41 @@ class SymbolTable:
             ret = False
         elif self.are_same_type(t1_identifier, t2_identifier):
             ret = True
+        elif isinstance(t1type, pascaltypes.OrdinalType) and isinstance(t2type, pascaltypes.OrdinalType) and \
+                self.are_compatible(t1_identifier, t2_identifier):
+            # "are compatible" means T1 and T2 are both Ordinal Types and one is subrange of the other,
+            # or both are subranges of the same host type.
+            if isinstance(t1type, pascaltypes.SubrangeType) and optional_t2_value is not None:
+                # if t2 is a constant and falls in the range of t1 then rule 3 is true
+                # from definition of "are compatible" we know that at this point either t1 is a
+                # subrange of t2, or t1 and t2 are subranges of the same host type.
+                if t1type.isinrange(optional_t2_value):
+                    ret = True
+                else:
+                    ret = False
+            elif isinstance(t1type, pascaltypes.SubrangeType) and not isinstance(t2type, pascaltypes.SubrangeType):
+                # if t1 is a subrange type and t2 is not, and t2 is same type as t1's host type then at
+                # compile time, it's ok, but we need to check at runtime too.
+                if self.are_same_type(t1type.hosttypedef.identifier, t2_identifier):
+                    ret = True
+                else:
+                    ret = False
+            elif isinstance(t1type, pascaltypes.SubrangeType) and isinstance(t2type, pascaltypes.SubrangeType):
+                # if t1 and t2 are both subrange types and there is at least some overlap then rule 3 is true
+                # from definition of "are compatible" above, we know that t1 and t2 are subranges of the
+                # same host type.
+                if t1type.rangemin_int <= t2type.rangemax_int and t1type.rangemax_int >= t2type.rangemin_int:
+                    ret = True
+                else:
+                    ret = False
+            elif not isinstance(t1type, pascaltypes.SubrangeType) and isinstance(t2type, pascaltypes.SubrangeType):
+                # if t2 base type is a subrange and t1 is not and t1 is t2's host type then rule 3 is true:
+                # from definition of "are compatible" above, we know that t2 is a subtange of t1
+                ret = True
+            else:
+                # if they are compatible ordinal types but none of the other tests above were true, then
+                # they must be non-overlapping subranges or such, so are not assignment compatible.
+                ret = False
         elif isinstance(t1type, pascaltypes.RealType) and isinstance(t2type, pascaltypes.IntegerType):
             ret = True
         else:

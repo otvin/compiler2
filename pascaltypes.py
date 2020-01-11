@@ -10,6 +10,9 @@ class BaseType:
     def __str__(self):
         return self.typename
 
+    def __repr__(self):
+        return self.typename
+
 
 class StringLiteralType(BaseType):
     # this is a bit hacky, but allows us to pass around string literals in places that require pascal types
@@ -59,6 +62,8 @@ class IntegerType(OrdinalType):
         return n
 
     def position(self, s):
+        if isinstance(s, str):
+            s = int(s)
         assert isinstance(s, int)
         assert s <= MAXINT
         assert s >= NEGMAXINT
@@ -94,8 +99,11 @@ class BooleanType(OrdinalType):
         return n
 
     def position(self, s):
-        assert s in (0, 1)
-        return s
+        assert s.lower() in ('false', 'true')
+        if s.lower() == 'false':
+            return 0
+        else:
+            return 1
 
 
 class EnumeratedTypeValue:
@@ -144,7 +152,10 @@ class EnumeratedType(OrdinalType):
         self.size = 1
         self.value_list = value_list
 
-    def __str__(self):
+    def __str__(self):  # pragma: no cover
+        return "Enumerated type: {}".format(self.typename)
+
+    def __repr__(self):  # pragma: no cover
         ret = "Enumerated type: {} with values (".format(self.typename)
         for i in self.value_list:
             ret = ret + str(i) + ', '
@@ -181,22 +192,40 @@ class SubrangeType(OrdinalType):
         self.typename = typename
         self.size = 4
         self.hosttypedef = hosttypedef
-        self.rangemin = rangemin  # min/max will be int for Integer, Char, Boolean, and strings for EnumeratedTypes
+        # this is needed because Pycharm shows some inaccurate "errors" if I do not.
+        assert isinstance(self.hosttypedef.basetype, OrdinalType)
+        self.rangemin = rangemin  # these are always strings
         self.rangemax = rangemax
+        # need to convert the rangemin / rangemax to ints so we can compare them
+        self.rangemin_int = self.hosttypedef.basetype.position(self.rangemin)
+        self.rangemax_int = self.hosttypedef.basetype.position(self.rangemax)
 
     def __getitem__(self, n):
-        min_inhosttype = self.hosttypedef.basetype.position(self.rangemin)
-        max_inhosttype = self.hosttypedef.basetype.position(self.rangemax)
-        assert min_inhosttype + n <= max_inhosttype
-        return self.hosttypedef.basetype[n - min_inhosttype]
+        # this is needed because Pycharm shows some inaccurate "errors" if I do not.
+        assert isinstance(self.hosttypedef.basetype, OrdinalType)
+        assert self.rangemin_int + n <= self.rangemax_int
+        return self.hosttypedef.basetype[n - self.rangemin_int]
 
     def position(self, s):
+        assert self.isinrange(s)
+        # this is needed because Pycharm shows some inaccurate "errors" if I do not.
+        assert isinstance(self.hosttypedef.basetype, OrdinalType)
         host_position = self.hosttypedef.basetype.position(s)
-        min_inhosttype = self.hosttypedef.basetype.position(self.rangemin)
-        max_inhosttype = self.hosttypedef.basetype.position(self.rangemax)
-        assert host_position >= min_inhosttype
-        assert host_position <= max_inhosttype
-        return host_position - min_inhosttype
+        return host_position - self.rangemin_int
+
+    def isinrange(self, s):
+        # this is needed because Pycharm shows some inaccurate "errors" if I do not.
+        assert isinstance(self.hosttypedef.basetype, OrdinalType)
+        host_position = self.hosttypedef.basetype.position(s)
+        return self.rangemin_int <= host_position <= self.rangemax_int
+
+    def __str__(self):  # pragma: no cover
+        return "Subrange type: '{}'".format(self.typename)
+
+    def __repr__(self):  # pragma: no cover
+        retstr = "Subrange type: '{}'.  Hosttypedef: {} \n rangemin: {}  rangemax: {}"
+        retstr = retstr.format(self.typename, repr(self.hosttypedef), self.rangemin, self.rangemax)
+        return retstr
 
 
 class RealType(SimpleType):
@@ -304,9 +333,14 @@ class TypeDef:
     def __str__(self):
         return "TypeDef '{}'".format(self.name)
 
-    def __repr__(self):
-        ret = "TypeDef '{}' with denoter {} and basetype {}"
-        ret = ret.format(self.name, str(self.denoter), str(self.basetype))
+    def __repr__(self):  # pragma: no cover
+        if isinstance(self.basetype, SubrangeType):
+            ret = "TypeDef '{}' with denoter {} and hosttype of \n\t{}\n\tminimum: {}  maximum: {}"
+            ret = ret.format(self.name, str(self.denoter), str(repr(self.basetype.hosttypedef)),
+                             self.basetype.rangemin, self.basetype.rangemax)
+        else:
+            ret = "TypeDef '{}' with denoter {} and basetype {}"
+            ret = ret.format(self.name, str(self.denoter), str(repr(self.basetype)))
         return ret
 
 
@@ -346,7 +380,7 @@ class BooleanLiteralTypeDef(OrdinalLiteralTypeDef):
 
 
 class CharacterLiteralTypeDef(OrdinalLiteralTypeDef):
-    def __init__(selfself):
+    def __init__(self):
         super().__init__('char literal', CharacterType(), CharacterType())
 
 

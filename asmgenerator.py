@@ -183,6 +183,7 @@ class AssemblyGenerator:
         self.emitcode('_stringerr_4 db `Error: Cannot take ln() of number less than or equal to zero`, 0')
         self.emitcode('_stringerr_5 db `Error: value to chr() exceeds 0-255 range for Char type`, 0')
         self.emitcode('_stringerr_6 db `Error: succ() or pred() exceeds range for enumerated type`, 0')
+        self.emitcode('_stringerr_7 db `Error: value exceeds range for subrange type`, 0')
         self.emitcomment("support for write() commands")
         self.emitcode('_printf_intfmt db "%d",0')
         self.emitcode('_printf_strfmt db "%s",0')
@@ -212,6 +213,14 @@ class AssemblyGenerator:
                     lit.memoryaddress = litname
                 else:  # pragma: no cover
                     raise ASMGeneratorError("Invalid literal type")
+
+    def generate_subrangetest_code(self, reg, subrange_basetype):
+        assert isinstance(subrange_basetype, pascaltypes.SubrangeType)
+        comment = "Validate we are within proper range"
+        self.emitcode("CMP {}, {}".format(reg, subrange_basetype.rangemin_int), comment)
+        self.emitcode("JL _PASCAL_SUBRANGE_ERROR")
+        self.emitcode("CMP {}, {}".format(reg, subrange_basetype.rangemax_int))
+        self.emitcode("JG _PASCAL_SUBRANGE_ERROR")
 
     def generate_code(self):
         params = []  # this is a stack of parameters
@@ -349,7 +358,9 @@ class AssemblyGenerator:
                         # dereference the pointer.
                         comment = "Move {} into {}".format(node.arg1.name, node.lval.name)
                         self.emit_movtoregister_fromstack(reg, node.arg1, comment)
-
+                        if isinstance(node.lval.typedef.basetype, pascaltypes.SubrangeType):
+                            # need to validate that the value is in the range before assigning it
+                            self.generate_subrangetest_code(reg, node.lval.typedef.basetype)
                         # now, get the value from reg into lval.  If lval is a byref parameter, we
                         # need to dereference the pointer.
                         self.emit_movtostack_fromregister(node.lval, reg)
@@ -388,6 +399,7 @@ class AssemblyGenerator:
                                 val = ord(node.literal1.value)
                             else:
                                 val = node.literal1.value
+
                             tmpreg = get_register_slice_bybytes("RAX", node.lval.typedef.basetype.size)
                             self.emitcode("mov {}, {}".format(tmpreg, val), comment)
                             self.emit_movtostack_fromregister(node.lval, tmpreg)
@@ -684,6 +696,8 @@ class AssemblyGenerator:
                         elif isinstance(bt, pascaltypes.BooleanType):
                             self.emitcode("CMP {}, 1".format(reg))
                             self.emitcode("JG _PASCAL_SUCC_ORD_ERROR")
+                        elif isinstance(bt, pascaltypes.SubrangeType):
+                            self.generate_subrangetest_code(reg, bt)
                         else:
                             assert isinstance(bt, pascaltypes.EnumeratedType)
                             self.emitcode("CMP {}, {}".format(reg, str(len(bt.value_list))))
@@ -698,8 +712,11 @@ class AssemblyGenerator:
 
                         self.emit_movtoregister_fromstack(reg, params[-1].paramval, comment)
                         self.emitcode("DEC {}".format(reg))
-                        if isinstance(params[-1].paramval.typedef.basetype, pascaltypes.IntegerType):
+                        bt = params[-1].paramval.typedef.basetype
+                        if isinstance(bt, pascaltypes.IntegerType):
                             self.emitcode("jo _PASCAL_SUCC_ORD_ERROR")
+                        elif isinstance(bt, pascaltypes.SubrangeType):
+                            self.generate_subrangetest_code(reg, bt)
                         else:
                             self.emitcode("CMP {}, 0".format(reg))
                             self.emitcode("JL _PASCAL_SUCC_ORD_ERROR")
@@ -898,6 +915,9 @@ class AssemblyGenerator:
         self.emitcode("jmp _PASCAL_PRINT_ERROR")
         self.emitlabel("_PASCAL_SUCC_ORD_ERROR")
         self.emitcode("mov rdi, _stringerr_6")
+        self.emitcode("jmp _PASCAL_PRINT_ERROR")
+        self.emitlabel("_PASCAL_SUBRANGE_ERROR")
+        self.emitcode("mov rdi, _stringerr_7")
         self.emitcode("jmp _PASCAL_PRINT_ERROR")
 
         self.emitlabel("_PASCAL_PRINT_ERROR")

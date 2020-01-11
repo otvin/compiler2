@@ -1,0 +1,5 @@
+2
+-4
+8
+and this should error...
+Error: value exceeds range for subrange type

@@ -182,7 +182,7 @@ class Parser:
     def parse_labeldeclarationpart(self, parent_ast):
         return None
 
-    def parse_constant(self, parent_ast, optionalconstid = ""):
+    def parse_constant(self, parent_ast, optionalconstid=""):
         # returns a tuple (typedef of the constant, value of the constant)
         # value of the constant will be a string
         # optionalconstid is if you are using this to parse a constant definition, it enables us to catch
@@ -209,7 +209,6 @@ class Parser:
         #
         # p.65 of [Cooper] states that if a constant has a sign then the next token must be
         # a real, an integer, or a real/integer constant.  That can't be captured in the BNF.
-
 
         if self.tokenstream.peektokentype() == TokenType.MINUS:
             self.getexpectedtoken(TokenType.MINUS)
@@ -241,10 +240,8 @@ class Parser:
         elif self.tokenstream.peektokentype() == TokenType.MAXINT:
             self.getexpectedtoken(TokenType.MAXINT)
             if isneg:
-                tokval = pascaltypes.STRNEGMAXINT
                 ret = pascaltypes.SIMPLETYPEDEF_INTEGER, pascaltypes.STRNEGMAXINT
             else:
-                tokval = pascaltypes.STRMAXINT
                 ret = pascaltypes.SIMPLETYPEDEF_INTEGER, pascaltypes.STRMAXINT
         elif self.tokenstream.peektokentype() in (TokenType.TRUE, TokenType.FALSE):
             booltok = self.tokenstream.eattoken()
@@ -324,7 +321,6 @@ class Parser:
         # 6.2.1 <constant-definition-part> ::= [ "const" <constant-definition> ";" {<constant-definition> ";"} ]
         # 6.3 <constant-definition> ::= <identifier> "=" <constant>
 
-
         if self.tokenstream.peektokentype() == TokenType.CONST:
             assert isinstance(parent_ast.symboltable, SymbolTable), \
                 "Parser.parse_constantdefinitionpart: missing symboltable"
@@ -360,9 +356,9 @@ class Parser:
         # contains a subrange token.  Hard to write in a single line, legibly, so I broke it out.
         next3 = self.tokenstream.peekmultitokentype(3)
         if next3[1] == TokenType.SUBRANGE or next3[2] == TokenType.SUBRANGE:
-                return True
+            return True
         else:
-                return False
+            return False
 
     def parse_typedefinitionpart(self, parent_ast):
         # 6.2.1 <type-definition-part> ::= ["type" <type-definition> ";" {<type-definition> ";"} ]
@@ -393,17 +389,17 @@ class Parser:
                 self.getexpectedtoken(TokenType.EQUALS)
 
                 if self.next_three_tokens_contain_subrange():
-                    const1tuple = self.parse_constant(parent_ast)
+                    const1typedef, const1value = self.parse_constant(parent_ast)
                     self.getexpectedtoken(TokenType.SUBRANGE)
-                    const2tuple = self.parse_constant(parent_ast)
-                    if not parent_ast.symboltable.are_same_type(const1tuple[0].identifier, const2tuple[0].identifier):
+                    const2typedef, const2value = self.parse_constant(parent_ast)
+                    if not parent_ast.symboltable.are_same_type(const1typedef.identifier, const2typedef.identifier):
                         errstr = "Both elements of subrange type {} must be same type."
                         errstr += "'{}' is type {} and '{}' is type {} in {}."
-                        errstr = errstr.format(identifier.value, const1tuple[1], const1tuple[0].identifier,
-                                               const2tuple[1], const2tuple[0].identifier, identifier.location)
+                        errstr = errstr.format(identifier.value, const1value, const1typedef.identifier,
+                                               const2value, const2typedef.identifier, identifier.location)
                         raise ParseException(errstr)
-                    newbasetype = pascaltypes.SubrangeType(identifier.value, const1tuple[0], const1tuple[1],
-                                                           const2tuple[1])
+                    newbasetype = pascaltypes.SubrangeType(identifier.value, const1typedef, const1value,
+                                                           const2value)
                     symtab.add(pascaltypes.TypeDef(identifier.value, newbasetype, newbasetype))
                 else:
                     denoter_token = self.tokenstream.eattoken()
