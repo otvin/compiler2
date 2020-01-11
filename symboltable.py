@@ -457,19 +457,19 @@ class SymbolTable:
         # fields: x and y.  q2 is of type c2, which is also of a type named Coordinates, which is also a record
         # with two real fields x and y.  However, you can NOT assign q1 to q2 or vice-versa.
 
-        t1_originaltypedef = self.fetch_originalsymtable_andtypedef(t1_identifier)
-        t2_originaltypedef = self.fetch_originalsymtable_andtypedef(t2_identifier)
+        t1_originalsymtable, t1_originaltypedef = self.fetch_originalsymtable_andtypedef(t1_identifier)
+        t2_originalsymtable, t2_originaltypedef = self.fetch_originalsymtable_andtypedef(t2_identifier)
 
         # fetch_originalsymtable_andtypedef returns a tuple (symtable, typdef)
 
-        if t1_originaltypedef[0] != t2_originaltypedef[0]:
+        if t1_originalsymtable != t2_originalsymtable:
             ret = False
         else:
             # None for typename would mean that we have a bug and didn't name the type we created,
             # as None is assigned at the BaseType level
-            assert t1_originaltypedef[1].denoter.typename is not None
-            assert t2_originaltypedef[1].denoter.typename is not None
-            if t1_originaltypedef[1].denoter.typename.lower() == t2_originaltypedef[1].denoter.typename.lower():
+            assert t1_originaltypedef.denoter.typename is not None
+            assert t2_originaltypedef.denoter.typename is not None
+            if t1_originaltypedef.denoter.typename.lower() == t2_originaltypedef.denoter.typename.lower():
                 ret = True
             else:
                 ret = False
