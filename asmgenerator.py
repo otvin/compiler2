@@ -650,6 +650,23 @@ class AssemblyGenerator:
                         self.emitcode("cmovl eax, r11d")  # if neg eax made eax less than zero, move r11d into eax
                         comment = "assign return value of function to {}".format(node.lval.name)
                         self.emit_movtostack_fromregister(node.lval, "EAX", comment)
+                    elif node.label.name == '_ODDI':
+                        # per 6.6.6.5 of the ISO Standard, the ODD() function is defined as returning true
+                        # if (abs(x) mod 2) = 1.  We could have the TAC simplify ODD into calling ABS but that would
+                        # mean two function calls and they are slow.  So for now we will copy the logic for ABS and
+                        # mod in here manually.  Note that fortunately the mod equals 0 or 1 at the end, and
+                        # that means we do not need a jump test.
+                        comment = "parameter {} for odd()".format(str(params[-1].paramval))
+                        self.emit_movtoregister_fromstack("eax", params[-1].paramval, comment)
+                        self.emitcode("mov r11d, eax", "odd() is 'if ABS(x) mod 2 == 1")
+                        self.emitcode("neg eax")  # neg sets the FLAGS
+                        self.emitcode("cmovl eax, r11d")  # if neg eax made eax less than zero, move r11d into eax
+                        self.emitcode("cdq", "sign extend eax -> edx:eax")
+                        self.emitcode("mov r11d, 2")
+                        self.emitcode("idiv r11d")
+                        self.emitcode("mov al, dl", "remainder of idiv is in edx; must be 0 or 1. Take lowest 8 bits")
+                        comment = "assign return value of function to {}".format(node.lval.name)
+                        self.emit_movtostack_fromregister(node.lval, "AL", comment)
                     elif node.label.name == "_SQRR":
                         # easy - multiply the value by itself
                         # TODO - test for INF since that would be an error, and per ISO standard we need to exit

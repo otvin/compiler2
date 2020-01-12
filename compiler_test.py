@@ -4,7 +4,7 @@ import compiler
 
 NUM_ATTEMPTS = 0
 NUM_SUCCESSES = 0
-TEST_FPC_INSTEAD = False # switch to true to validate the .out files using fpc
+TEST_FPC_INSTEAD = False  # switch to true to validate the .out files using fpc
 
 
 def dotest(infilename, resultfilename):
@@ -140,7 +140,7 @@ def main():
     run_test_list("idiv", 1, 2)
     run_test_list("if", 1, 3)
     run_test_list("localvar", 1, 2)
-    run_test_list("math", 1, 6)
+    run_test_list("math", 1, 7)
     run_test_list("misc", 1, 1)
     run_test_list("mod", 1, 2)
     run_test_list("ord", 1, 4)

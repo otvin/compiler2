@@ -20,6 +20,8 @@ Compiler2 supports the following Pascal Language features:
         * ```trunc()``` and ```round()``` 
     * Supports following ordinal functions required by ISO standard:
         * ```chr()```, ```ord()```, ```pred()```, and ```succ()```
+    * Supports following boolean function reuqired by ISO standard:
+        * ```odd()``` 
 * Relational operators: ```=```, ```<>```, ```<```, ```<=```, ```>```, ```>=```
   * for real, integer, and user-defined enumerated types; can compare integers to reals.
 * Boolean operators: ```not```, ```and```, and ```or```
@@ -55,7 +57,7 @@ Compiler2 also has the following functionality that compiler1 did not:
 * Constants
 * REPEAT..UNTIL construct
 * Ability to do relational operations comparing Integer and Real types, and relational operations involving enumerated types.
-* abs(), sqr(), sin(), cos(), exp(), ln(), sqrt(), trunc(), round(), chr(), ord(), succ(), and pred()
+* abs(), sqr(), sin(), cos(), exp(), ln(), sqrt(), trunc(), round(), chr(), ord(), succ(), pred(), and odd()
 * Boolean operators not, or, and
 * Type Definitions, including Subrange Types and Enumerated Types
 
@@ -77,7 +79,7 @@ has made it easier to surpass the functionality of my previous attempt.
 
 ### Unit tests
 
-Compiler2 currently passes 150 unit tests, including 46 of the 60 unit tests created for Compiler, plus an additional test which represented the one known bug from Compiler.  You can execute the unit test suite by running:
+Compiler2 currently passes 151 unit tests, including 46 of the 60 unit tests created for Compiler, plus an additional test which represented the one known bug from Compiler.  You can execute the unit test suite by running:
 
 ```python3 compiler_test.py```
 
