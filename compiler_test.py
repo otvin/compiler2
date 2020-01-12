@@ -153,7 +153,7 @@ def main():
     run_test_list("scope", 1, 1)
     run_test_list("scope", 3, 3)
     run_test_list("sqrt", 1, 2)
-    run_test_list("typedef", 1, 8)
+    run_test_list("typedef", 1, 10)
     run_test_list("while", 1, 3)
     run_test_list("write", 1, 1)
     run_test_list("writeln", 1, 3)

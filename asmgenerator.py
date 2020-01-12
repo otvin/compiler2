@@ -73,6 +73,17 @@ def intparampos_to_register(pos):
     return ret
 
 
+def isIntegerOrBooleanSubrangeType(basetype):
+    assert isinstance(basetype, pascaltypes.BaseType)
+    ret = False
+    if isinstance(basetype, pascaltypes.SubrangeType):
+        if isinstance(basetype.hosttypedef.basetype, pascaltypes.IntegerType):
+            ret = True
+        elif isinstance(basetype.hosttypedef.basetype, pascaltypes.BooleanType):
+            ret = True
+    return ret
+
+
 class AssemblyGenerator:
     def __init__(self, asmfilename, tacgenerator):
         assert isinstance(tacgenerator, TACGenerator)
@@ -260,7 +271,6 @@ class AssemblyGenerator:
                 if totalstorageneeded % 16 > 0:
                     totalstorageneeded += 16 - (totalstorageneeded % 16)
                 self.emitcode("SUB RSP, " + str(totalstorageneeded), "allocate local storage")
-
                 if not block.ismain:
 
                     numintparams = 0
@@ -806,7 +816,8 @@ class AssemblyGenerator:
                         assert isinstance(node.result.typedef.basetype, pascaltypes.BooleanType)
                         n1type = node.arg1.typedef.basetype
                         n2type = node.arg2.typedef.basetype
-                        if type(n1type) != type(n2type):  # pragma: no cover
+
+                        if not block.symboltable.are_compatible(n1type.typename, n2type.typename):  # pragma: no cover
                             raise ASMGeneratorError("Cannot mix {} and {} with relational operator".format(str(n1type),
                                                                                                            str(n2type)))
 
@@ -822,7 +833,8 @@ class AssemblyGenerator:
                             self.emit_movtostack_fromregister(node.result, "AL")
                         else:
                             if isinstance(n1type, pascaltypes.BooleanType) or \
-                                    isinstance(n1type, pascaltypes.IntegerType):
+                                    isinstance(n1type, pascaltypes.IntegerType) or \
+                                    isIntegerOrBooleanSubrangeType(n1type):
                                 # TODO: Handling String types in relational operators
 
                                 # Boolean and Integer share same jump instructions
@@ -843,7 +855,8 @@ class AssemblyGenerator:
                             else:
                                 assert isinstance(n1type, pascaltypes.RealType) or \
                                     isinstance(n1type, pascaltypes.CharacterType) or \
-                                    isinstance(n1type, pascaltypes.EnumeratedType)
+                                    isinstance(n1type, pascaltypes.EnumeratedType) or \
+                                    isinstance(n1type, pascaltypes.SubrangeType)
                                 if node.operator == TACOperator.EQUALS:
                                     jumpinstr = "JE"
                                 elif node.operator == TACOperator.NOTEQUAL:
@@ -859,17 +872,22 @@ class AssemblyGenerator:
                                 else:  # pragma: no cover
                                     raise ASMGeneratorError("Invalid Relational Operator {}".format(node.operator))
 
-                            if isinstance(n1type, pascaltypes.BooleanType) or \
-                                    isinstance(n1type, pascaltypes.CharacterType) or \
-                                    isinstance(n1type, pascaltypes.EnumeratedType):
-                                self.emit_movtoregister_fromstack("al", node.arg1, comment)
-                                self.emit_movtoregister_fromstack("r11b", node.arg2)
-                                self.emitcode("cmp al, r11b")
-                            elif isinstance(n1type, pascaltypes.IntegerType):
+                            if isinstance(n1type, pascaltypes.IntegerType) or \
+                                    (isinstance(n1type, pascaltypes.SubrangeType) and
+                                     n1type.hosttypedef.basetype.size == 4):
                                 self.emit_movtoregister_fromstack("eax", node.arg1, comment)
                                 self.emit_movtoregister_fromstack("r11d", node.arg2)
                                 self.emitcode("cmp eax, r11d")
+                            elif isinstance(n1type, pascaltypes.BooleanType) or \
+                                    isinstance(n1type, pascaltypes.CharacterType) or \
+                                    isinstance(n1type, pascaltypes.EnumeratedType) or \
+                                    (isinstance(n1type, pascaltypes.SubrangeType) and
+                                     n1type.hosttypedef.basetype.size == 1):
+                                self.emit_movtoregister_fromstack("al", node.arg1, comment)
+                                self.emit_movtoregister_fromstack("r11b", node.arg2)
+                                self.emitcode("cmp al, r11b")
                             else:  # has to be real; we errored above if any other type
+                                assert isinstance(n1type, pascaltypes.RealType)
                                 self.emit_movtoxmmregister_fromstack("xmm0", node.arg1)
                                 self.emit_movtoxmmregister_fromstack("xmm8", node.arg2)
                                 self.emitcode("ucomisd xmm0, xmm8")

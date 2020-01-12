@@ -270,7 +270,7 @@ class Parser:
                     errstr = "Undefined Identifier: '{}' in {}".format(ident_token.value, ident_token.location)
                 raise ParseException(errstr)
             sym = parent_ast.symboltable.fetch(ident_token.value)
-            if not isinstance(sym, ConstantSymbol):
+            if not isinstance(sym, ConstantSymbol) and not isinstance(sym, pascaltypes.EnumeratedTypeValue):
                 if optionalconstid != "":
                     errstr = "Constant '{}' must be defined as a literal or another constant, cannot use '{}' in {}"
                     errstr = errstr.format(optionalconstid, ident_token.value, ident_token.location)
@@ -307,6 +307,9 @@ class Parser:
                     errstr += " In: {}"
                     errstr = errstr.format(ident_token.value, ident_token.location)
                     raise ParseException(errstr)
+            elif isinstance(sym, pascaltypes.EnumeratedTypeValue):
+                 enumerated_typedef = parent_ast.symboltable.fetch_originalsymtable_andtypedef(sym.typename)[1]
+                 ret = enumerated_typedef, ident_token.value
             else:
                 tokval = sym.value
                 ret = sym.typedef, tokval

@@ -1,0 +1,6 @@
+Green
+Blue
+yes, it is greater than Red
+yes it is less than orange
+this should error:
+Error: value exceeds range for subrange type

@@ -1,0 +1,6 @@
+3
+Red
+Green
+Blue
+this should error
+Error: value exceeds range for subrange type

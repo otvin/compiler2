@@ -173,7 +173,7 @@ class EnumeratedType(OrdinalType):
         i = 0
         foundit = False
         while i < len(self.value_list) and not foundit:
-            if self.value_list[s].identifier.lower() == s.lower():
+            if self.value_list[i].identifier.lower() == s.lower():
                 foundit = True
             else:
                 i += 1
