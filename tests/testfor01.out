@@ -1,0 +1,73 @@
+1
+2
+3
+try again
+17
+16
+15
+14
+13
+12
+11
+10
+9
+8
+7
+6
+5
+4
+3
+2
+1
+0
+-1
+-2
+-3
+-4
+now for nato
+delta
+echo
+foxtrot
+golf
+hotel
+india
+juliett
+kilo
+next loop shouldn't print anything
+now back to writing
+foxtrot
+echo
+delta
+charlie
+now characters
+k
+l
+m
+n
+o
+p
+q
+r
+s
+t
+u
+v
+w
+x
+y
+z
+Q
+P
+O
+N
+M
+L
+and subranges
+echo
+foxtrot
+golf
+and now an error
+foxtrot
+echo
+delta
+Error: value exceeds range for subrange type

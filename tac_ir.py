@@ -611,12 +611,139 @@ class TACBlock:
             self.processast(ast.children[2])
             self.addnode(TACLabelNode(labeldone))
 
+    def validate_controlvariable_notthreatened(self, controlvariableidentifier, ast):
+        return True
+
     def processast_repetitivestatement(self, ast):
         assert isinstance(ast, AST)
-        assert ast.token.tokentype in (TokenType.REPEAT, TokenType.WHILE)
+        assert ast.token.tokentype in (TokenType.REPEAT, TokenType.WHILE, TokenType.FOR)
 
         tok = ast.token
-        if tok.tokentype == TokenType.WHILE:
+        if tok.tokentype == TokenType.FOR:
+            assert len(ast.children) == 3, "TACBlock.processast - For SATs must have 3 children"
+
+            # We need to validate that this is a legal "for" statement.  Rules per section 6.8.3.9 include:
+            #
+            # 1) The control variable must be declared in the variable-declaration-block closest-containing the for
+            #    statement.  Cannot use a global variable as a control variable.
+            # 2) The control variable must be an ordinal type, and the initial value and final value must be a type
+            #    compatible with this type.
+            # 3) The initial-value and final-value must be assignment-compatible with the type possessed by the
+            #    control variable if the <statement> is actually executed.  This will be a runtime check.
+            # 4) No statement S can exist that threatens the control variable - which is defined as:
+            #       a) control variable cannot be the left side (variable access) for an assignment statement
+            #       b) control variable cannot be passed as a variable parameter (ByRef) to a procedure or function
+            #       c) control variable cannot be passed into read() or readln()
+            #       d) control variable is used as a control variable for a nested for statement (as interpreted by
+            #          Cooper, p.27
+
+
+            # the FOR statement "for v := e1 to e2 do body" shall be translated to:
+            # begin
+            #   temp1 = e1
+            #   temp2 = e2
+            #   if temp1 <= temp2 then begin
+            #       v := temp1
+            #       body;
+            #       while v <> temp2 do begin
+            #           v := succ(v);
+            #           body;
+            #       end
+            #   end
+            # end
+            #
+            # "downto" is parsed the same except the <= is >= and the succ() call is replaced with pred()
+
+            # We will build out the for statement, and then enforce the rules from above once we have
+            # types for all the symbols.
+
+            assignmentast = ast.children[0]
+            assert len(assignmentast.children) == 2
+            todowntoast = ast.children[1]
+            assert todowntoast.token.tokentype in (TokenType.TO, TokenType.DOWNTO)
+            assert len(todowntoast.children) == 1
+            bodyast = ast.children[2]
+
+            # need to assign the initial and final value to temp1 and temp2 so that any changes to variables
+            # in the initial and final value have no impact on the for statement.  See Cooper p.28 and p.29
+            initialvalue = self.processast(assignmentast.children[1])
+            temp1 = Symbol(self.gettemporary(), initialvalue.location, initialvalue.typedef)
+            self.symboltable.add(temp1)
+            self.addnode(TACUnaryNode(temp1, TACOperator.ASSIGN, initialvalue))
+
+            finalvalue = self.processast(todowntoast.children[0])
+            temp2 = Symbol(self.gettemporary(), finalvalue.location, finalvalue.typedef)
+            self.symboltable.add(temp2)
+            self.addnode(TACUnaryNode(temp2, TACOperator.ASSIGN, finalvalue))
+
+            controlvartoken = assignmentast.children[0].token
+            assert isinstance(controlvartoken, Token)
+
+            # Enforce rule 1 from above
+            if not ast.nearest_symboltable().exists(controlvartoken.value):
+                errstr = "Control variable '{}' must be declared in same block as the 'for'"
+                errstr = errstr.format(controlvartoken.value)
+                raise TACException(tac_errstr(errstr, controlvartoken))
+
+            controlvarsym = self.symboltable.fetch(controlvartoken.value)
+            assert isinstance(controlvarsym, Symbol)
+
+            # Enforce rule 2 from above
+            if not isinstance(controlvarsym.typedef.basetype, pascaltypes.OrdinalType):
+                errstr = "'For' statements require control variables to be of ordinal type. "
+                errstr += "Variable '{}' is of type '{}'".format(controlvartoken.value,
+                                                                 controlvarsym.typedef.identifier)
+                raise TACException(tac_errstr(errstr, controlvartoken))
+
+            if not ast.nearest_symboltable().are_compatible(controlvarsym.typedef.identifier, temp1.typedef.identifier):
+                errstr = "Type {} not compatible with type {} in 'for' statement"
+                errstr = errstr.format(controlvarsym.typedef.identifier, temp1.typedef.identifier)
+                raise TACException(tac_errstr(errstr, controlvartoken))
+
+            if not ast.nearest_symboltable().are_compatible(controlvarsym.typedef.identifier, temp2.typedef.identifier):
+                errstr = "Type {} not compatible with type {} in 'for' statement"
+                errstr = errstr.format(controlvarsym.typedef.identifier, temp2.typedef.identifier)
+                raise TACException(tac_errstr(errstr, controlvartoken))
+
+            # rule 3 will be a runtime check
+
+            # Enforce rule 4 from above
+            self.validate_controlvariable_notthreatened(controlvartoken.value, bodyast)
+
+            # finish assembling the TAC
+            # TODO - refactor processast_conditionalstatement and the while from below so we don't have
+            # to be repetitive
+
+            if todowntoast.token.tokentype == TokenType.TO:
+                sysfunc = Label("_SUCCO")
+                compareop = TACOperator.LESSEQ
+            else:
+                sysfunc = Label("_PREDO")
+                compareop = TACOperator.GREATEREQ
+
+            labeldoneif = self.getlabel()
+            ifsym = Symbol(self.gettemporary(), assignmentast.children[1].token.location,
+                           pascaltypes.SIMPLETYPEDEF_BOOLEAN)
+            self.symboltable.add(ifsym)
+            self.addnode(TACBinaryNode(ifsym, compareop, temp1, temp2))
+            self.addnode(TACIFZNode(ifsym, labeldoneif))
+            self.addnode(TACUnaryNode(controlvarsym, TACOperator.ASSIGN, temp1))
+            self.processast(bodyast)
+            labelstartwhile = self.getlabel()
+            self.addnode(TACLabelNode(labelstartwhile))
+            whilesym = Symbol(self.gettemporary(), todowntoast.children[0].token.location,
+                              pascaltypes.SIMPLETYPEDEF_BOOLEAN)
+            self.symboltable.add(whilesym)
+            self.addnode(TACBinaryNode(whilesym, TACOperator.NOTEQUAL, controlvarsym, temp2))
+            self.addnode(TACIFZNode(whilesym, labeldoneif))
+            self.addnode(TACParamNode(controlvarsym))
+            self.addnode(TACCallSystemFunctionNode(sysfunc, 1, controlvarsym))
+            self.processast(bodyast)
+            self.addnode(TACGotoNode(labelstartwhile))
+            self.addnode(TACLabelNode(labeldoneif))
+
+
+        elif tok.tokentype == TokenType.WHILE:
             assert len(ast.children) == 2, "TACBlock.processast - While ASTs must have 2 children"
             labelstart = self.getlabel()
             labeldone = self.getlabel()
@@ -982,7 +1109,7 @@ class TACBlock:
             self.processast_write(ast)
         elif toktype == TokenType.IF:
             self.processast_conditionalstatement(ast)
-        elif toktype in (TokenType.WHILE, TokenType.REPEAT):
+        elif toktype in (TokenType.WHILE, TokenType.REPEAT, TokenType.FOR):
             self.processast_repetitivestatement(ast)
         elif is_isorequiredfunction(tok.tokentype):
             ret = self.processast_isorequiredfunction(ast)

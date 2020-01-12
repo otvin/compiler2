@@ -942,7 +942,7 @@ class Parser:
         # 6.8.3.4 <else-part> ::= "else" <statement>
         # 6.7.2.3 <Boolean-expression> ::= <expression>
         assert self.tokenstream.peektokentype() == TokenType.IF, \
-            "Parser.parse_ifstatement called and 'if' not next token."
+            "Parser.parse_ifstatement called and 'if' not next token. {}".format(self.tokenstream.peektokentype())
 
         self.tokenstream.setstartpos()
         ret = AST(self.tokenstream.eattoken(), parent_ast)
@@ -988,7 +988,7 @@ class Parser:
             "Parser.parse_repeatstatement called and 'repeat' not next token."
 
         self.tokenstream.setstartpos()
-        ret = AST(self.tokenstream.eattoken(), parent_ast)
+        ret = AST(self.getexpectedtoken(TokenType.REPEAT), parent_ast)
         self.tokenstream.setendpos()
         repeatcomment = self.tokenstream.printstarttoend()
 
@@ -1003,6 +1003,51 @@ class Parser:
         ret.comment = "{0} {1}".format(repeatcomment, untilcomment)
         return ret
 
+    def parse_forstatement(self, parent_ast):
+        # 6.8.3.9 <for-statement> := "for" <control-variable> ":=" <initial-value> ("to"|"downto") <final-value>
+        #                               "do" <statement>
+        # 6.8.3.9 <control-variable> := <entire-variable>
+        # 6.5.2 <entire-variable> := <variable-identifier>
+        # 6.5.2 <variable-identifier> := <identifier>
+        # 6.8.3.9 <initial-value> := <expression>
+        # 6.8.3.9 <final-value> := <expression>
+        #
+        assert self.tokenstream.peektokentype() == TokenType.FOR, \
+            "Parser.parse_forstatement called and 'for' not next token."
+
+        self.tokenstream.setstartpos()
+        ret = AST(self.getexpectedtoken(TokenType.FOR), parent_ast)
+        self.tokenstream.setendpos()
+        ret.comment = self.tokenstream.printstarttoend()
+        nexttwo = self.tokenstream.peekmultitokentype(2)
+        if nexttwo[0] != TokenType.IDENTIFIER:
+            errstr = token_errstr(self.tokenstream.eattoken(), "Identifier expected following 'for' statement")
+            raise ParseException(errstr)
+        if nexttwo[1] != TokenType.ASSIGNMENT:
+            self.tokenstream.eattoken()  # eat the identifier
+            self.getexpectedtoken(TokenType.ASSIGNMENT)  # will generate the exception and exit
+            raise ParseException('Unexpected Exception')  # pragma: no cover (only here so reader can see we exit))
+
+        assignast = self.parse_assignmentstatement(ret)
+        ret.children.append(assignast)
+
+        if self.tokenstream.peektokentype() not in (TokenType.TO, TokenType.DOWNTO):
+            tmptok = self.tokenstream.eattoken()
+            errstr = token_errstr(tmptok, "'to' or 'downto' expected, instead saw {}".format(tmptok.value))
+            raise ParseException(errstr)
+
+        self.tokenstream.setstartpos()
+        todowntoast = AST(self.tokenstream.eattoken(), ret)
+        self.tokenstream.setendpos()
+        todowntoast.comment = self.tokenstream.printstarttoend()
+        finalvalueast = self.parse_expression(todowntoast)
+        todowntoast.children.append(finalvalueast)
+        ret.children.append(todowntoast)
+        self.getexpectedtoken(TokenType.DO)
+        ret.children.append(self.parse_statement(ret))
+
+        return ret
+
     def parse_repetitivestatement(self, parent_ast):
         # 6.8.3.6 - <repetitive-statement> ::= <repeat-statement> | <while-statement> | <for-statement>
         assert self.tokenstream.peektokentype() in (TokenType.WHILE, TokenType.REPEAT, TokenType.FOR), \
@@ -1014,7 +1059,7 @@ class Parser:
         elif self.tokenstream.peektokentype() == TokenType.REPEAT:
             ret = self.parse_repeatstatement(parent_ast)
         else:
-            ret = None  # we don't handle FOR yet
+            ret = self.parse_forstatement(parent_ast)
         return ret
 
     def parse_structuredstatement(self, parent_ast):
@@ -1026,7 +1071,7 @@ class Parser:
 
         if self.tokenstream.peektokentype() == TokenType.BEGIN:
             return self.parse_compoundstatement(parent_ast)
-        elif self.tokenstream.peektokentype() in (TokenType.WHILE, TokenType.REPEAT):
+        elif self.tokenstream.peektokentype() in (TokenType.WHILE, TokenType.REPEAT, TokenType.FOR):
             return self.parse_repetitivestatement(parent_ast)
         else:
             return self.parse_conditionalstatement(parent_ast)

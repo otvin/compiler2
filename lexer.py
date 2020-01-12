@@ -555,7 +555,7 @@ class Lexer:
                     toktype = SYMBOL_LOOKUP[val]
                     self.tokenstream.addtoken(Token(toktype, curlocation, val))
                 else:
-                    errstr = 'Unexpected character: {}'.format(self.peek())
+                    errstr = 'Unexpected character: {} in {}'.format(self.peek(), curlocation)
                     raise LexerException(errstr)
             except Exception:
                 print("Parse error in {} ".format(curlocation))
