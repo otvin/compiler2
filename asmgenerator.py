@@ -714,21 +714,29 @@ class AssemblyGenerator:
                         assert node.lval.typedef.basetype.size == params[-1].paramval.typedef.basetype.size
                         comment = "parameter {} for succ()".format(str(params[-1].paramval))
                         reg = get_register_slice_bybytes("RAX", node.lval.typedef.basetype.size)
+                        bt = params[-1].paramval.typedef.basetype
 
                         self.emit_movtoregister_fromstack(reg, params[-1].paramval, comment)
+
+                        if isinstance(bt, pascaltypes.CharacterType):
+                            self.emitcode("CMP {}, 255".format(reg))
+                            self.emitcode("JE _PASCAL_SUCC_PRED_ERROR")  # cannot increment a char past 255
+
                         self.emitcode("INC {}".format(reg))
-                        bt = params[-1].paramval.typedef.basetype
+
                         if isinstance(bt, pascaltypes.IntegerType):
-                            self.emitcode("jo _PASCAL_SUCC_ORD_ERROR")
+                            self.emitcode("jo _PASCAL_SUCC_PRED_ERROR")
                         elif isinstance(bt, pascaltypes.BooleanType):
                             self.emitcode("CMP {}, 1".format(reg))
-                            self.emitcode("JG _PASCAL_SUCC_ORD_ERROR")
+                            self.emitcode("JG _PASCAL_SUCC_PRED_ERROR")
                         elif isinstance(bt, pascaltypes.SubrangeType):
                             self.generate_subrangetest_code(reg, bt)
+                        elif isinstance(bt, pascaltypes.CharacterType):
+                            pass # did the test for overflow above.
                         else:
                             assert isinstance(bt, pascaltypes.EnumeratedType)
                             self.emitcode("CMP {}, {}".format(reg, str(len(bt.value_list))))
-                            self.emitcode("JGE _PASCAL_SUCC_ORD_ERROR")
+                            self.emitcode("JGE _PASCAL_SUCC_PRED_ERROR")
                         comment = "assign return value of function to {}".format(node.lval.name)
                         self.emit_movtostack_fromregister(node.lval, reg, comment)
                     elif node.label.name == "_PREDO":
@@ -741,12 +749,12 @@ class AssemblyGenerator:
                         self.emitcode("DEC {}".format(reg))
                         bt = params[-1].paramval.typedef.basetype
                         if isinstance(bt, pascaltypes.IntegerType):
-                            self.emitcode("jo _PASCAL_SUCC_ORD_ERROR")
+                            self.emitcode("jo _PASCAL_SUCC_PRED_ERROR")
                         elif isinstance(bt, pascaltypes.SubrangeType):
                             self.generate_subrangetest_code(reg, bt)
                         else:
                             self.emitcode("CMP {}, 0".format(reg))
-                            self.emitcode("JL _PASCAL_SUCC_ORD_ERROR")
+                            self.emitcode("JL _PASCAL_SUCC_PRED_ERROR")
                         comment = "assign return value of function to {}".format(node.lval.name)
                         self.emit_movtostack_fromregister(node.lval, reg, comment)
                     elif node.label.name in ("_ROUNDR", "_TRUNCR"):
@@ -948,7 +956,7 @@ class AssemblyGenerator:
         self.emitlabel("_PASCAL_CHR_ERROR")
         self.emitcode("mov rdi, _stringerr_5")
         self.emitcode("jmp _PASCAL_PRINT_ERROR")
-        self.emitlabel("_PASCAL_SUCC_ORD_ERROR")
+        self.emitlabel("_PASCAL_SUCC_PRED_ERROR")
         self.emitcode("mov rdi, _stringerr_6")
         self.emitcode("jmp _PASCAL_PRINT_ERROR")
         self.emitlabel("_PASCAL_SUBRANGE_ERROR")

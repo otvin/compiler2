@@ -143,7 +143,7 @@ def main():
     run_test_list("math", 1, 7)
     run_test_list("misc", 1, 1)
     run_test_list("mod", 1, 2)
-    run_test_list("ord", 1, 4)
+    run_test_list("ord", 1, 6)
     # note testprocedure02 was "proc01" in the old Compiler suite
     run_test_list("procedure", 1, 7)
     run_test_list("real", 1, 8)

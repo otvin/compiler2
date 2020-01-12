@@ -1,0 +1,3 @@
+should be ok
+next line should error
+Error: succ() or pred() exceeds range for enumerated type
