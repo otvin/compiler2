@@ -133,7 +133,7 @@ def main():
     run_test_list("comments", 1, 1)
     run_test_list("const", 1, 5)
     run_test_list("divide", 1, 1)
-    run_test_list("for", 1, 1)
+    run_test_list("for", 1, 5)
     run_test_list("fpmath", 1, 7)
     run_test_list("functions", 1, 11)
     run_test_list("functions", 13, 15)
@@ -159,7 +159,7 @@ def main():
     run_test_list("write", 1, 1)
     run_test_list("writeln", 1, 3)
 
-    run_compilefail_test_list(1, 41)
+    run_compilefail_test_list(1, 50)
 
     # tests from old compiler not yet running in compiler2
     # dotest("tests/testconcat01.pas", "tests/testconcat01.out")

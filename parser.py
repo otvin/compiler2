@@ -676,8 +676,15 @@ class Parser:
                     actsym = ret.nearest_symboltable().fetch(str_procfuncname)
                     if isinstance(actsym, ActivationSymbol):
                         if actsym.returntypedef is None:
-                            errstr = "Procedure {} cannot be used as parameter to {}() in {}"
-                            errstr = errstr.format(str_procfuncname, parent_ast.token.value, ret.token.location)
+                            if parent_ast.token.tokentype == TokenType.ASSIGNMENT:
+                                errstr = "Procedure {} cannot be used as right value to assignment in {}"
+                                errstr = errstr.format(str_procfuncname, ret.token.location)
+                            elif parent_ast.token.tokentype in (TokenType.TO, TokenType.DOWNTO):
+                                errstr = "Procedure {} cannot be used as the final value of a 'for' statement in {}"
+                                errstr = errstr.format(str_procfuncname, ret.token.location)
+                            else:
+                                errstr = "Procedure {} cannot be used as parameter to {}() in {}"
+                                errstr = errstr.format(str_procfuncname, parent_ast.token.value, ret.token.location)
                             raise ParseException(errstr)
                     self.parse_actualparameterlist(ret)
             else:
@@ -808,7 +815,11 @@ class Parser:
             if isinstance(sym, ConstantSymbol):
                 errstr = "Cannot assign to constant '{}' in {}".format(ident_token.value, ident_token.location)
                 raise ParseException(errstr)
-            assert isinstance(sym, VariableSymbol)  # we insert a FunctionResultVariableSymbol when parsing functions
+            assert isinstance(sym, VariableSymbol)
+            # TODO - here is where we would see procedures with a return value or functions without a return value
+            # if not isinstance(sym, VariableSymbol):  # we insert a FunctionResultVariableSymbol when parsing functions
+            #    errstr = "function {} has no return value in {}".format(ident_token.value, ident_token.location)
+            #    raise ParseException(errstr)
 
         # Two possible designs considered here.  First, having ret have some token that represents
         # the variable-identifier and that it is being assigned to, and then have one child which

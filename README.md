@@ -8,6 +8,7 @@ Compiler2 supports the following Pascal Language features:
 * ```if - then [- else]```
 * ```while - do```
 * ```repeat - until```
+* ```for - to/downto - do```
 * Math operations: addition, subtraction, multiplication, floating point/integer division, and the modulo function
     * Can mix integers and reals in a single expression e.g. adding an integer to a real
     * When Real and Integer combined in an operation, result is a Real
@@ -56,6 +57,7 @@ Compiler2 also has the following functionality that compiler1 did not:
 * Boolean and Character types
 * Constants
 * REPEAT..UNTIL construct
+* FOR loops
 * Ability to do relational operations comparing Integer and Real types, and relational operations involving enumerated types.
 * abs(), sqr(), sin(), cos(), exp(), ln(), sqrt(), trunc(), round(), chr(), ord(), succ(), pred(), and odd()
 * Boolean operators not, or, and
@@ -79,7 +81,7 @@ has made it easier to surpass the functionality of my previous attempt.
 
 ### Unit tests
 
-Compiler2 currently passes 151 unit tests, including 46 of the 60 unit tests created for Compiler, plus an additional test which represented the one known bug from Compiler.  You can execute the unit test suite by running:
+Compiler2 currently passes 167 unit tests, including 46 of the 60 unit tests created for Compiler, plus an additional test which represented the one known bug from Compiler.  You can execute the unit test suite by running:
 
 ```python3 compiler_test.py```
 
@@ -90,10 +92,10 @@ Current code coverage:
 |asm_generator.py|97%|
 |filelocation.py|100%|
 |lexer.py|88%|
-|parser.py|94%|
-|pascaltypes.py|68%|
-|symboltable.py|93%|
-|tac_ir.py|91%|
+|parser.py|93%|
+|pascaltypes.py|81%|
+|symboltable.py|89%|
+|tac_ir.py|92%|
 
 _Code for exceptions that should never occur are excluded.  Regular compiler errors e.g. syntax errors in Pascal code are covered via "compilefail" tests.  Code written for future features, e.g. the code that handles 64-bit integers in spots, does count against code coverage, so I do not forget to add them back to the code to be tested._
  

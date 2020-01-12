@@ -1,0 +1,1 @@
+'For' statements require control variables to be of ordinal type. Variable 'k' is of type 'real' in file:tests/compilefail46.pas line:11    column:9  

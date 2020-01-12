@@ -1,0 +1,1 @@
+Procedure sixtimes cannot be used as the final value of a 'for' statement in file:tests/compilefail50.pas line:20    column:31 

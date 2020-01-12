@@ -1,0 +1,1 @@
+Cannot pass control variable 'myalpha' of a 'for' statement as variable parameter 'pp' to 'writethenextnato' in file:tests/compilefail48.pas line:52    column:30 

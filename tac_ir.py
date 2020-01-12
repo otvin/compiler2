@@ -612,6 +612,46 @@ class TACBlock:
             self.addnode(TACLabelNode(labeldone))
 
     def validate_controlvariable_notthreatened(self, controlvariableidentifier, ast):
+        #
+        # No statement S in the ast can exist that threatens the control variable - which is defined as:
+        #       a) control variable cannot be the left side (variable access) for an assignment statement
+        #       b) control variable cannot be passed as a variable parameter (ByRef) to a procedure or function
+        #       c) control variable cannot be passed into read() or readln()
+        #       d) control variable is used as a control variable for a nested for statement (as interpreted by
+        #          Cooper, p.27
+        assert isinstance(ast, AST)
+
+        if ast.token.tokentype == TokenType.ASSIGNMENT:
+            if ast.children[0].token.value.lower() == controlvariableidentifier.lower():
+                errstr = "Cannot assign a value to the control variable '{}' of a 'for' statement"
+                errstr = errstr.format(controlvariableidentifier)
+                raise TACException(tac_errstr(errstr, ast.children[0].token))
+            self.validate_controlvariable_notthreatened(controlvariableidentifier, ast.children[1])
+        elif ast.token.tokentype == TokenType.IDENTIFIER:
+            sym = self.symboltable.fetch(ast.token.value)
+            if isinstance(sym, ActivationSymbol):
+                # procedure or function call - check to see if any of the parameters are the control variable
+                for i in range(0, len(ast.children)):
+                    child = ast.children[i]
+                    if child.token.value.lower() == controlvariableidentifier.lower():
+                        if sym.paramlist[i].is_byref:
+                            errstr = "Cannot pass control variable '{}' of a 'for' statement as variable parameter "
+                            errstr += "'{}' to '{}'"
+                            errstr = errstr.format(controlvariableidentifier, sym.paramlist[i].symbol.name, sym.name)
+                            raise TACException(tac_errstr(errstr, child.token))
+        elif ast.token.tokentype == TokenType.FOR:
+            if ast.children[0].children[0].token.value.lower() == controlvariableidentifier.lower():
+                errstr = "Cannot use control variable '{}' of a 'for' statement as a control variable of a nested 'for'"
+                errstr = errstr.format(controlvariableidentifier)
+                raise TACException(tac_errstr(errstr, ast.children[0].children[0].token))
+            else:
+                self.validate_controlvariable_notthreatened(controlvariableidentifier, ast.children[0].children[1])
+                self.validate_controlvariable_notthreatened(controlvariableidentifier, ast.children[1])
+                self.validate_controlvariable_notthreatened(controlvariableidentifier, ast.children[2])
+        else:
+            for child in ast.children:
+                self.validate_controlvariable_notthreatened(controlvariableidentifier, child)
+
         return True
 
     def processast_repetitivestatement(self, ast):
@@ -636,7 +676,6 @@ class TACBlock:
             #       c) control variable cannot be passed into read() or readln()
             #       d) control variable is used as a control variable for a nested for statement (as interpreted by
             #          Cooper, p.27
-
 
             # the FOR statement "for v := e1 to e2 do body" shall be translated to:
             # begin
@@ -698,12 +737,12 @@ class TACBlock:
             if not ast.nearest_symboltable().are_compatible(controlvarsym.typedef.identifier, temp1.typedef.identifier):
                 errstr = "Type {} not compatible with type {} in 'for' statement"
                 errstr = errstr.format(controlvarsym.typedef.identifier, temp1.typedef.identifier)
-                raise TACException(tac_errstr(errstr, controlvartoken))
+                raise TACException(tac_errstr(errstr, assignmentast.children[1].token))
 
             if not ast.nearest_symboltable().are_compatible(controlvarsym.typedef.identifier, temp2.typedef.identifier):
                 errstr = "Type {} not compatible with type {} in 'for' statement"
                 errstr = errstr.format(controlvarsym.typedef.identifier, temp2.typedef.identifier)
-                raise TACException(tac_errstr(errstr, controlvartoken))
+                raise TACException(tac_errstr(errstr, todowntoast.children[0].token))
 
             # rule 3 will be a runtime check
 
@@ -741,7 +780,6 @@ class TACBlock:
             self.processast(bodyast)
             self.addnode(TACGotoNode(labelstartwhile))
             self.addnode(TACLabelNode(labeldoneif))
-
 
         elif tok.tokentype == TokenType.WHILE:
             assert len(ast.children) == 2, "TACBlock.processast - While ASTs must have 2 children"
