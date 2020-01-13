@@ -756,23 +756,24 @@ class Parser:
         self.tokenstream.setstartpos()
 
         ret = AST(self.tokenstream.eattoken(), parent_ast)
-        self.getexpectedtoken(TokenType.LPAREN)
-        # TODO: When we support other Output types, we need to actually parse the first parameter
-        # to see if it is a file-variable.
-        # TODO: The file-variable, or implied file-variable OUTPUT should be a symbol.
-        if self.tokenstream.peektokentype() == TokenType.OUTPUT:
-            # note - the below code will fail because TAC-IR won't know how to parse the OUTPUT token
-            ret.children.append(AST(self.getexpectedtoken(TokenType.OUTPUT), parent_ast))
-            self.getexpectedtoken(TokenType.COMMA)
-
-        done = False
-        while not done:
-            ret.children.append(self.parse_expression(ret))
-            if self.tokenstream.peektokentype() == TokenType.COMMA:
+        if self.tokenstream.peektokentype() == TokenType.LPAREN:
+            self.getexpectedtoken(TokenType.LPAREN)
+            # TODO: When we support other Output types, we need to actually parse the first parameter
+            # to see if it is a file-variable.
+            # TODO: The file-variable, or implied file-variable OUTPUT should be a symbol.
+            if self.tokenstream.peektokentype() == TokenType.OUTPUT:
+                # note - the below code will fail because TAC-IR won't know how to parse the OUTPUT token
+                ret.children.append(AST(self.getexpectedtoken(TokenType.OUTPUT), parent_ast))
                 self.getexpectedtoken(TokenType.COMMA)
-            else:
-                done = True
-        self.getexpectedtoken(TokenType.RPAREN)
+
+            done = False
+            while not done:
+                ret.children.append(self.parse_expression(ret))
+                if self.tokenstream.peektokentype() == TokenType.COMMA:
+                    self.getexpectedtoken(TokenType.COMMA)
+                else:
+                    done = True
+            self.getexpectedtoken(TokenType.RPAREN)
         self.tokenstream.setendpos()
         ret.comment = self.tokenstream.printstarttoend()
         return ret
@@ -902,7 +903,8 @@ class Parser:
         ret = AST(self.getexpectedtoken(TokenType.IDENTIFIER), parent_ast)
         self.tokenstream.setendpos()
         ret.comment = "Call procedure: {}".format(self.tokenstream.printstarttoend())
-        self.parse_actualparameterlist(ret)
+        if self.tokenstream.peektokentype() == TokenType.LPAREN:
+            self.parse_actualparameterlist(ret)
         return ret
 
     def parse_simplestatement(self, parent_ast):
