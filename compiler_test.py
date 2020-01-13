@@ -136,7 +136,7 @@ def main():
     run_test_list("for", 1, 5)
     run_test_list("fpmath", 1, 7)
     run_test_list("functions", 1, 11)
-    run_test_list("functions", 13, 16)
+    run_test_list("functions", 13, 17)
     run_test_list("globalvar", 1, 3)
     run_test_list("idiv", 1, 2)
     run_test_list("if", 1, 3)

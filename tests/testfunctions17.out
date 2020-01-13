@@ -1,0 +1,21 @@
+GCD of 8 and 12 should be 4: 4
+GCD of 60 and 90 should be 30: 30
+GCD 84723912 and 999331 should be 1 since 999331 is prime: 1
+Is 48 even? TRUE
+Is -932 even? TRUE
+Is 38121 even? FALSE
+Tangent of Pi should be 0: -0.000002653590
+Tangent of Pi/12 should be 0.267949...: 0.267948955422
+Tangent of 16 Pi / 13 should be 0.885922...: 0.885916864388
+and now for some pseudo-random numbers
+0.234771728516
+0.120040893555
+0.000732421875
+0.648574829102
+0.785491943359
+0.400009155273
+0.641784667969
+0.856765747070
+0.575469970703
+0.516891479492
+0.920532226562

@@ -352,10 +352,10 @@ class AssemblyGenerator:
                             raise ASMGeneratorError("Cannot handle 8- or 16-bit int convert to real")
                         elif node.arg1.typedef.basetype.size == 4:
                             # extend to 8 bytes
-                            self.emitcode("mov eax, [{}]".format(node.arg1.memoryaddress))
+                            self.emit_movtoregister_fromstack("eax", node.arg1)
                             self.emitcode("cdqe")
                         else:
-                            self.emitcode("mov rax, [{}]".format(node.arg1.memoryaddress))
+                            self.emit_movtoregister_fromstack("rax", node.arg1)
                         # rax now has the value we need to convert to the float
                         comment = "convert {} to real, store result in {}".format(node.arg1.name, node.lval.name)
                         self.emitcode("cvtsi2sd xmm0, rax", comment)
