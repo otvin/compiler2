@@ -448,6 +448,31 @@ class TACBlock:
         for child in ast.children:
             self.processast(child)
 
+    def validate_function_returnsvalue(self, functionidentifier, ast):
+        # 6.7.3 of the ISO standard states that it shall be an error if the result of a function is undefined
+        # upon completion of the algorithm.  We will need a runtime check later, similar to how we need a
+        # runtime check that a variable is assigned before it is used, but for now we will just validate
+        # at compile time that there is at least one assignment statement with the function-identifier is
+        # on the left side.
+        # Per Cooper, p.77: "Every function must contain at least one assignment to its identifier."  Also,
+        # "[T]he function-identifier alone ... represents a storage location ... that may only be assigned to."
+        # I infer from this that you cannot set the return value of a function by passing the function-identifier
+        # to a procedure as a byref argument or such.
+        # TODO - Add the runtime checks described above.
+        assert isinstance(ast, AST)
+
+        if ast.token.tokentype == TokenType.ASSIGNMENT:
+            if ast.children[0].token.value.lower() == functionidentifier.lower():
+                return True
+            else:
+                return self.validate_function_returnsvalue(functionidentifier, ast.children[1])
+        else:
+            for child in ast.children:
+                tmp = self.validate_function_returnsvalue(functionidentifier, child)
+                if tmp:
+                    return True
+            return False
+
     def processast_procedurefunction(self, ast):
         assert isinstance(ast, AST)
         assert ast.token.tokentype in (TokenType.PROCEDURE, TokenType.FUNCTION)
@@ -490,6 +515,10 @@ class TACBlock:
             self.processast(child)
 
         if tok.tokentype == TokenType.FUNCTION:
+            function_has_returnvalue = self.validate_function_returnsvalue(str_procname, ast)
+            if not function_has_returnvalue:
+                errstr = 'Function {} must have a return value'.format(str_procname)
+                raise TACException(tac_errstr(errstr, tok))
             self.addnode(TACFunctionReturnNode(self.symboltable.fetch(str_procname)))
         else:
             self.addnode(TACFunctionReturnNode(None))

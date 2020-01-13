@@ -816,11 +816,13 @@ class Parser:
             if isinstance(sym, ConstantSymbol):
                 errstr = "Cannot assign to constant '{}' in {}".format(ident_token.value, ident_token.location)
                 raise ParseException(errstr)
+            elif isinstance(sym, ActivationSymbol):
+                # for functions, we put a FunctionResultVariableSymbol in the symbol table.  So if we are getting
+                # an ActivationSymbol that means this is an invalid assignment, likely an assignment to a Procedure,
+                # which is invalid
+                errstr = "Cannot assign to Procedure name '{}' in {}".format(ident_token.value, ident_token.location)
+                raise ParseException(errstr)
             assert isinstance(sym, VariableSymbol)
-            # TODO - here is where we would see procedures with a return value or functions without a return value
-            # if not isinstance(sym, VariableSymbol):  # we insert a FunctionResultVariableSymbol when parsing functions
-            #    errstr = "function {} has no return value in {}".format(ident_token.value, ident_token.location)
-            #    raise ParseException(errstr)
 
         # Two possible designs considered here.  First, having ret have some token that represents
         # the variable-identifier and that it is being assigned to, and then have one child which
