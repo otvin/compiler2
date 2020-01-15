@@ -1,0 +1,4 @@
+yes!
+66
+And now an error for exceeding subrange...
+Error: value exceeds range for subrange type

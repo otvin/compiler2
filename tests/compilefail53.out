@@ -1,0 +1,1 @@
+Constant 'Ford' is not numeric. Cannot define constant 'mycar' by putting a sign before a non-numeric constant. In: file:tests/compilefail53.pas line:8     column:16 

@@ -165,6 +165,7 @@ class Parser:
         self.parseerrorlist = []
         self.parsewarninglist = []
         self.literaltable = LiteralTable()
+        self.anonymous_type_counter = 0
 
     def getexpectedtoken(self, tokentype):
         assert(isinstance(tokentype, TokenType)), "Parser.getexpectedtoken: Expected Token must be a token"
@@ -209,6 +210,8 @@ class Parser:
         #
         # p.65 of [Cooper] states that if a constant has a sign then the next token must be
         # a real, an integer, or a real/integer constant.  That can't be captured in the BNF.
+
+        ret = None  # this is to avoid PyCharm flagging that ret may not be assigned before it's used
 
         if self.tokenstream.peektokentype() == TokenType.MINUS:
             self.getexpectedtoken(TokenType.MINUS)
@@ -279,25 +282,34 @@ class Parser:
                     errstr = errstr.format(ident_token.value, ident_token.location)
                 raise ParseException(errstr)
             if sawsign:
-                if isinstance(sym.typedef.basetype, pascaltypes.RealType) or \
-                        isinstance(sym.typedef.basetype, pascaltypes.IntegerType):
-                    if isneg:
-                        if sym.value[0] == "-":
-                            tokval = sym.value[1:]  # remove the negative
+                invalidsign = False
+                if isinstance(sym, pascaltypes.EnumeratedTypeValue):
+                    invalidsign = True
+                else:
+                    assert isinstance(sym, ConstantSymbol)
+
+                    if isinstance(sym.typedef.basetype, pascaltypes.RealType) or \
+                            isinstance(sym.typedef.basetype, pascaltypes.IntegerType):
+                        if isneg:
+                            if sym.value[0] == "-":
+                                tokval = sym.value[1:]  # remove the negative
+                            else:
+                                tokval = "-" + sym.value
+                            # If we define a constant as negative another constant, we need to ensure the
+                            # literal value is in the literals table if it's a real constant.
+                            # LiteralTable.add() allows adding duplicates and filters them out.
+                            if isinstance(sym.typedef.basetype, pascaltypes.RealType):
+                                self.literaltable.add(RealLiteral(tokval, ident_token.location))
+                                ret = sym.typedef, tokval
+                            else:
+                                ret = sym.typedef, tokval
                         else:
-                            tokval = "-" + sym.value
-                        # If we define a constant as negative another constant, we need to ensure the
-                        # literal value is in the literals table if it's a real constant.
-                        # LiteralTable.add() allows adding duplicates and filters them out.
-                        if isinstance(sym.typedef.basetype, pascaltypes.RealType):
-                            self.literaltable.add(RealLiteral(tokval, ident_token.location))
-                            ret = sym.typedef, tokval
-                        else:
+                            tokval = sym.value
                             ret = sym.typedef, tokval
                     else:
-                        tokval = sym.value
-                        ret = sym.typedef, tokval
-                else:
+                        invalidsign = True
+
+                if invalidsign:
                     errstr = "Constant '{}' is not numeric."
                     if optionalconstid != "":
                         errstr += " Cannot define constant '{}' ".format(optionalconstid)
@@ -308,9 +320,10 @@ class Parser:
                     errstr = errstr.format(ident_token.value, ident_token.location)
                     raise ParseException(errstr)
             elif isinstance(sym, pascaltypes.EnumeratedTypeValue):
-                 enumerated_typedef = parent_ast.symboltable.fetch_originalsymtable_andtypedef(sym.typename)[1]
-                 ret = enumerated_typedef, ident_token.value
+                enumerated_typedef = parent_ast.symboltable.fetch_originalsymtable_andtypedef(sym.typename)[1]
+                ret = enumerated_typedef, ident_token.value
             else:
+                assert isinstance(sym, ConstantSymbol)
                 tokval = sym.value
                 ret = sym.typedef, tokval
         else:
@@ -318,6 +331,7 @@ class Parser:
             errstr = "Unexpected token {} in {}.".format(str(nexttok.value), nexttok.location)
             raise ParseException(errstr)
 
+        assert ret is not None  # None isn't valid, but we assigned to None to avoid ret not assigned warning below
         return ret
 
     def parse_constantdefinitionpart(self, parent_ast):
@@ -371,16 +385,12 @@ class Parser:
             assert isinstance(parent_ast.symboltable, SymbolTable), \
                 "Parser.parse_typedeclarationpart: missing symboltable"
 
-            symtab = parent_ast.symboltable
-
             self.getexpectedtoken(TokenType.TYPE)
             done = False
             while not done:
                 identifier = self.getexpectedtoken(TokenType.IDENTIFIER)
                 self.getexpectedtoken(TokenType.EQUALS)
-                newdenoter, newbasetype = self.parse_typedenoter(parent_ast, identifier.value)
-                newtypedef = pascaltypes.TypeDef(identifier.value, newdenoter, newbasetype)
-                symtab.add(newtypedef)
+                self.parse_typedenoter(parent_ast, identifier.value)
                 self.getexpectedtoken(TokenType.SEMICOLON)
                 if self.tokenstream.peektokentype() != TokenType.IDENTIFIER:
                     done = True
@@ -405,6 +415,11 @@ class Parser:
         assert isinstance(symboltypedef, pascaltypes.TypeDef)
         return symboltypedef
 
+    def generate_anonmous_typename(self):
+        ret = "anonymous_{}".format(str(self.anonymous_type_counter))
+        self.anonymous_type_counter += 1
+        return ret
+
     def parse_typedenoter(self, parent_ast, optionaltypename=""):
         # 6.4.1 <type-denoter> ::= <type-identifier> | <new-type>
         # 6.4.1 <type-identifier> ::= <identifier>
@@ -420,7 +435,10 @@ class Parser:
         # 6.4.3.1 <new-structured-type> ::= ["packed"] <unpacked-structured-type>
         # 6.4.3.1 <unpacked-structured-type> ::= <array-type> | <record-type> | <set-type> | <file-type>
         #
-        # This function returns the tuple (denoter, basetype) which can be used then to form a typedef
+        # This function returns the typedef.  If a <new-type> is created, then the <new-type> will be
+        # added to the symbol table.  The name of the new type will be in the optionaltypename field.
+        # If a <new-type> is created and the typename is blank, then the type name will be created
+        # anonymously.  See page 69 of Cooper for discussion of anonymous types.
 
         if self.next_three_tokens_contain_subrange():
             nexttok = self.tokenstream.peektoken()  # used for error messages
@@ -430,33 +448,59 @@ class Parser:
             if not parent_ast.symboltable.are_same_type(const1typedef.identifier, const2typedef.identifier):
                 errstr = "Both elements of subrange type {} must be same type."
                 errstr += "'{}' is type {} and '{}' is type {} in {}."
+                # optionaltypename may be blank here, and that's ok for the error message, rather than
+                # plugging in an anonymous type
                 errstr = errstr.format(optionaltypename, const1value, const1typedef.identifier,
                                        const2value, const2typedef.identifier, nexttok.location)
                 raise ParseException(errstr)
 
-            newbasetype = pascaltypes.SubrangeType(optionaltypename, const1typedef, const1value,
+            if optionaltypename == "":
+                typename = self.generate_anonmous_typename()
+            else:
+                typename = optionaltypename
+
+            newbasetype = pascaltypes.SubrangeType(typename, const1typedef, const1value,
                                                    const2value)
-            return newbasetype, newbasetype
+            ret = pascaltypes.TypeDef(typename, newbasetype, newbasetype)
+            parent_ast.symboltable.add(ret)
+            return ret
         else:
             if self.tokenstream.peektokentype() == TokenType.LPAREN:
                 # new enumerated type
                 self.getexpectedtoken(TokenType.LPAREN)
+
+                if optionaltypename == "":
+                    typename = self.generate_anonmous_typename()
+                else:
+                    typename = optionaltypename
+
                 idlist = self.parse_identifierlist()
                 etvlist = []
                 for idtoken in idlist:
-                    newetv = pascaltypes.EnumeratedTypeValue(idtoken.value, optionaltypename, len(etvlist))
+                    newetv = pascaltypes.EnumeratedTypeValue(idtoken.value, typename, len(etvlist))
                     etvlist.append(newetv)
                     try:
                         parent_ast.symboltable.add(newetv)
                     except SymbolException:
                         errstr = token_errstr(idtoken, "Identifier redefined: '{}'".format(idtoken.value))
                         raise ParseException(errstr)
-                newbasetype = pascaltypes.EnumeratedType(optionaltypename, etvlist)
+
+                newbasetype = pascaltypes.EnumeratedType(typename, etvlist)
                 self.getexpectedtoken(TokenType.RPAREN)
-                return newbasetype, newbasetype
+                ret = pascaltypes.TypeDef(typename, newbasetype, newbasetype)
+                parent_ast.symboltable.add(ret)
+
+                return ret
             else:
-                typedef = self.parse_typeidentifier(parent_ast)
-                return typedef.denoter, typedef.basetype
+                existingtypedef = self.parse_typeidentifier(parent_ast)
+                if optionaltypename != "":
+                    # if we have an identifier, we don't need to create a symbol for an anonymous type.  But if we
+                    # were given a new type name, then we do need to create a symbol for it, as it is an alias.
+                    newtypedef = pascaltypes.TypeDef(optionaltypename, existingtypedef, existingtypedef.basetype)
+                    parent_ast.symboltable.add(newtypedef)
+                    return newtypedef
+                else:
+                    return existingtypedef
 
     def parse_identifierlist(self):
         # 6.4.2.3 <identifier-list> ::= <identifier> { "," <identifier> }
@@ -483,7 +527,7 @@ class Parser:
             while not done:
                 identifier_list = self.parse_identifierlist()
                 self.getexpectedtoken(TokenType.COLON)
-                symboltypedef = self.parse_typeidentifier(parent_ast)
+                symboltypedef = self.parse_typedenoter(parent_ast)
                 self.getexpectedtoken(TokenType.SEMICOLON)
                 for identifier_token in identifier_list:
                     parent_ast.symboltable.add(VariableSymbol(identifier_token.value,
