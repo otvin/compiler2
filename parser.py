@@ -366,19 +366,7 @@ class Parser:
     def parse_typedefinitionpart(self, parent_ast):
         # 6.2.1 <type-definition-part> ::= ["type" <type-definition> ";" {<type-definition> ";"} ]
         # 6.4.1 <type-definition> ::= <identifier> "=" <type-denoter>
-        # 6.4.1 <type-denoter> ::= <type-identifier> | <new-type>
-        # 6.4.1 <type-identifier> ::= <identifier>
-        # 6.4.1 <new-type> ::= <new-ordinal-type> | <new-structured-type> | <new-pointer-type>
-        # 6.4.2.1 <new-ordinal-type> ::= <enumerated-type> | <subrange-type>
-        # 6.4.2.3 <enumerated-type> ::= "(" <identifier-list> ")"
-        # 6.4.2.4 <subrange-type> ::= <constant> ".." <constant>
-        # 6.3 <constant> ::= [sign] (<unsigned-number> | <constant-identifier>) | <character-string>
-        #   (character-string is not valid for subrange types, however)
-        #
-        # The valid type-identifiers are the simple types (integer, char, boolean, real) and identifiers
-        # that have already been defined for other types.
 
-        # In this iteration, we will now allowe new types to be defined, just aliases for existing types.
         if self.tokenstream.peektokentype() == TokenType.TYPE:
             assert isinstance(parent_ast.symboltable, SymbolTable), \
                 "Parser.parse_typedeclarationpart: missing symboltable"
@@ -390,87 +378,85 @@ class Parser:
             while not done:
                 identifier = self.getexpectedtoken(TokenType.IDENTIFIER)
                 self.getexpectedtoken(TokenType.EQUALS)
-
-                if self.next_three_tokens_contain_subrange():
-                    const1typedef, const1value = self.parse_constant(parent_ast)
-                    self.getexpectedtoken(TokenType.SUBRANGE)
-                    const2typedef, const2value = self.parse_constant(parent_ast)
-                    if not parent_ast.symboltable.are_same_type(const1typedef.identifier, const2typedef.identifier):
-                        errstr = "Both elements of subrange type {} must be same type."
-                        errstr += "'{}' is type {} and '{}' is type {} in {}."
-                        errstr = errstr.format(identifier.value, const1value, const1typedef.identifier,
-                                               const2value, const2typedef.identifier, identifier.location)
-                        raise ParseException(errstr)
-                    newbasetype = pascaltypes.SubrangeType(identifier.value, const1typedef, const1value,
-                                                           const2value)
-                    symtab.add(pascaltypes.TypeDef(identifier.value, newbasetype, newbasetype))
-                else:
-                    denoter_token = self.tokenstream.eattoken()
-                    assert isinstance(denoter_token, Token)
-
-                    if denoter_token.tokentype == TokenType.LPAREN:
-                        idlist = self.parse_identifierlist()
-                        etvlist = []
-                        for idtoken in idlist:
-                            newetv = pascaltypes.EnumeratedTypeValue(idtoken.value, identifier.value, len(etvlist))
-                            etvlist.append(newetv)
-                            try:
-                                symtab.add(newetv)
-                            except SymbolException:
-                                errstr = token_errstr(idtoken, "Identifier redefined: '{}'".format(idtoken.value))
-                                raise ParseException(errstr)
-                        newbasetype = pascaltypes.EnumeratedType(identifier.value, etvlist)
-                        symtab.add(pascaltypes.TypeDef(identifier.value, newbasetype, newbasetype))
-                        self.getexpectedtoken(TokenType.RPAREN)
-                    else:
-                        if denoter_token.tokentype not in (TokenType.INTEGER, TokenType.REAL, TokenType.CHAR,
-                                                           TokenType.BOOLEAN, TokenType.IDENTIFIER):
-                            raise ParseException(token_errstr(denoter_token, "Invalid type denoter"))
-
-                        if denoter_token.tokentype == TokenType.INTEGER:
-                            denoter = pascaltypes.IntegerType()
-                            basetype = denoter
-                        elif denoter_token.tokentype == TokenType.REAL:
-                            denoter = pascaltypes.RealType()
-                            basetype = denoter
-                        elif denoter_token.tokentype == TokenType.CHAR:
-                            denoter = pascaltypes.CharacterType()
-                            basetype = denoter
-                        elif denoter_token.tokentype == TokenType.BOOLEAN:
-                            denoter = pascaltypes.BooleanType()
-                            basetype = denoter
-                        else:
-                            # denoter_token.tokentype == TokenType.IDENTIFIER
-                            denoter = symtab.fetch(denoter_token.value)
-                            # fetch_originalsymtable_andtypedef returns a tuple (symboltable, basetype)
-                            basetype = symtab.fetch_originalsymtable_andtypedef(denoter_token.value)[1].basetype
-
-                        symtab.add(pascaltypes.TypeDef(identifier.value, denoter, basetype))
-
+                newdenoter, newbasetype = self.parse_typedenoter(parent_ast, identifier.value)
+                newtypedef = pascaltypes.TypeDef(identifier.value, newdenoter, newbasetype)
+                symtab.add(newtypedef)
                 self.getexpectedtoken(TokenType.SEMICOLON)
                 if self.tokenstream.peektokentype() != TokenType.IDENTIFIER:
                     done = True
-        
-    def parse_typeidentifier(self, parent_ast):
-        # Types can be very flexibile due to user-defined types, which we do not support now.  For now, we will use
-        # <type-identifier> ::= "integer" | "real" | "boolean" | "char"
-        #
-        # This function returns the typedef itself.
 
-        # this next line will be updated when we can have more complex types
-        if self.tokenstream.peektokentype() not in (TokenType.INTEGER, TokenType.REAL, TokenType.BOOLEAN,
-                                                    TokenType.CHAR, TokenType.IDENTIFIER):
-            tok = self.tokenstream.peektoken()
-            errstr = "Invalid type identifier '{}'".format(tok.value)
-            raise ParseException(token_errstr(tok, errstr))
+    def parse_typeidentifier(self, parent_ast):
+        # 6.4.1 <type-identifier> ::= <identifier>
+        #   The valid type-identifiers are the simple types (integer, char, boolean, real) and identifiers
+        #   that have already been defined for other types.
+        #
+        # Returns a typedef
 
         type_token = self.tokenstream.eattoken()
+        if type_token.tokentype not in (TokenType.INTEGER, TokenType.REAL, TokenType.BOOLEAN,
+                                        TokenType.CHAR, TokenType.IDENTIFIER):
+            errstr = "Invalid type identifier '{}'".format(type_token.value)
+            raise ParseException(token_errstr(type_token, errstr))
+
         if type_token.tokentype == TokenType.IDENTIFIER:
             symboltypedef = parent_ast.symboltable.fetch(type_token.value)
         else:
             symboltypedef = parent_ast.symboltable.fetch(str(type_token.tokentype))
         assert isinstance(symboltypedef, pascaltypes.TypeDef)
         return symboltypedef
+
+    def parse_typedenoter(self, parent_ast, optionaltypename=""):
+        # 6.4.1 <type-denoter> ::= <type-identifier> | <new-type>
+        # 6.4.1 <type-identifier> ::= <identifier>
+        #   The valid type-identifiers are the simple types (integer, char, boolean, real) and identifiers
+        #   that have already been defined for other types.
+        # 6.4.1 <new-type> ::= <new-ordinal-type> | <new-structured-type> | <new-pointer-type>
+        # 6.4.2.1 <new-ordinal-type> ::= <enumerated-type> | <subrange-type>
+        # 6.4.2.3 <enumerated-type> ::= "(" <identifier-list> ")"
+        # 6.4.2.3 <identifier-list> ::= <identifier> {"," <identifier>}
+        # 6.4.2.4 <subrange-type> ::= <constant> ".." <constant>
+        # 6.3 <constant> ::= [sign](<unsigned-number> | <constant-identifier>) | <character-string>
+        #   (character-string is not valid for subrange types, however)
+        # 6.4.3.1 <new-structured-type> ::= ["packed"] <unpacked-structured-type>
+        # 6.4.3.1 <unpacked-structured-type> ::= <array-type> | <record-type> | <set-type> | <file-type>
+        #
+        # This function returns the tuple (denoter, basetype) which can be used then to form a typedef
+
+        if self.next_three_tokens_contain_subrange():
+            nexttok = self.tokenstream.peektoken()  # used for error messages
+            const1typedef, const1value = self.parse_constant(parent_ast)
+            self.getexpectedtoken(TokenType.SUBRANGE)
+            const2typedef, const2value = self.parse_constant(parent_ast)
+            if not parent_ast.symboltable.are_same_type(const1typedef.identifier, const2typedef.identifier):
+                errstr = "Both elements of subrange type {} must be same type."
+                errstr += "'{}' is type {} and '{}' is type {} in {}."
+                errstr = errstr.format(optionaltypename, const1value, const1typedef.identifier,
+                                       const2value, const2typedef.identifier, nexttok.location)
+                raise ParseException(errstr)
+
+            newbasetype = pascaltypes.SubrangeType(optionaltypename, const1typedef, const1value,
+                                                   const2value)
+            return newbasetype, newbasetype
+        else:
+            if self.tokenstream.peektokentype() == TokenType.LPAREN:
+                # new enumerated type
+                self.getexpectedtoken(TokenType.LPAREN)
+                idlist = self.parse_identifierlist()
+                etvlist = []
+                for idtoken in idlist:
+                    newetv = pascaltypes.EnumeratedTypeValue(idtoken.value, optionaltypename, len(etvlist))
+                    etvlist.append(newetv)
+                    try:
+                        parent_ast.symboltable.add(newetv)
+                    except SymbolException:
+                        errstr = token_errstr(idtoken, "Identifier redefined: '{}'".format(idtoken.value))
+                        raise ParseException(errstr)
+                newbasetype = pascaltypes.EnumeratedType(optionaltypename, etvlist)
+                self.getexpectedtoken(TokenType.RPAREN)
+                return newbasetype, newbasetype
+            else:
+                typedef = self.parse_typeidentifier(parent_ast)
+                return typedef.denoter, typedef.basetype
 
     def parse_identifierlist(self):
         # 6.4.2.3 <identifier-list> ::= <identifier> { "," <identifier> }
@@ -488,9 +474,7 @@ class Parser:
         # 6.5.1 <variable-declaration> ::= <identifier-list> ":" <type-denoter>
         # 6.4.2.3 <identifier-list> ::= <identifier> { "," <identifier> }
         # 6.1.3 <identifier> ::= <letter> {<letter> | <digit>}
-        # type-denoter is technically very flexible because of user-defined types, which are not yet supported,
-        # so for right now we will use:
-        # <type-denoter> ::= <type-identifier> which will be "integer" | "real" | "Boolean"
+
         if self.tokenstream.peektokentype() == TokenType.VAR:
             assert isinstance(parent_ast.symboltable, SymbolTable),\
                 "Parser.parse_variabledeclarationpart: missing symboltable"
@@ -499,11 +483,11 @@ class Parser:
             while not done:
                 identifier_list = self.parse_identifierlist()
                 self.getexpectedtoken(TokenType.COLON)
-                symboltype = self.parse_typeidentifier(parent_ast)
+                symboltypedef = self.parse_typeidentifier(parent_ast)
                 self.getexpectedtoken(TokenType.SEMICOLON)
                 for identifier_token in identifier_list:
                     parent_ast.symboltable.add(VariableSymbol(identifier_token.value,
-                                                              identifier_token.location, symboltype))
+                                                              identifier_token.location, symboltypedef))
                 if self.tokenstream.peektokentype() != TokenType.IDENTIFIER:
                     done = True
 
