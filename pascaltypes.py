@@ -199,6 +199,11 @@ class SubrangeType(OrdinalType):
         # need to convert the rangemin / rangemax to ints so we can compare them
         self.rangemin_int = self.hosttypedef.basetype.position(self.rangemin)
         self.rangemax_int = self.hosttypedef.basetype.position(self.rangemax)
+        if self.rangemin_int > self.rangemax_int:
+            # required in 6.4.2.4
+            errstr = "Invalid subrange - value {} is not less than or equal to value {}"
+            errstr = errstr.format(self.rangemin, self.rangemax)
+            raise PascalTypeException(errstr)
 
     def __getitem__(self, n):
         # this is needed because Pycharm shows some inaccurate "errors" if I do not.
@@ -251,15 +256,22 @@ class StructuredType(BaseType):
 
 
 class ArrayType(StructuredType):
-    # TODO: minindex and maxindex can be values of any OrdinalType, not just integers
-    # Do we convert those values to integers during compilation?  Probably?
-    def __init__(self, typename, arrayoftype, dimensionlist):
-        assert isinstance(arrayoftype, BaseType)
+    def __init__(self, typename, indextypedef, indexmin, indexmax,
+                 componenttypedef):
+        assert isinstance(indextypedef, TypeDef)
+        assert isinstance(indextypedef.basetype, OrdinalType)
+        assert isinstance(componenttypedef, TypeDef)
 
         super().__init__()
         self.typename = typename
-        self.arrayoftype = arrayoftype
-        self.dimensionlist = dimensionlist
+        self.indextype = indextype
+
+        self.indexmin = indexmin  # just like Subranges, these are always strings
+        self.indexmax = indexmax
+        # need to convert the rangemin / rangemax to ints so we can compare them
+        self.indexmin_int = self.indextypedef.basetype.position(self.indexmin)
+        self.indexmax_int = self.indextypedef.basetype.position(self.indexmax)
+        self.numitemsinarray = (self.indexmax_int - self.indexmin_int) + 1
 
         numitemsinarray = 1
         for i in dimensionlist:

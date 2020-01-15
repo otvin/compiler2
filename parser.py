@@ -415,10 +415,122 @@ class Parser:
         assert isinstance(symboltypedef, pascaltypes.TypeDef)
         return symboltypedef
 
-    def generate_anonmous_typename(self):
-        ret = "anonymous_{}".format(str(self.anonymous_type_counter))
+    def generate_anonymous_typename(self):
+        # begins with an underscore so can never clash with a valid pascal identifier.
+        ret = "_anonymous_{}".format(str(self.anonymous_type_counter))
         self.anonymous_type_counter += 1
         return ret
+
+    def parse_subrangetype(self, parent_ast, optionaltypename=""):
+        # 6.4.2.4 <subrange-type> ::= <constant> ".." <constant>
+        # 6.3 <constant> ::= [sign](<unsigned-number> | <constant-identifier>) | <character-string>
+        #   (character-string is not valid for subrange types, however)
+        #
+        # This function returns the typedef.  If a <new-type> is created, then the <new-type> will be
+        # added to the symbol table.  The name of the new type will be in the optionaltypename field.
+        # If a <new-type> is created and the typename is blank, then the type name will be created
+        # anonymously.  See page 69 of Cooper for discussion of anonymous types.
+
+        assert self.next_three_tokens_contain_subrange()
+
+        nexttok = self.tokenstream.peektoken()  # used for error messages
+        const1typedef, const1value = self.parse_constant(parent_ast)
+        self.getexpectedtoken(TokenType.SUBRANGE)
+        const2typedef, const2value = self.parse_constant(parent_ast)
+        if not parent_ast.symboltable.are_same_type(const1typedef.identifier, const2typedef.identifier):
+            errstr = "Both elements of subrange type {} must be same type."
+            errstr += "'{}' is type {} and '{}' is type {} in {}."
+            # optionaltypename may be blank here, and that's ok for the error message, rather than
+            # plugging in an anonymous type
+            errstr = errstr.format(optionaltypename, const1value, const1typedef.identifier,
+                                   const2value, const2typedef.identifier, nexttok.location)
+            raise ParseException(errstr)
+
+        if optionaltypename == "":
+            typename = self.generate_anonymous_typename()
+        else:
+            typename = optionaltypename
+
+        try:
+            newbasetype = pascaltypes.SubrangeType(typename, const1typedef, const1value,
+                                                   const2value)
+        except pascaltypes.PascalTypeException as e:
+            errstr = str(e) + " in {}".format(nexttok.location)
+            raise ParseException(errstr)
+
+        ret = pascaltypes.TypeDef(typename, newbasetype, newbasetype)
+        parent_ast.symboltable.add(ret)
+        return ret
+
+    def parse_enumeratedtype(self, parent_ast, optionaltypename=""):
+        # 6.4.2.3 <enumerated-type> ::= "(" <identifier-list> ")"
+        # 6.4.2.3 <identifier-list> ::= <identifier> {"," <identifier>}
+        #
+        # This function returns the typedef.  If a <new-type> is created, then the <new-type> will be
+        # added to the symbol table.  The name of the new type will be in the optionaltypename field.
+        # If a <new-type> is created and the typename is blank, then the type name will be created
+        # anonymously.  See page 69 of Cooper for discussion of anonymous types.
+        # new enumerated type
+
+        self.getexpectedtoken(TokenType.LPAREN)
+
+        if optionaltypename == "":
+            typename = self.generate_anonymous_typename()
+        else:
+            typename = optionaltypename
+
+        idlist = self.parse_identifierlist()
+        etvlist = []
+        for idtoken in idlist:
+            newetv = pascaltypes.EnumeratedTypeValue(idtoken.value, typename, len(etvlist))
+            etvlist.append(newetv)
+            try:
+                parent_ast.symboltable.add(newetv)
+            except SymbolException:
+                errstr = token_errstr(idtoken, "Identifier redefined: '{}'".format(idtoken.value))
+                raise ParseException(errstr)
+
+        newbasetype = pascaltypes.EnumeratedType(typename, etvlist)
+        self.getexpectedtoken(TokenType.RPAREN)
+        ret = pascaltypes.TypeDef(typename, newbasetype, newbasetype)
+        parent_ast.symboltable.add(ret)
+
+        return ret
+
+    def parse_structuredtype(self, parent_ast, optionaltypename=""):
+        # 6.4.3.1 <new-structured-type> ::= ["packed"] <unpacked-structured-type>
+        # 6.4.3.1 <unpacked-structured-type> ::= <array-type> | <record-type> | <set-type> | <file-type>
+        # 6.4.3.2 <array-type> ::= "array" "[" <index-type> {"," <index-type>} "]" "of" <component-type>
+        # 6.4.3.2 <index-type> ::= <ordinal-type>
+        # 6.4.2.1 <ordinal-type> ::= <new-ordinal-type> | <ordinal-type-identifier>
+        # 6.4.3.2 <component-type> ::= <type-denoter>
+        #
+        # This function returns the typedef.  If a <new-type> is created, then the <new-type> will be
+        # added to the symbol table.  The name of the new type will be in the optionaltypename field.
+        # If a <new-type> is created and the typename is blank, then the type name will be created
+        # anonymously.  See page 69 of Cooper for discussion of anonymous types.
+        #
+        # Note that both the index types and the component type can be defined anonymously, as well as the
+        # array type which we are parsing.
+        #
+        # Also note, in 6.4.3.2 of the ISO standard, it states that an Array type that specifies 2 or more
+        # index types shall be viewed as short-hand for an array that has the first index type as its index
+        # type, containing other arrays.  Thus, we will represent arrays that way in our system.  Reason
+        # is that these types are the same type when it comes to type compatibility, assume "size" is an
+        # ordinal type:
+        #
+        #       array [Boolean] of array [1..10] of array [size] of real
+        #       array [Boolean] of array [1..10, size] of real
+        #       array [Boolean, 1..10, size] of real
+        #       array [Boolean, 1..10] of array [size] of real
+        #
+        if self.tokenstream.peektokentype() == TokenType.PACKED:
+            self.getexpectedtoken(TokenType.PACKED)
+            ispacked = True
+        else:
+            ispacked = False
+
+        pass
 
     def parse_typedenoter(self, parent_ast, optionaltypename=""):
         # 6.4.1 <type-denoter> ::= <type-identifier> | <new-type>
@@ -427,11 +539,6 @@ class Parser:
         #   that have already been defined for other types.
         # 6.4.1 <new-type> ::= <new-ordinal-type> | <new-structured-type> | <new-pointer-type>
         # 6.4.2.1 <new-ordinal-type> ::= <enumerated-type> | <subrange-type>
-        # 6.4.2.3 <enumerated-type> ::= "(" <identifier-list> ")"
-        # 6.4.2.3 <identifier-list> ::= <identifier> {"," <identifier>}
-        # 6.4.2.4 <subrange-type> ::= <constant> ".." <constant>
-        # 6.3 <constant> ::= [sign](<unsigned-number> | <constant-identifier>) | <character-string>
-        #   (character-string is not valid for subrange types, however)
         # 6.4.3.1 <new-structured-type> ::= ["packed"] <unpacked-structured-type>
         # 6.4.3.1 <unpacked-structured-type> ::= <array-type> | <record-type> | <set-type> | <file-type>
         #
@@ -441,66 +548,23 @@ class Parser:
         # anonymously.  See page 69 of Cooper for discussion of anonymous types.
 
         if self.next_three_tokens_contain_subrange():
-            nexttok = self.tokenstream.peektoken()  # used for error messages
-            const1typedef, const1value = self.parse_constant(parent_ast)
-            self.getexpectedtoken(TokenType.SUBRANGE)
-            const2typedef, const2value = self.parse_constant(parent_ast)
-            if not parent_ast.symboltable.are_same_type(const1typedef.identifier, const2typedef.identifier):
-                errstr = "Both elements of subrange type {} must be same type."
-                errstr += "'{}' is type {} and '{}' is type {} in {}."
-                # optionaltypename may be blank here, and that's ok for the error message, rather than
-                # plugging in an anonymous type
-                errstr = errstr.format(optionaltypename, const1value, const1typedef.identifier,
-                                       const2value, const2typedef.identifier, nexttok.location)
-                raise ParseException(errstr)
-
-            if optionaltypename == "":
-                typename = self.generate_anonmous_typename()
-            else:
-                typename = optionaltypename
-
-            newbasetype = pascaltypes.SubrangeType(typename, const1typedef, const1value,
-                                                   const2value)
-            ret = pascaltypes.TypeDef(typename, newbasetype, newbasetype)
-            parent_ast.symboltable.add(ret)
-            return ret
+            return self.parse_subrangetype(parent_ast, optionaltypename)
+        elif self.tokenstream.peektokentype() == TokenType.LPAREN:
+            return self.parse_enumeratedtype(parent_ast, optionaltypename)
+        elif self.tokenstream.peektokentype() in (TokenType.PACKED, TokenType.ARRAY, TokenType.RECORD, TokenType.SET,
+                                                  TokenType.FILE):
+            return self.parse_structuredtype(parent_ast, optionaltypename)
         else:
-            if self.tokenstream.peektokentype() == TokenType.LPAREN:
-                # new enumerated type
-                self.getexpectedtoken(TokenType.LPAREN)
-
-                if optionaltypename == "":
-                    typename = self.generate_anonmous_typename()
-                else:
-                    typename = optionaltypename
-
-                idlist = self.parse_identifierlist()
-                etvlist = []
-                for idtoken in idlist:
-                    newetv = pascaltypes.EnumeratedTypeValue(idtoken.value, typename, len(etvlist))
-                    etvlist.append(newetv)
-                    try:
-                        parent_ast.symboltable.add(newetv)
-                    except SymbolException:
-                        errstr = token_errstr(idtoken, "Identifier redefined: '{}'".format(idtoken.value))
-                        raise ParseException(errstr)
-
-                newbasetype = pascaltypes.EnumeratedType(typename, etvlist)
-                self.getexpectedtoken(TokenType.RPAREN)
-                ret = pascaltypes.TypeDef(typename, newbasetype, newbasetype)
-                parent_ast.symboltable.add(ret)
-
-                return ret
+            existingtypedef = self.parse_typeidentifier(parent_ast)
+            if optionaltypename != "":
+                # if we have an existing type, we don't need to create a symbol for an anonymous type.  But if we
+                # were given a new type name, then we do need to create a symbol for it, as the statement
+                # we are parsing is a typedef with an alias.
+                newtypedef = pascaltypes.TypeDef(optionaltypename, existingtypedef, existingtypedef.basetype)
+                parent_ast.symboltable.add(newtypedef)
+                return newtypedef
             else:
-                existingtypedef = self.parse_typeidentifier(parent_ast)
-                if optionaltypename != "":
-                    # if we have an identifier, we don't need to create a symbol for an anonymous type.  But if we
-                    # were given a new type name, then we do need to create a symbol for it, as it is an alias.
-                    newtypedef = pascaltypes.TypeDef(optionaltypename, existingtypedef, existingtypedef.basetype)
-                    parent_ast.symboltable.add(newtypedef)
-                    return newtypedef
-                else:
-                    return existingtypedef
+                return existingtypedef
 
     def parse_identifierlist(self):
         # 6.4.2.3 <identifier-list> ::= <identifier> { "," <identifier> }
