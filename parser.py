@@ -459,6 +459,7 @@ class Parser:
             raise ParseException(errstr)
 
         ret = pascaltypes.TypeDef(typename, newbasetype, newbasetype)
+        # TODO - figure out if we need to always add this or only add it if typename isn't anonymous
         parent_ast.symboltable.add(ret)
         return ret
 
@@ -497,12 +498,37 @@ class Parser:
 
         return ret
 
+
+    def parse_indextype_list(self, parent_ast):
+        # 6.4.3.2 <array-type> ::= "array" "[" <index-type> {"," <index-type>} "]" "of" <component-type>
+        # 6.4.3.2 <index-type> ::= <ordinal-type>
+        # 6.4.2.1 <ordinal-type> ::= <new-ordinal-type> | <ordinal-type-identifier>
+        # 6.4.2.1 <new-ordinal-type> ::= <enumerated-type> | <subrange-type>
+        #
+        # returns a list of typedefs
+        ret = []
+        done = False
+
+        while not done:
+            tmptok = self.tokenstream.peektoken()  # used for error messages
+            newtypedef = self.parse_typedenoter(parent_ast)
+            if not isinstance(newtypedef.basetype, pascaltypes.OrdinalType):
+                raise ParseException(token_errstr(tmptok, "Invalid type for array index"))
+            ret.append(newtypedef)
+            if self.tokenstream.peektokentype() == TokenType.COMMA:
+                self.getexpectedtoken(TokenType.COMMA)
+            else:
+                done = True
+        return ret
+
+
     def parse_structuredtype(self, parent_ast, optionaltypename=""):
         # 6.4.3.1 <new-structured-type> ::= ["packed"] <unpacked-structured-type>
         # 6.4.3.1 <unpacked-structured-type> ::= <array-type> | <record-type> | <set-type> | <file-type>
         # 6.4.3.2 <array-type> ::= "array" "[" <index-type> {"," <index-type>} "]" "of" <component-type>
         # 6.4.3.2 <index-type> ::= <ordinal-type>
         # 6.4.2.1 <ordinal-type> ::= <new-ordinal-type> | <ordinal-type-identifier>
+        # 6.4.2.1 <new-ordinal-type> ::= <enumerated-type> | <subrange-type>
         # 6.4.3.2 <component-type> ::= <type-denoter>
         #
         # This function returns the typedef.  If a <new-type> is created, then the <new-type> will be
@@ -530,7 +556,40 @@ class Parser:
         else:
             ispacked = False
 
-        pass
+        if self.tokenstream.peektokentype() == TokenType.ARRAY:
+
+            self.getexpectedtoken(TokenType.ARRAY)
+            self.getexpectedtoken(TokenType.LBRACKET)
+            indextypelist = self.parse_indextype_list(parent_ast)
+            self.getexpectedtoken(TokenType.RBRACKET)
+            self.getexpectedtoken(TokenType.OF)
+            component_typedef = self.parse_typedenoter(parent_ast)
+
+            # iterate through the indextype list backwards.
+            for i in range(-1, (-1 * len(indextypelist)) - 1, -1):
+                indextypedef = indextypelist[i]
+                # the typename passed into this function goes to the outermost array definition.
+                # If it is shorthand for multiple arrays, then the inner array definitions are all
+                # anonymously named.
+                if i == (-1 * len(indextypelist)) and optionaltypename != "":
+                    typename = optionaltypename
+                else:
+                    typename = self.generate_anonymous_typename()
+
+                # the ret variable will be overwritten every type through the loop, so only
+                # the final one processed will be returned
+                print ('creating new array:\n{}\n{}\nPacked: {}'.format(repr(indextypedef), repr(component_typedef), str(ispacked)))
+                newarraytype = pascaltypes.ArrayType(indextypedef, component_typedef, ispacked)
+                ret = pascaltypes.TypeDef(typename, newarraytype, newarraytype)
+
+            # TODO - figure out if we need to always add this or only add it if typename isn't anonymous
+            if optionaltypename != "":
+                parent_ast.symboltable.add(ret)
+            return ret
+
+        else:
+            tok = self.tokenstream.eattoken()
+            raise ParseException(token_errstr(tok, "Invalid Structured Type {}".format(tok.value)))
 
     def parse_typedenoter(self, parent_ast, optionaltypename=""):
         # 6.4.1 <type-denoter> ::= <type-identifier> | <new-type>

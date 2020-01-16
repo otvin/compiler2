@@ -40,6 +40,16 @@ class OrdinalType(SimpleType):
         # returns the position where item S is in the sequence defined by the ordinal type
         raise NotImplementedError("position() not implemented)")
 
+    def min_item(self):  # pragma: no cover
+        # this is a pure virtual function
+        # returns the smallest possible value of the type, as a string
+        raise NotImplementedError("min_item() not implemented")
+
+    def max_item(self):  # pragma: nocover
+        # this is a pure virtual function
+        # returns the largest possible value of the type, as a string
+        raise NotImplementedError("max_item() not implemented")
+
 
 # Putting these constants here because if we change the size of the Integer, we would need to change
 # the constants.
@@ -59,7 +69,7 @@ class IntegerType(OrdinalType):
         assert isinstance(n, int)
         assert n <= MAXINT
         assert n >= NEGMAXINT
-        return n
+        return str(n)
 
     def position(self, s):
         if isinstance(s, str):
@@ -68,6 +78,12 @@ class IntegerType(OrdinalType):
         assert s <= MAXINT
         assert s >= NEGMAXINT
         return s
+
+    def min_item(self):
+        return STRNEGMAXINT
+
+    def max_item(self):
+        return STRMAXINT
 
 
 class CharacterType(OrdinalType):
@@ -87,6 +103,12 @@ class CharacterType(OrdinalType):
         assert len(s) == 1
         return ord(s)
 
+    def min_item(self):
+        return chr(1)
+
+    def max_item(self):
+        return chr(255)
+
 
 class BooleanType(OrdinalType):
     def __init__(self):
@@ -96,7 +118,7 @@ class BooleanType(OrdinalType):
 
     def __getitem__(self, n):
         assert n in (0, 1)
-        return n
+        return str(n)
 
     def position(self, s):
         assert s.lower() in ('false', 'true')
@@ -104,6 +126,12 @@ class BooleanType(OrdinalType):
             return 0
         else:
             return 1
+
+    def min_item(self):
+        return "false"
+
+    def max_item(self):
+        return "true"
 
 
 class EnumeratedTypeValue:
@@ -131,6 +159,7 @@ class EnumeratedTypeValue:
 
 
 class EnumeratedType(OrdinalType):
+    # TODO - remove the typename - it's only used for printout.  The identifier for symbol table is on the typedef
     def __init__(self, typename, value_list):
         i = 0
         value_identifier_list = []
@@ -183,8 +212,15 @@ class EnumeratedType(OrdinalType):
             raise PascalTypeException(errstr)
         return i
 
+    def min_item(self):
+        return self.value_list[0].identifier
+
+    def max_item(self):
+        return self.value_list[-1].identifier
+
 
 class SubrangeType(OrdinalType):
+    # TODO - remove the typename - it's only used for printout.  The identifier for symbol table is on the typedef
     def __init__(self, typename, hosttypedef, rangemin, rangemax):
         assert isinstance(hosttypedef, TypeDef)
         assert isinstance(hosttypedef.basetype, OrdinalType)
@@ -232,6 +268,12 @@ class SubrangeType(OrdinalType):
         retstr = retstr.format(self.typename, repr(self.hosttypedef), self.rangemin, self.rangemax)
         return retstr
 
+    def min_item(self):
+        return self.rangemin
+
+    def max_item(self):
+        return self.rangemax
+
 
 class RealType(SimpleType):
     def __init__(self):
@@ -256,30 +298,34 @@ class StructuredType(BaseType):
 
 
 class ArrayType(StructuredType):
-    def __init__(self, typename, indextypedef, indexmin, indexmax,
-                 componenttypedef):
+    def __init__(self, indextypedef, componenttypedef, ispacked):
         assert isinstance(indextypedef, TypeDef)
         assert isinstance(indextypedef.basetype, OrdinalType)
         assert isinstance(componenttypedef, TypeDef)
+        assert isinstance(ispacked, bool)
 
         super().__init__()
-        self.typename = typename
-        self.indextype = indextype
+        self.typename = "array"
+        self.indextypedef = indextypedef
+        self.componenttypedef = componenttypedef
+        self.ispacked = ispacked
 
-        self.indexmin = indexmin  # just like Subranges, these are always strings
-        self.indexmax = indexmax
+        assert isinstance(self.indextypedef.basetype, OrdinalType)  # to prevent PyCharm from flagging violations
+        self.indexmin = self.indextypedef.basetype.min_item()  # just like Subranges, these are always strings
+        self.indexmax = self.indextypedef.basetype.max_item()
         # need to convert the rangemin / rangemax to ints so we can compare them
         self.indexmin_int = self.indextypedef.basetype.position(self.indexmin)
         self.indexmax_int = self.indextypedef.basetype.position(self.indexmax)
         self.numitemsinarray = (self.indexmax_int - self.indexmin_int) + 1
 
-        numitemsinarray = 1
-        for i in dimensionlist:
-            assert isinstance(i, SubrangeType)
-            numitemsindimension = i.position(i.rangemax) - i.position(i.rangemin)
-            numitemsinarray *= numitemsindimension
+        self.size = self.numitemsinarray * self.componenttypedef.basetype.size
 
-        self.size = numitemsinarray * arrayoftype.size
+    def __repr__(self):  # pragma: no cover
+        retstr = ""
+        if self.ispacked:
+            retstr = "Packed "
+        retstr += "Array [{}] of {}".format(repr(self.indextypedef), repr(self.componenttypedef))
+        return retstr
 
 
 class StringType(ArrayType):
