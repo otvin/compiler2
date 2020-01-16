@@ -459,7 +459,7 @@ class Parser:
             raise ParseException(errstr)
 
         ret = pascaltypes.TypeDef(typename, newbasetype, newbasetype)
-        # TODO - figure out if we need to always add this or only add it if typename isn't anonymous
+
         parent_ast.symboltable.add(ret)
         return ret
 
@@ -494,8 +494,8 @@ class Parser:
         newbasetype = pascaltypes.EnumeratedType(typename, etvlist)
         self.getexpectedtoken(TokenType.RPAREN)
         ret = pascaltypes.TypeDef(typename, newbasetype, newbasetype)
-        parent_ast.symboltable.add(ret)
 
+        parent_ast.symboltable.add(ret)
         return ret
 
 
@@ -566,6 +566,8 @@ class Parser:
             component_typedef = self.parse_typedenoter(parent_ast)
 
             # iterate through the indextype list backwards.
+
+            nexttypedef = component_typedef
             for i in range(-1, (-1 * len(indextypelist)) - 1, -1):
                 indextypedef = indextypelist[i]
                 # the typename passed into this function goes to the outermost array definition.
@@ -576,16 +578,12 @@ class Parser:
                 else:
                     typename = self.generate_anonymous_typename()
 
-                # the ret variable will be overwritten every type through the loop, so only
+                # the nexttypedef variable will be overwritten every type through the loop, so only
                 # the final one processed will be returned
-                print ('creating new array:\n{}\n{}\nPacked: {}'.format(repr(indextypedef), repr(component_typedef), str(ispacked)))
-                newarraytype = pascaltypes.ArrayType(indextypedef, component_typedef, ispacked)
-                ret = pascaltypes.TypeDef(typename, newarraytype, newarraytype)
-
-            # TODO - figure out if we need to always add this or only add it if typename isn't anonymous
-            if optionaltypename != "":
-                parent_ast.symboltable.add(ret)
-            return ret
+                newarraytype = pascaltypes.ArrayType(indextypedef, nexttypedef, ispacked)
+                nexttypedef = pascaltypes.TypeDef(typename, newarraytype, newarraytype)
+                parent_ast.symboltable.add(nexttypedef)
+            return nexttypedef
 
         else:
             tok = self.tokenstream.eattoken()

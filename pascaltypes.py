@@ -324,7 +324,9 @@ class ArrayType(StructuredType):
         retstr = ""
         if self.ispacked:
             retstr = "Packed "
-        retstr += "Array [{}] of {}".format(repr(self.indextypedef), repr(self.componenttypedef))
+        retstr += "Array [{}] of {} (size {} bytes)".format(repr(self.indextypedef), repr(self.componenttypedef),
+                                                            self.size)
+
         return retstr
 
 
