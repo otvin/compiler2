@@ -498,7 +498,6 @@ class Parser:
         parent_ast.symboltable.add(ret)
         return ret
 
-
     def parse_indextype_list(self, parent_ast):
         # 6.4.3.2 <array-type> ::= "array" "[" <index-type> {"," <index-type>} "]" "of" <component-type>
         # 6.4.3.2 <index-type> ::= <ordinal-type>
@@ -520,7 +519,6 @@ class Parser:
             else:
                 done = True
         return ret
-
 
     def parse_structuredtype(self, parent_ast, optionaltypename=""):
         # 6.4.3.1 <new-structured-type> ::= ["packed"] <unpacked-structured-type>
@@ -768,6 +766,34 @@ class Parser:
             ret.append(ast_procfunc)
         return ret
 
+    def parse_variableaccess(self, parent_ast):
+        # 6.5.1 <variable-access> ::= <entire-variable> | <component-variable> | <identified-variable>
+        #                             | <buffer-variable>
+        # 6.5.2 <entire-variable> ::= <variable-identifier>
+        # 6.5.2 <variable-identifier> ::= <identifier>
+        # 6.5.3.1 <component-variable> ::= <indexed-variable> | <field-designator>
+        # 6.5.3.2 <indexed-variable> ::= <array-variable> "[" <index-expression> {"," <index-expression>} "]"
+        # 6.5.3.2 <array-variable> ::= <variable-access>
+        #       Note the recursive definition here.  The two below notations are equivalent:
+        #       a[i][j]
+        #       a[i,j]
+        # 6.5.3.2 <index-expression> ::= <expression>
+        # 6.5.3.3 <field-designator> ::= <record-variable> "." <field-specifier> | <field-designator-identifier>
+        # 6.5.3.3 <field-specifier> ::= <field-identifier>
+        # 6.5.3.3 <field-identifier> ::= <identifier>
+        # 6.8.3.10 <field-deisgnator-identifier> ::= <identifier>
+        # 6.5.4 <identified-variable> ::= <pointer-variable> "^"
+        # 6.5.4 <pointer-variable> ::= <variable-access>
+        # 6.5.5 <buffer-variable> ::= <file-variable> "^"
+        # 6.5.5 <file-variable> ::= <variable-access>
+        #
+        # NOTE: if we see a function without an argument list, or a reference to a constant it will come here
+        # and work fine, because we build the AST the same way for all those cases.  Same as if we are seeing
+        # the lval of the assignment statement to set the return value for a function.  It might be cleaner
+        # to explicitly handle those elsewhere but for now since the AST ends up the same, it's fine.
+        assert self.tokenstream.peektokentype() == TokenType.IDENTIFIER
+        return AST(self.tokenstream.eattoken(), parent_ast)
+
     def parse_factor(self, parent_ast):
         # 6.7.1 <factor> ::= <variable-access> | <unsigned-constant> | <function-designator> |
         #                    <set-constructor> | "(" <expression> ")" | "not" <factor>
@@ -812,11 +838,14 @@ class Parser:
                 self.getexpectedtoken(TokenType.RPAREN)
             elif self.tokenstream.peektokentype() == TokenType.IDENTIFIER:
                 # An identifier standalone could either be variable-access, constant-identifier or
-                # function-designator with no actual parameter list.  That's fine here, we will disambiguate
-                # when generating the TAC. If we see a left paren however, we have the actual parameter list.
-                ret = AST(self.tokenstream.eattoken(), parent_ast)
-                if self.tokenstream.peektokentype() == TokenType.LPAREN:
-                    # now we know it's supposed to be a function-designator.  But, it could be a
+                # function-designator with no actual parameter list.  That's fine.  When we run through
+                # parse_variableaccess() those three will all be stored as a simple AST node with the identifier
+                # and we can disambiguate when generating the TAC. If we see a left paren however, we have
+                # the actual parameter list, so we know it's a function
+                nexttwo = self.tokenstream.peekmultitokentype(2)
+                if nexttwo[1] == TokenType.LPAREN:
+                    ret = AST(self.tokenstream.eattoken(), parent_ast)
+                    # we know it's supposed to be a function-designator.  But, it could be a
                     # procedure by mistake, which would be a compile error.
                     str_procfuncname = ret.token.value
                     # in case of recursion, the actsym will be potentially the return value of a function
@@ -836,6 +865,8 @@ class Parser:
                                 errstr = errstr.format(str_procfuncname, parent_ast.token.value, ret.token.location)
                             raise ParseException(errstr)
                     self.parse_actualparameterlist(ret)
+                else:
+                    return self.parse_variableaccess(parent_ast)
             else:
                 errtok = self.tokenstream.eattoken()
                 raise ParseException(token_errstr(errtok, "Invalid <unsigned-constant>"))
@@ -929,17 +960,10 @@ class Parser:
 
     def parse_assignmentstatement(self, parent_ast):
         # 6.8.2.2 - <assignment-statement> ::= (<variable-access>|<function-identifier>) ":=" <expression>
-        # 6.5.1 - <variable-access> ::= <entire-variable> | <component-variable> | <identified-variable>
-        #                               | <buffer-variable>
-        # 6.5.2 - <entire-variable> ::= <variable-identifier>
-        # 6.5.2 - <variable-identifier> ::= <identifier>
-        nexttwo = self.tokenstream.peekmultitokentype(2)
-        assert nexttwo[0] == TokenType.IDENTIFIER, "Parser.parse_assignmentstatement called, identifier not next token."
-        assert nexttwo[1] == TokenType.ASSIGNMENT, "Parser.parse_assignmentstatement called without assignment token."
+        assert self.tokenstream.peektokentype() == TokenType.IDENTIFIER
         assert parent_ast is not None
 
-        self.tokenstream.setstartpos()
-        ident_token = self.getexpectedtoken(TokenType.IDENTIFIER)
+        ident_token = self.tokenstream.peektoken()
 
         # validate that we are assigning to a valid identifier - either a symbol or a parameter
         symtab = parent_ast.nearest_symboltable()
@@ -949,7 +973,7 @@ class Parser:
             while tmp_paramlist is None:
                 assert isinstance(tmp_ast, AST)
                 if tmp_ast.parent is None:
-                    # we made it to the top of the AST without finding a param list.  Since
+                    # we made it to the top of the AST without finding a param list.
                     errstr = "Undefined Identifier: {} in {}".format(ident_token.value, ident_token.location)
                     raise ParseException(errstr)
                 tmp_ast = tmp_ast.parent
@@ -980,8 +1004,13 @@ class Parser:
         # being the expression.  I don't know that either is better but this seemed cleaner
         # because it put all the tokens in the AST and did not require creation of a new tokentype
         # like I did in first compiler.
-        ret = AST(self.getexpectedtoken(TokenType.ASSIGNMENT), parent_ast)
-        ret.children.append(AST(ident_token, ret))
+
+        # I haven't seen the real assignment token yet, so I will create the AST with a placeholder
+        ret = AST(Token(TokenType.ASSIGNMENT, None, ":="), parent_ast)
+        self.tokenstream.setstartpos()
+        ret.children.append(self.parse_variableaccess(ret))
+        # Now assign the real token to ret
+        ret.token = self.getexpectedtoken(TokenType.ASSIGNMENT)
         ret.children.append(self.parse_expression(ret))
         self.tokenstream.setendpos()
         ret.comment = self.tokenstream.printstarttoend()
@@ -998,16 +1027,14 @@ class Parser:
         #                                   | <function-identifier>
         # 6.6.1 - <procedure-identifier> ::= <identifier>
         # 6.6.2 - <function-identifier> ::= <identifier>
-        # 6.5.1 - <variable-access> ::= <entire-variable> | <component-variable> | <identified-variable>
-        #                               | <buffer-variable>
-        # 6.5.2 - <entire-variable> ::= <variable-identifier>
-        # 6.5.2 - <variable-identifier> ::= <identifier>
 
         # This function appends each parameter to the parent_ast as a child.
 
         # The <procedure-identifier> and <function-identifier> are for passing in procedures and functions
         # as parameters.  We do not support that yet.  Passing the value of a function in as a parameter
-        # would come from the <factor> which in turn comes from the <expression>.
+        # would come from the <factor> which in turn comes from the <expression>.  Similarly, while
+        # <variable-access> is allowed here, it is also allowed in the <factor>, so it too will come
+        # from the expression.
 
         # note there is a weird corner case here.  Look at the following snippet:
         # var i:integer;
