@@ -158,6 +158,19 @@ class AssemblyGenerator:
         else:
             self.emitcode("movsd {}, [{}]".format(destreg, symbol.memoryaddress), comment)
 
+    def emit_movaddresstoregister_fromstack(self, destreg, symbol, comment=None):
+        assert isinstance(symbol, Symbol)
+        if symbol.is_byref:  # TODO - need to test this
+            self.emitcode("mov {}, [{}]".format(destreg, symbol.memoryaddress), comment)
+        else:
+            self.emitcode("lea {}, [{}]".format(destreg, symbol.memoryaddress), comment)
+
+    def emit_movdereftoregister_fromstack(self, destreg, symbol, comment=None):
+        assert isinstance(symbol, Symbol)
+        assert not symbol.is_byref  # not 100% positive this will be true
+        self.emitcode("mov r10, [{}]".format(symbol.memoryaddress), comment)
+        self.emitcode("mov {}, [r10]".format(destreg))
+
     def emit_movtostack_fromregister(self, symbol, sourcereg, comment=None):
         assert isinstance(symbol, Symbol)
         if symbol.is_byref:
@@ -374,7 +387,24 @@ class AssemblyGenerator:
                         # now, get the value from reg into lval.  If lval is a byref parameter, we
                         # need to dereference the pointer.
                         self.emit_movtostack_fromregister(node.lval, reg)
-
+                    elif node.operator == TACOperator.ASSIGNADDRESSOF:
+                        assert isinstance(node.lval.typedef, pascaltypes.PointerTypeDef)
+                        comment = "Move address of {} into {}".format(node.arg1.name, node.lval.name)
+                        self.emit_movaddresstoregister_fromstack("RAX", node.arg1, comment)
+                        self.emit_movtostack_fromregister(node.lval, "RAX")
+                    elif node.operator == TACOperator.ASSIGNTODEREF:
+                        assert isinstance(node.lval.typedef, pascaltypes.PointerTypeDef)
+                        comment = "Mov {} to address contained in {}".format(node.arg1.name, node.lval.name)
+                        # TODO - handle Real types
+                        reg = get_register_slice_bybytes("R11", node.arg1.typedef.basetype.size)
+                        self.emit_movtoregister_fromstack(reg, node.arg1, comment)
+                        self.emitcode("MOV R10, [{}]".format(node.lval.memoryaddress))
+                        self.emitcode("MOV [R10], {}".format(reg))
+                    elif node.operator == TACOperator.ASSIGNDEREFTO:
+                        assert isinstance(node.arg1.typedef, pascaltypes.PointerTypeDef)
+                        destreg = get_register_slice_bybytes("RAX", node.lval.typedef.basetype.size)
+                        self.emit_movdereftoregister_fromstack(destreg, node.arg1, comment)
+                        self.emit_movtostack_fromregister(node.lval, destreg)
                     elif node.operator == TACOperator.NOT:
                         assert isinstance(node.arg1.typedef.basetype, pascaltypes.BooleanType)
                         assert isinstance(node.lval.typedef.basetype, pascaltypes.BooleanType)
@@ -776,11 +806,24 @@ class AssemblyGenerator:
 
                     assert isinstance(node.result.typedef.basetype, pascaltypes.IntegerType) or \
                             isinstance(node.result.typedef.basetype, pascaltypes.BooleanType) or \
-                            isinstance(node.result.typedef.basetype, pascaltypes.RealType)
+                            isinstance(node.result.typedef.basetype, pascaltypes.RealType) or \
+                            isinstance(node.result.typedef, pascaltypes.PointerTypeDef)
 
                     comment = "{} := {} {} {}".format(node.result.name, node.arg1.name, node.operator, node.arg2.name)
 
-                    if isinstance(node.result.typedef.basetype, pascaltypes.IntegerType):
+                    if isinstance(node.result.typedef, pascaltypes.PointerTypeDef):
+                        # only valid binary operation with pointers is addition, when we are accessing
+                        # structured types
+                        assert node.operator == TACOperator.ADD
+                        self.emit_movtoregister_fromstack("rax", node.arg1, comment)
+                        self.emit_movtoregister_fromstack("r11d", node.arg2)  # Automatically zero-extends into r11
+
+                        self.emitcode("add rax, r11")
+                        self.emitcode("jo _PASCAL_OVERFLOW_ERROR")
+                        self.emitcomment(repr(node.result))
+                        self.emit_movtostack_fromregister(node.result, "rax")
+
+                    elif isinstance(node.result.typedef.basetype, pascaltypes.IntegerType):
                         # TODO - handle something other than 4-byte integers
                         if node.operator in (TACOperator.MULTIPLY, TACOperator.ADD, TACOperator.SUBTRACT):
                             if node.operator == TACOperator.MULTIPLY:

@@ -124,6 +124,7 @@ def main():
     global NUM_ATTEMPTS
     global NUM_SUCCESSES
 
+    run_test_list("array", 1, 1)
     run_test_list("assign", 1, 1)
     run_test_list("boolean", 1, 2)
     run_test_list("bugfix", 1, 1)

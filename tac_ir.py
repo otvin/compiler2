@@ -1057,6 +1057,7 @@ class TACBlock:
         self.addnode(TACBinaryNode(T4, TACOperator.MULTIPLY, T2, T3))
 
         T5 = Symbol(self.gettemporary(), ast.token.location, T1.typedef)
+        self.symboltable.add(T5)
         self.addnode(TACBinaryNode(T5, TACOperator.ADD, T1, T4))
 
         return T5
