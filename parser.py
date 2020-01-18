@@ -147,6 +147,23 @@ class AST:
         assert isinstance(ptr.symboltable, SymbolTable)
         return ptr.symboltable
 
+    def nearest_symboldefinition(self, symbolname):
+        # returns the nearest symbol with a given identifier, None if the symbol is not defined.
+        # checks the local symbol table, then the local parameter list, then goes to the parent ast
+        # and repeats, until symbol is found, or the top of the tree is reached.
+
+        ptr = self
+        ret = None
+        while ptr is not None and ret is None:
+            if ptr.symboltable is not None and ptr.symboltable.exists(symbolname):
+                ret = ptr.symboltable.fetch(symbolname)  # errors if not found, hence testing exists()
+            elif ptr.paramlist is not None:
+                param = ptr.paramlist.fetch(symbolname)  # returns None if not found
+                if param is not None:
+                    ret = param.symbol
+            ptr = ptr.parent
+        return ret
+
     def nearest_paramlist(self):
         # returns None if no paramlist above this node in the tree, meaning the statement is outside
         # a procedure or function.
@@ -1112,34 +1129,23 @@ class Parser:
             return self.parse_gotostatement(parent_ast)
         elif next_tokentype == TokenType.IDENTIFIER:
             next_tokenname = self.tokenstream.peektoken().value
-            nearestparamlist = parent_ast.nearest_paramlist()
-            if nearestparamlist is not None and nearestparamlist.fetch(next_tokenname) is not None:
-                # TODO - this will fail when we get nested procedures - we will have to manage the parameters
-                # of the parent procedures/functions.  Until then, this works.
-                # the only statement that begins with Variable access (including FunctionResultVariableSymbol,
-                # which is a <function-identifier>, is an assignment statement.
-                return self.parse_assignmentstatement(parent_ast)
-            else:
-                try:
-                    sym = parent_ast.nearest_symboltable().fetch(next_tokenname)
-                except SymbolException:
-                    raise ParseException(token_errstr(self.tokenstream.peektoken(), "Identifier undefined"))
-                if isinstance(sym, ActivationSymbol):
-                    if sym.returntypedef is not None:
-                        errstr = "Cannot invoke function without assigning its return value: "
-                        raise ParseException(token_errstr(self.tokenstream.eattoken(), errstr))
-                    return self.parse_procedurestatement(parent_ast)
-                elif isinstance(sym, VariableSymbol):
-                    # the only statement that begins with Variable access (including FunctionResultVariableSymbol,
-                    # which is a <function-identifier>, is an assignment statement.
-                    return self.parse_assignmentstatement(parent_ast)
-                elif isinstance(sym, ConstantSymbol):
-                    errstr = "Cannot assign to constant".format(next_tokenname)
+            tmpsym = parent_ast.nearest_symboldefinition(next_tokenname)
+            if tmpsym is None:
+                raise ParseException(token_errstr(self.tokenstream.peektoken(), "Identifier undefined"))
+            elif isinstance(tmpsym, ActivationSymbol):
+                if tmpsym.returntypedef is not None:
+                    errstr = "Cannot invoke function without assigning its return value: "
                     raise ParseException(token_errstr(self.tokenstream.eattoken(), errstr))
-                else:
-                    tok = self.tokenstream.eattoken()
-                    errstr = "Identifier '{}' seen at {}, unclear how to parse".format(tok.value, tok.location)
-                    raise ParseException(errstr)
+                return self.parse_procedurestatement(parent_ast)
+            elif isinstance(tmpsym, VariableSymbol):
+                return self.parse_assignmentstatement(parent_ast)
+            elif isinstance(tmpsym, ConstantSymbol):
+                errstr = "Cannot assign to constant".format(next_tokenname)
+                raise ParseException(token_errstr(self.tokenstream.eattoken(), errstr))
+            else:
+                tok = self.tokenstream.eattoken()
+                errstr = "Identifier '{}' seen at {}, unclear how to parse".format(tok.value, tok.location)
+                raise ParseException(errstr)
         else:
             raise ParseException(token_errstr(self.tokenstream.eattoken()))
 
