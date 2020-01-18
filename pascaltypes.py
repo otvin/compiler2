@@ -326,6 +326,7 @@ class ArrayType(StructuredType):
             retstr = "Packed "
         retstr += "Array [{}] of {} (size {} bytes)".format(repr(self.indextypedef), repr(self.componenttypedef),
                                                             self.size)
+        retstr += "\n basetype size: {}".format(self.componenttypedef.basetype.size)
 
         return retstr
 
@@ -383,6 +384,12 @@ class TypeDef:
         self.identifier = identifier.lower()
         self.denoter = denoter
         self.basetype = basetype
+
+    def get_pointer_to(self):
+        # returns a new typedef that is a pointer to the current typedef
+        bt = PointerType(self.basetype)
+        ret = PointerTypeDef("_ptrto_"+self.identifier, bt, bt, self)
+        return ret
 
     # allows us to use TypeDefs in Symbol tables, and yet keep the vocabluary in the TypeDef
     # such that matches the terminology in the ISO standard
@@ -456,3 +463,21 @@ class ProcedureTypeDef(ActivationTypeDef):
 class FunctionTypeDef(ActivationTypeDef):
     def __init__(self):
         super().__init__('n/a', FunctionType(), FunctionType())
+
+
+class PointerTypeDef(TypeDef):
+    def __init__(self, identifier, denoter, basetype, pointsto_typedef):
+        assert isinstance(basetype, PointerType)
+        assert isinstance(pointsto_typedef, TypeDef)
+        super().__init__(identifier, denoter, basetype)
+        self.pointsto_typedef = pointsto_typedef
+
+
+class StructuredTypeDef(TypeDef):
+    pass
+
+
+class ArrayTypeDef(StructuredTypeDef):
+    def __init__(self, identifier, denoter, basetype):
+        assert isinstance(basetype, ArrayType)
+        super().__init__(identifier, denoter, basetype)

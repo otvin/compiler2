@@ -608,7 +608,7 @@ class Parser:
                 # the nexttypedef variable will be overwritten every type through the loop, so only
                 # the final one processed will be returned
                 newarraytype = pascaltypes.ArrayType(indextypedef, nexttypedef, ispacked)
-                nexttypedef = pascaltypes.TypeDef(typename, newarraytype, newarraytype)
+                nexttypedef = pascaltypes.ArrayTypeDef(typename, newarraytype, newarraytype)
                 parent_ast.symboltable.add(nexttypedef)
             return nexttypedef
 

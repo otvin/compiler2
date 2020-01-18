@@ -105,6 +105,9 @@ class TACOperator(Enum):
     LESSEQ = "<="
     GREATER = ">"
     GREATEREQ = ">="
+    ASSIGNADDRESSOF = ":= &"
+    ASSIGNTODEREF = "* :="
+    ASSIGNDEREFTO = ":= *"
     AND = "and"
     OR = "or"
     NOT = "not"
@@ -435,6 +438,9 @@ class TACBlock:
     def gettemporary(self):
         return self.generator.gettemporary()
 
+    def gettypetemporary(self):
+        return self.generator.gettypetemporary()
+
     def addnode(self, node):
         assert isinstance(node, TACNode)
         self.tacnodes.append(node)
@@ -447,6 +453,18 @@ class TACBlock:
         assert isinstance(ast, AST)
         for child in ast.children:
             self.processast(child)
+
+    def deref_ifneeded(self, sym):
+        assert isinstance(sym, Symbol)
+        if isinstance(sym.typedef, pascaltypes.PointerTypeDef):
+            # make a new symbol that has as its base type, the base type of the pointer
+            # assign deref of the pointer to the new symbol.
+            basetypesym = Symbol(self.gettemporary(), sym.location, sym.typedef.pointsto_typedef)
+            self.symboltable.add(basetypesym)
+            self.addnode(TACUnaryNode(basetypesym, TACOperator.ASSIGNDEREFTO, sym))
+            return basetypesym
+        else:
+            return sym
 
     def validate_function_returnsvalue(self, functionidentifier, ast):
         # 6.7.3 of the ISO standard states that it shall be an error if the result of a function is undefined
@@ -842,8 +860,13 @@ class TACBlock:
             raise TACException(errstr)
         sym = self.symboltable.fetch(tok.value)
         if isinstance(sym, FunctionResultVariableSymbol):
-            # we know it is a function, so get the activation symbol, which is stored in the parent
-            sym = self.symboltable.parent.fetch(tok.value)
+            # need to see if it's really the result of a function, or a recursive function call
+            # if it is the result of a function, the parent will be an assign and this will be the left child
+            if ast.parent.token.tokentype == TokenType.ASSIGNMENT and ast.parent.children[0]==ast:
+                pass
+            else:
+                # we know it is a function call, so get the activation symbol, which is stored in the parent
+                sym = self.symboltable.parent.fetch(tok.value)
 
         if isinstance(sym, ConstantSymbol):
             ret = Symbol(self.gettemporary(), tok.location, sym.typedef)
@@ -988,18 +1011,74 @@ class TACBlock:
         self.addnode(TACUnaryLiteralNode(ret, TACOperator.ASSIGN, lit))
         return ret
 
+    def processast_array(self, ast):
+        assert isinstance(ast, AST)
+        assert ast.token.tokentype == TokenType.LBRACKET
+        assert len(ast.children) == 2, "TACBlock.processast_array - Array ASTs must have 2 children."
+
+        # Core logic:
+        #   T0 = Resolve the lval.  It will either be a symbol with a typedef of an array, or a pointer that
+        #   points to a typedef of an array.
+        #   T1 will be a symbol that points to the lval array's component type
+        #   T1 = the address of lval (if lval is array symbol) or straight equals lval (if lval is already a pointer)
+        #   T2 = the size of the array's component type - this will be a symbol of integer type
+        #   T3 = a symbol that contains the result of the rval - this also will be a symbol of integer type
+        #   T4 = multiply T2 * T3
+        #   T5 = a symbol of same type as T1, and it equals T1 + T4
+        #   return T5
+
+        T0 = self.processast(ast.children[0])
+        if isinstance(T0.typedef, pascaltypes.ArrayTypeDef):
+            assert isinstance(T0.typedef.basetype, pascaltypes.ArrayType)
+            T1 = Symbol(self.gettemporary(), T0.location, T0.typedef.basetype.componenttypedef.get_pointer_to())
+            self.symboltable.add(T1)
+            self.addnode(TACUnaryNode(T1, TACOperator.ASSIGNADDRESSOF, T0))
+        else:
+            assert isinstance(T0.typedef, pascaltypes.PointerTypeDef)
+            assert isinstance(T0.typedef.pointsto_typedef.basetype, pascaltypes.ArrayType)
+            T1 = Symbol(self.gettemporary(), T0.location, T0.typedef.pointsto_typedef.basetype.componenttypedef.get_pointer_to())
+            self.symboltable.add(T1)
+            # T1 points to same address T0 but has a different type
+            self.addnode(TACUnaryNode(T1, TACOperator.ASSIGN, T0))
+
+        # TODO - check this construction - seems like there should be a simpler way to set T2 equal to the size
+        assert isinstance(T1.typedef, pascaltypes.PointerTypeDef)
+        size = T1.typedef.pointsto_typedef.basetype.size
+        sizelit = IntegerLiteral(str(size), T1.location)
+        T2 = ConstantSymbol(self.gettemporary(), T1.location, pascaltypes.SIMPLETYPEDEF_INTEGER, sizelit.value)
+        self.symboltable.add(T2)
+        self.addnode(TACUnaryLiteralNode(T2, TACOperator.ASSIGN, sizelit))
+        # end - check this construction
+
+        T3 = self.processast(ast.children[1])
+        assert isinstance(T3.typedef.basetype, pascaltypes.IntegerType)
+        T4 = Symbol(self.gettemporary(), ast.token.location, pascaltypes.SIMPLETYPEDEF_INTEGER)
+        self.symboltable.add(T4)
+        self.addnode(TACBinaryNode(T4, TACOperator.MULTIPLY, T2, T3))
+
+        T5 = Symbol(self.gettemporary(), ast.token.location, T1.typedef)
+        self.addnode(TACBinaryNode(T5, TACOperator.ADD, T1, T4))
+
+        return T5
+
+
     def processast_assignment(self, ast):
         assert isinstance(ast, AST)
         assert ast.token.tokentype == TokenType.ASSIGNMENT
-        assert len(ast.children) == 2, "TACBlock.processast - Assignment ASTs must have 2 children."
+        assert len(ast.children) == 2, "TACBlock.processast_assignment - Assignment ASTs must have 2 children."
 
-        tok = ast.token
+        lval = self.processast(ast.children[0])
+        if isinstance(lval.typedef, pascaltypes.PointerTypeDef):
+            lval_reftypedef = lval.typedef.pointsto_typedef
+            assignop = TACOperator.ASSIGNTODEREF
+        else:
+            lval_reftypedef = lval.typedef
+            assignop = TACOperator.ASSIGN
 
-        lval = self.symboltable.fetch(ast.children[0].token.value)
         if isinstance(lval, ConstantSymbol):
-            raise TACException(tac_errstr("Cannot assign a value to a constant", tok))
+            raise TACException(tac_errstr("Cannot assign a value to a constant", ast.token))
 
-        rval = self.processast(ast.children[1])
+        rval = self.deref_ifneeded(self.processast(ast.children[1]))
 
         if isinstance(rval, pascaltypes.EnumeratedTypeValue):
             comment = "Convert literal {} to integer value {}".format(rval.identifier, rval.value)
@@ -1011,21 +1090,21 @@ class TACBlock:
             else:
                 t2value = None
 
-            if not ast.nearest_symboltable().are_assignment_compatible(lval.typedef.identifier,
+            if not ast.nearest_symboltable().are_assignment_compatible(lval_reftypedef.identifier,
                                                                        rval.typedef.identifier, t2value):
                 if t2value is not None:
                     errstr = "Cannot assign value '{}' of type {} to type {}"
-                    errstr = errstr.format(t2value, rval.typedef.identifier, lval.typedef.identifier)
+                    errstr = errstr.format(t2value, rval.typedef.identifier, lval_reftypedef.identifier)
                 else:
-                    errstr = "Cannot assign {} type to {}".format(rval.typedef.identifier, lval.typedef.identifier)
+                    errstr = "Cannot assign {} type to {}".format(rval.typedef.identifier, lval_reftypedef.identifier)
                 raise TACException(tac_errstr(errstr, ast.children[1].token))
-            if isinstance(lval.typedef.basetype, pascaltypes.RealType) and \
+            if isinstance(lval_reftypedef.basetype, pascaltypes.RealType) and \
                     isinstance(rval.typedef.basetype, pascaltypes.IntegerType):
                 newrval = self.process_sym_inttoreal(rval)
             else:
                 newrval = rval
 
-            self.addnode(TACUnaryNode(lval, TACOperator.ASSIGN, newrval))
+            self.addnode(TACUnaryNode(lval, assignop, newrval))
         return lval
 
     def process_sym_inttoreal(self, sym):
@@ -1180,6 +1259,8 @@ class TACBlock:
             self.processast_repetitivestatement(ast)
         elif is_isorequiredfunction(tok.tokentype):
             ret = self.processast_isorequiredfunction(ast)
+        elif toktype == TokenType.LBRACKET:
+            ret = self.processast_array(ast)
         elif toktype == TokenType.ASSIGNMENT:
             ret = self.processast_assignment(ast)
         elif toktype == TokenType.IDENTIFIER:
@@ -1211,6 +1292,7 @@ class TACGenerator:
         self.tacblocks = []
         self.nextlabel = 0
         self.nexttemporary = 0
+        self.nextanonymoustype = 0
         self.globalsymboltable = SymbolTable()
         self.globalliteraltable = deepcopy(literaltable)
 
@@ -1254,6 +1336,11 @@ class TACGenerator:
     def gettemporary(self):
         temporary = "_T" + str(self.nexttemporary)
         self.nexttemporary += 1
+        return temporary
+
+    def gettypetemporary(self):
+        temporary = "_TYPE_" + str(self.nextanonymoustype)
+        self.nextanonymoustype += 1
         return temporary
 
     def printblocks(self):
