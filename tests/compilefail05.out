@@ -1,1 +1,1 @@
-Identifier 'i' followed by '=' seen at file:tests/compilefail05.pas line:9     column:9  , was assignment intended?
+Variable access followed by '=' seen at file:tests/compilefail05.pas line:9     column:10 , was assignment intended?

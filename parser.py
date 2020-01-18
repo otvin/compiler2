@@ -147,6 +147,18 @@ class AST:
         assert isinstance(ptr.symboltable, SymbolTable)
         return ptr.symboltable
 
+    def nearest_paramlist(self):
+        # returns None if no paramlist above this node in the tree, meaning the statement is outside
+        # a procedure or function.
+        # TODO - where this is used, we will have a problem with nested procs/funcs.
+        ptr = self
+        while ptr is not None and ptr.paramlist is None:
+            ptr = ptr.parent
+        if ptr is None:
+            return None
+        else:
+            return ptr.paramlist
+
     def dump_symboltables(self):  # pragma: no cover
         # used only for debugging
         for child in self.children:
@@ -986,15 +998,6 @@ class Parser:
                 assert isinstance(param, Parameter)
         else:
             sym = symtab.fetch(ident_token.value)
-            if isinstance(sym, ConstantSymbol):
-                errstr = "Cannot assign to constant '{}' in {}".format(ident_token.value, ident_token.location)
-                raise ParseException(errstr)
-            elif isinstance(sym, ActivationSymbol):
-                # for functions, we put a FunctionResultVariableSymbol in the symbol table.  So if we are getting
-                # an ActivationSymbol that means this is an invalid assignment, likely an assignment to a Procedure,
-                # which is invalid
-                errstr = "Cannot assign to Procedure name '{}' in {}".format(ident_token.value, ident_token.location)
-                raise ParseException(errstr)
             assert isinstance(sym, VariableSymbol)
 
         # Two possible designs considered here.  First, having ret have some token that represents
@@ -1010,6 +1013,11 @@ class Parser:
         self.tokenstream.setstartpos()
         ret.children.append(self.parse_variableaccess(ret))
         # Now assign the real token to ret
+        if self.tokenstream.peektokentype() == TokenType.EQUALS:
+            errstr = "Variable access followed by '=' seen at {}, was assignment intended?"
+            errstr = errstr.format(self.tokenstream.eattoken().location)
+            raise ParseException(errstr)
+
         ret.token = self.getexpectedtoken(TokenType.ASSIGNMENT)
         ret.children.append(self.parse_expression(ret))
         self.tokenstream.setendpos()
@@ -1093,10 +1101,7 @@ class Parser:
         #                                            | <writeln-parameter-list>)
         # 6.6.1 - <procedure-identifier> ::= <identifier>
         # 6.8.2.2 - <assignment-statement> ::= (<variable-access>|<function-identifier>) ":=" <expression>
-        # 6.5.1 - <variable-access> ::= <entire-variable> | <component-variable> | <identified-variable>
-        #                               | <buffer-variable>
-        # 6.5.2 - <entire-variable> ::= <variable-identifier>
-        # 6.5.2 - <variable-identifier> ::= <identifier>
+
         assert parent_ast is not None
 
         next_tokentype = self.tokenstream.peektokentype()
@@ -1106,24 +1111,34 @@ class Parser:
         elif next_tokentype == TokenType.GOTO:
             return self.parse_gotostatement(parent_ast)
         elif next_tokentype == TokenType.IDENTIFIER:
-            nexttwo = self.tokenstream.peekmultitokentype(2)
-            if nexttwo[1] == TokenType.ASSIGNMENT:
+            next_tokenname = self.tokenstream.peektoken().value
+            nearestparamlist = parent_ast.nearest_paramlist()
+            if nearestparamlist is not None and nearestparamlist.fetch(next_tokenname) is not None:
+                # TODO - this will fail when we get nested procedures - we will have to manage the parameters
+                # of the parent procedures/functions.  Until then, this works.
+                # the only statement that begins with Variable access (including FunctionResultVariableSymbol,
+                # which is a <function-identifier>, is an assignment statement.
                 return self.parse_assignmentstatement(parent_ast)
             else:
-                next_tokenname = self.tokenstream.peektoken().value
                 try:
                     sym = parent_ast.nearest_symboltable().fetch(next_tokenname)
                 except SymbolException:
                     raise ParseException(token_errstr(self.tokenstream.peektoken(), "Identifier undefined"))
                 if isinstance(sym, ActivationSymbol):
+                    if sym.returntypedef is not None:
+                        errstr = "Cannot invoke function without assigning its return value: "
+                        raise ParseException(token_errstr(self.tokenstream.eattoken(), errstr))
                     return self.parse_procedurestatement(parent_ast)
+                elif isinstance(sym, VariableSymbol):
+                    # the only statement that begins with Variable access (including FunctionResultVariableSymbol,
+                    # which is a <function-identifier>, is an assignment statement.
+                    return self.parse_assignmentstatement(parent_ast)
+                elif isinstance(sym, ConstantSymbol):
+                    errstr = "Cannot assign to constant".format(next_tokenname)
+                    raise ParseException(token_errstr(self.tokenstream.eattoken(), errstr))
                 else:
                     tok = self.tokenstream.eattoken()
-                    if self.tokenstream.peektokentype() == TokenType.EQUALS:
-                        errstr = "Identifier '{}' followed by '=' seen at {}, was assignment intended?"
-                        errstr = errstr.format(tok.value, tok.location)
-                    else:
-                        errstr = "Identifier '{}' seen at {}, unclear how to parse".format(tok.value, tok.location)
+                    errstr = "Identifier '{}' seen at {}, unclear how to parse".format(tok.value, tok.location)
                     raise ParseException(errstr)
         else:
             raise ParseException(token_errstr(self.tokenstream.eattoken()))

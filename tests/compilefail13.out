@@ -1,1 +1,1 @@
-Undefined Identifier: i in file:tests/compilefail13.pas line:10    column:5  
+Identifier undefined 'i' in file:tests/compilefail13.pas line:10    column:5  

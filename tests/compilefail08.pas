@@ -1,5 +1,8 @@
 program compilefail08(output);
 {validates that a local variable named the same as a parameter into a function is properly detected}
+
+var q:integer;
+
 function oops(a:integer):integer;
 var
 	a:real;
@@ -9,5 +12,5 @@ begin
 end;
 
 begin
-	oops(3);
+	q := oops(3);
 end.
