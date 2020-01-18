@@ -795,6 +795,22 @@ class Parser:
             ret.append(ast_procfunc)
         return ret
 
+    def insert_ast_between(self, parent_ast, child_ast, expected_tokentype):
+        # Start: the parent of child_ast is parent_ast
+        # End: A new AST is created with parent = parent_ast, and child_ast as a child.
+        #      child_ast's parent is reset to point to this new AST that is created.
+        #      A reference to the new AST is returned
+
+        assert isinstance(parent_ast, AST)
+        assert isinstance(child_ast, AST)
+        assert child_ast.parent == parent_ast
+        assert isinstance(expected_tokentype, TokenType)
+
+        ret = AST(self.getexpectedtoken(expected_tokentype), parent_ast)
+        ret.children.append(child_ast)
+        child_ast.parent = ret
+        return ret
+
     def parse_variableaccess(self, parent_ast):
         # 6.5.1 <variable-access> ::= <entire-variable> | <component-variable> | <identified-variable>
         #                             | <buffer-variable>
@@ -821,7 +837,59 @@ class Parser:
         # the lval of the assignment statement to set the return value for a function.  It might be cleaner
         # to explicitly handle those elsewhere but for now since the AST ends up the same, it's fine.
         assert self.tokenstream.peektokentype() == TokenType.IDENTIFIER
-        return AST(self.tokenstream.eattoken(), parent_ast)
+
+        ident_token = self.tokenstream.eattoken()
+        sym = parent_ast.nearest_symboldefinition(ident_token.value)
+        assert isinstance(sym, VariableSymbol)
+
+        # if the identifier is an array, we could see one of a few valid things. Assume the array variable
+        # is named myarr and has 2 dimensions.  We could see myarr by itself - meaning it's being passed into a
+        # function/proc or being assigned to another variable of the same type.  We could see myarr followed by a
+        # left bracket.  If we see "myarr[" - we do not know if we have the shorthand myarr[i,j] or the longer
+        # myarr[i][j].  Since the contents of what is in the brackets couldbe arbitrarily long (unlimited
+        # dimensions or even a single dimension with an arbitrarily complex expression) we can't easily look
+        # ahead to see which form it is.  Additionally, since the definition of <array-variable> is
+        # <variable-access> - we don't know until we see the second left bracket in "myarr[i][j]" that we
+        # should call parse_variableaccess() recursively.  As such, we are not going to use a recursive
+        # definition.  Remember also, depending on the types, this is valid syntax:
+        #
+        # myarr[2,3}.foobar.x[7][(x+2*9+i)].fizbuz[-apple]^
+        #
+        # so we are going to just parse a token at a time until we lookahead and see something that would
+        # cause the variable access to end, and we will iterate and create the ASTs as if we had called it
+        # recursively.  This involves resetting the parents of the AST's as we go.
+
+        mainloopdone = False
+        ret = AST(ident_token, parent_ast)
+        while not mainloopdone:
+            nexttok = self.tokenstream.peektoken()
+            if nexttok.tokentype == TokenType.POINTER:
+                ret = self.insert_ast_between(parent_ast, ret, TokenType.POINTER)
+                mainloopdone = True
+            elif nexttok.tokentype == TokenType.PERIOD:
+                ret = self.insert_ast_between(parent_ast, ret, TokenType.PERIOD)
+                ret.children.append(AST(self.getexpectedtoken(TokenType.IDENTIFIER), ret))
+            elif nexttok.tokentype == TokenType.LBRACKET:
+                arrayloopdone = False
+                ret = self.insert_ast_between(parent_ast, ret, TokenType.LBRACKET)
+                while not arrayloopdone:
+                    ret.children.append(self.parse_expression(ret))
+                    nexttok = self.tokenstream.peektoken()
+                    if nexttok.tokentype == TokenType.RBRACKET:
+                        self.getexpectedtoken(TokenType.RBRACKET)
+                        arrayloopdone = True
+                    elif nexttok.tokentype == TokenType.COMMA:
+                        ret = self.insert_ast_between(parent_ast, ret, TokenType.COMMA)
+                        # change the tokentype to left bracket, because a[i,j] is shorthand for a[i][j]
+                        ret.token.tokentype = TokenType.LBRACKET
+                        # and now we go back to the arrayloop, parsing the expression
+                    else:
+                        raise ParseException(token_errstr(nexttok))
+            else:
+                mainloopdone = True
+
+        return ret
+
 
     def parse_factor(self, parent_ast):
         # 6.7.1 <factor> ::= <variable-access> | <unsigned-constant> | <function-designator> |
@@ -866,34 +934,33 @@ class Parser:
                 ret.children.append(self.parse_expression(ret))
                 self.getexpectedtoken(TokenType.RPAREN)
             elif self.tokenstream.peektokentype() == TokenType.IDENTIFIER:
-                # An identifier standalone could either be variable-access, constant-identifier or
-                # function-designator with no actual parameter list.  That's fine.  When we run through
-                # parse_variableaccess() those three will all be stored as a simple AST node with the identifier
-                # and we can disambiguate when generating the TAC. If we see a left paren however, we have
-                # the actual parameter list, so we know it's a function
-                nexttwo = self.tokenstream.peekmultitokentype(2)
-                if nexttwo[1] == TokenType.LPAREN:
-                    ret = AST(self.tokenstream.eattoken(), parent_ast)
-                    # we know it's supposed to be a function-designator.  But, it could be a
-                    # procedure by mistake, which would be a compile error.
-                    str_procfuncname = ret.token.value
-                    # in case of recursion, the actsym will be potentially the return value of a function
-                    # instead of an Activation symbol.  But in every other instance, it should be an
-                    # activation symbol that we can test.
-                    actsym = ret.nearest_symboltable().fetch(str_procfuncname)
-                    if isinstance(actsym, ActivationSymbol):
-                        if actsym.returntypedef is None:
+                nexttok = self.tokenstream.peektoken()
+                sym = parent_ast.nearest_symboldefinition(nexttok.value)
+                if sym is None:
+                    raise ParseException("Undefined Identifier: '{}' in {}".format(nexttok.value, nexttok.location))
+                elif isinstance(sym, pascaltypes.EnumeratedTypeValue) or isinstance(sym, ConstantSymbol):
+                    return AST(self.getexpectedtoken(TokenType.IDENTIFIER), parent_ast)
+                elif isinstance(sym, ActivationSymbol) or isinstance(sym, FunctionResultVariableSymbol):
+                    ret = AST(self.getexpectedtoken(TokenType.IDENTIFIER), parent_ast)
+                    if self.tokenstream.peektokentype() == TokenType.LPAREN:
+                        # we know it's supposed to be a function-designator.  But, it could be a
+                        # procedure by mistake, which would be a compile error.  If it's a FunctionResultVariableSymbol
+                        # it would be a recursive call, which is fine, but the nearest_symboldefinition would be
+                        # the FunctionResultVariableSymbol not the ActivationSymbol, and that's by design.  Hence
+                        # testing for isinstance(ActivationSymbol) in the next line before testing to see if it is
+                        # a procedure call.
+                        if isinstance(sym, ActivationSymbol) and sym.returntypedef is None:
                             if parent_ast.token.tokentype == TokenType.ASSIGNMENT:
                                 errstr = "Procedure {} cannot be used as right value to assignment in {}"
-                                errstr = errstr.format(str_procfuncname, ret.token.location)
+                                errstr = errstr.format(nexttok.value, ret.token.location)
                             elif parent_ast.token.tokentype in (TokenType.TO, TokenType.DOWNTO):
                                 errstr = "Procedure {} cannot be used as the final value of a 'for' statement in {}"
-                                errstr = errstr.format(str_procfuncname, ret.token.location)
+                                errstr = errstr.format(nexttok.value, ret.token.location)
                             else:
                                 errstr = "Procedure {} cannot be used as parameter to {}() in {}"
-                                errstr = errstr.format(str_procfuncname, parent_ast.token.value, ret.token.location)
+                                errstr = errstr.format(nexttok.value, parent_ast.token.value, ret.token.location)
                             raise ParseException(errstr)
-                    self.parse_actualparameterlist(ret)
+                        self.parse_actualparameterlist(ret)
                 else:
                     return self.parse_variableaccess(parent_ast)
             else:
