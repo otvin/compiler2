@@ -472,7 +472,7 @@ class AssemblyGenerator:
                             comment = comment.format(node.literal1.value, node.lval.name)
                             # self.emitcode("MOV R11D, {}".format(node.literal1.value), comment)
                             self.emitcode("MOV R10, [{}]".format(node.lval.memoryaddress), comment)
-                            self.emitcode("MOV [R10], WORD {}".format(node.literal1.value))
+                            self.emitcode("MOV [R10], DWORD {}".format(node.literal1.value))
 
                         else:
                             print(repr(node.operator))

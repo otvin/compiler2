@@ -1051,78 +1051,52 @@ class TACBlock:
             in step 2, and store that result in a symbol.  The typedef for the symbol should equal
             a pointer to the componenttypedef for the array.  Return this symbol.
         '''
-        '''
+
         step1 = self.processast(ast.children[0])
         assert isinstance(step1.typedef, pascaltypes.ArrayTypeDef) or \
                (isinstance(step1.typedef, pascaltypes.PointerTypeDef) and 
                 isinstance(step1.typedef.pointsto_typedef.basetype, pascaltypes.ArrayType))
         
         if isinstance(step1.typedef, pascaltypes.ArrayTypeDef):
-            pointertypedef = step1.typedef.basetype.componenttypedef.get_pointer_to()
+            arraytypedef = step1.typedef
+            componenttypedef = arraytypedef.basetype.componenttypedef
+            indextypedef = arraytypedef.basetype.indextypedef
+            assignop = TACOperator.ASSIGNADDRESSOF
         else:
-            pointertypedef = step1.typedef.pointsto_typedef.basetype.componenttypedef.get_pointer_to()
-        '''
+            arraytypedef = step1.typedef.pointsto_typedef
+            assert isinstance(arraytypedef, pascaltypes.ArrayTypeDef)
+            componenttypedef = arraytypedef.basetype.componenttypedef
+            indextypedef = arraytypedef.basetype.indextypedef
+            assignop = TACOperator.ASSIGN
 
-        # Core logic:
-        #   T0 = Resolve the lval.  It will either be a symbol with a typedef of an array, or a pointer that
-        #   points to a typedef of an array.
-        #   T1 will be a symbol that points to the lval array's component type
-        #   T1 = the address of lval (if lval is array symbol) or straight equals lval (if lval is already a pointer)
-        #   T2 = the size of the array's component type - this will be a symbol of integer type
-        #   T3 = a symbol that contains the result of the rval - this also will be a symbol of integer type
-        #   T3a = the minimum dimension of the array
-        #   T3b = subtract the low end of the dimension from T3, to get how much past the start we are going
-        #   T4 = multiply T2 * T3
-        #   T5 = a symbol of same type as T1, and it equals T1 + T4
-        #   return T5
+        step2 = Symbol(self.gettemporary(), step1.location, componenttypedef.get_pointer_to())
+        self.symboltable.add(step2)
+        self.addnode(TACUnaryNode(step2, assignop, step1))
 
-        T0 = self.processast(ast.children[0])
-        if isinstance(T0.typedef, pascaltypes.ArrayTypeDef):
-            assert isinstance(T0.typedef.basetype, pascaltypes.ArrayType)
-            T1 = Symbol(self.gettemporary(), T0.location, T0.typedef.basetype.componenttypedef.get_pointer_to())
-            self.symboltable.add(T1)
-            self.addnode(TACUnaryNode(T1, TACOperator.ASSIGNADDRESSOF, T0))
-            lowerboundlit = IntegerLiteral(str(T0.typedef.basetype.indextypedef.basetype.rangemin_int), T1.location)
+        step3 = self.processast(ast.children[1])
+
+        # logic here - take result of (step 3 minus the minimum index) and multiply by the component size.
+        # add that to the result of step 2.
+
+        if isinstance(step3, IntegerLiteral):
+            # we can do the math in the compiler
+            indexpos = (int(step3.value) - arraytypedef.basetype.indextypedef.basetype.rangemin_int)
+            numbytes = indexpos * componenttypedef.basetype.size
+            step4 = IntegerLiteral(str(numbytes), step1.location)
         else:
-            assert isinstance(T0.typedef, pascaltypes.PointerTypeDef)
-            assert isinstance(T0.typedef.pointsto_typedef.basetype, pascaltypes.ArrayType)
-            T1 = Symbol(self.gettemporary(), T0.location, T0.typedef.pointsto_typedef.basetype.componenttypedef.get_pointer_to())
-            self.symboltable.add(T1)
-            # T1 points to same address T0 but has a different type
-            self.addnode(TACUnaryNode(T1, TACOperator.ASSIGN, T0))
-            lowerboundlit = IntegerLiteral(str(T0.typedef.pointsto_typedef.basetype.indextypedef.basetype.rangemin_int), T1.location)
+            step4a = Symbol(self.gettemporary(), step1.location, pascaltypes.SIMPLETYPEDEF_INTEGER)
+            indexmin_literal = IntegerLiteral(str(arraytypedef.basetype.indextypedef.basetype.rangemin_int), step1.location)
+            size_literal = IntegerLiteral(str(componenttypedef.basetype.size), step1.location)
+            self.symboltable.add(step4a)
+            self.addnode(TACBinaryNode(step4a, TACOperator.SUBTRACT, step3, indexmin_literal))
+            step4 = Symbol(self.gettemporary(), step1.location, pascaltypes.SIMPLETYPEDEF_INTEGER)
+            self.symboltable.add(step4)
+            self.addnode(TACBinaryNode(step4, TACOperator.MULTIPLY, step4a, size_literal))
 
-        # TODO - check this construction - seems like there should be a simpler way to set T2 equal to the size
-        assert isinstance(T1.typedef, pascaltypes.PointerTypeDef)
-        size = T1.typedef.pointsto_typedef.basetype.size
-        sizelit = IntegerLiteral(str(size), T1.location)
-        T2 = ConstantSymbol(self.gettemporary(), T1.location, pascaltypes.SIMPLETYPEDEF_INTEGER, sizelit.value)
-        self.symboltable.add(T2)
-        self.addnode(TACUnaryLiteralNode(T2, TACOperator.ASSIGN, sizelit))
-        # end - check this construction
-
-        T3 = self.processast(ast.children[1])
-        assert isinstance(T3.typedef.basetype, pascaltypes.IntegerType)
-
-
-        T3A = ConstantSymbol(self.gettemporary(), T1.location, pascaltypes.SIMPLETYPEDEF_INTEGER, lowerboundlit.value)
-        self.symboltable.add(T3A)
-        self.addnode(TACUnaryLiteralNode(T3A, TACOperator.ASSIGN, lowerboundlit))
-
-        T3B = Symbol(self.gettemporary(), ast.token.location, pascaltypes.SIMPLETYPEDEF_INTEGER)
-        self.symboltable.add(T3B)
-        self.addnode(TACBinaryNode(T3B, TACOperator.SUBTRACT, T3, T3A))
-
-        T4 = Symbol(self.gettemporary(), ast.token.location, pascaltypes.SIMPLETYPEDEF_INTEGER)
-        self.symboltable.add(T4)
-        self.addnode(TACBinaryNode(T4, TACOperator.MULTIPLY, T2, T3B))
-
-        T5 = Symbol(self.gettemporary(), ast.token.location, T1.typedef)
-        self.symboltable.add(T5)
-        self.addnode(TACBinaryNode(T5, TACOperator.ADD, T1, T4))
-
-        return T5
-
+        step5 = Symbol(self.gettemporary(), step1.location, step2.typedef)
+        self.symboltable.add(step5)
+        self.addnode(TACBinaryNode(step5, TACOperator.ADD, step2, step4))
+        return step5
 
     def processast_assignment(self, ast):
         assert isinstance(ast, AST)
