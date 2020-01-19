@@ -144,11 +144,24 @@ class AssemblyGenerator:
     def emit_movtoregister_fromstack(self, destreg, symbol, comment=None):
         # TODO - instead of hardcoded r10, have some way to get an available scratch register
         assert isinstance(symbol, Symbol)
+
         if symbol.is_byref:
             self.emitcode("mov r10, [{}]".format(symbol.memoryaddress), comment)
             self.emitcode("mov {}, [r10]".format(destreg))
         else:
             self.emitcode("mov {}, [{}]".format(destreg, symbol.memoryaddress), comment)
+
+    def emit_movtoregister_fromstackorliteral(self, destreg, symbol, comment=None):
+        # TODO - instead of hardcoded r10, have some way to get an available scratch register
+        assert isinstance(symbol, Symbol) or isinstance(symbol, IntegerLiteral)
+        if isinstance(symbol, IntegerLiteral):
+            self.emitcode("mov {}, {}".format(destreg, symbol.value), comment)
+        else:
+            if symbol.is_byref:
+                self.emitcode("mov r10, [{}]".format(symbol.memoryaddress), comment)
+                self.emitcode("mov {}, [r10]".format(destreg))
+            else:
+                self.emitcode("mov {}, [{}]".format(destreg, symbol.memoryaddress), comment)
 
     def emit_movtoxmmregister_fromstack(self, destreg, symbol, comment=None):
         assert isinstance(symbol, Symbol)
@@ -257,8 +270,7 @@ class AssemblyGenerator:
                 self.emitcode("finit")  # TODO - this should only be written if we use x87 anywhere.
                 tacnodelist = block.tacnodes
             else:
-                self.emitlabel(block.tacnodes[0].label.name, block.tacnodes[0].comment
-                               )
+                self.emitlabel(block.tacnodes[0].label.name, block.tacnodes[0].comment)
                 tacnodelist = block.tacnodes[1:]
 
             totalstorageneeded = 0  # measured in bytes
@@ -272,7 +284,7 @@ class AssemblyGenerator:
                         totalstorageneeded += 8
                         sym.memoryaddress = "RBP-{}".format(str(totalstorageneeded))
 
-            if totalstorageneeded > 0:
+            if totalstorageneeded > 0 or block.ismain:
                 self.emitcode("PUSH RBP")  # ABI requires callee to preserve RBP
                 self.emitcode("MOV RBP, RSP", "save stack pointer")
                 # X86-64 ABI requires stack to stay aligned to 16-byte boundary.  Make sure we subtract in chunks of 16
@@ -373,6 +385,7 @@ class AssemblyGenerator:
                         comment = "convert {} to real, store result in {}".format(node.arg1.name, node.lval.name)
                         self.emitcode("cvtsi2sd xmm0, rax", comment)
                         # now save the float into its location
+                        # TODO - should this be move xmm register to stack?
                         self.emitcode("movsd [{}], xmm0".format(node.lval.memoryaddress))
                     elif node.operator == TACOperator.ASSIGN:
                         reg = get_register_slice_bybytes("RAX", node.lval.typedef.basetype.size)
@@ -402,6 +415,7 @@ class AssemblyGenerator:
                         self.emitcode("MOV [R10], {}".format(reg))
                     elif node.operator == TACOperator.ASSIGNDEREFTO:
                         assert isinstance(node.arg1.typedef, pascaltypes.PointerTypeDef)
+                        comment = "Mov deref of {} to {}".format(node.arg1.name, node.lval.name)
                         destreg = get_register_slice_bybytes("RAX", node.lval.typedef.basetype.size)
                         self.emit_movdereftoregister_fromstack(destreg, node.arg1, comment)
                         self.emit_movtostack_fromregister(node.lval, destreg)
@@ -430,7 +444,6 @@ class AssemblyGenerator:
                         self.emitcode("movsd xmm0, [rel {}]".format(litaddress), comment)
                         self.emit_movtostack_fromxmmregister(node.lval, "xmm0")
                     else:
-                        # TODO is node.operator ever anything other than ASSIGN?
                         if node.operator == TACOperator.ASSIGN:
                             comment = "Move literal '{}' into {}".format(node.literal1.value, node.lval.name)
                             # putting the result into rax so I can use existing helper function vs.
@@ -443,6 +456,27 @@ class AssemblyGenerator:
                             tmpreg = get_register_slice_bybytes("RAX", node.lval.typedef.basetype.size)
                             self.emitcode("mov {}, {}".format(tmpreg, val), comment)
                             self.emit_movtostack_fromregister(node.lval, tmpreg)
+                        elif node.operator == TACOperator.INTTOREAL:
+                            assert isinstance(node.literal1, IntegerLiteral)
+                            comment = "Move integer literal {} into real symbol {}".format(node.literal1.value,
+                                                                                           node.lval.name)
+                            self.emitcode("MOV EAX, {}".format(node.literal1.value), comment)
+                            self.emitcode("CDQE")
+                            self.emitcode("cvtsi2sd xmm0, rax")
+                            # now save the float into its location
+                            self.emit_movtostack_fromxmmregister(node.lval, "xmm0")
+                        elif node.operator == TACOperator.ASSIGNTODEREF:
+                            assert isinstance(node.lval.typedef, pascaltypes.PointerTypeDef)
+                            assert isinstance(node.lval.typedef.pointsto_typedef.basetype, pascaltypes.IntegerType)
+                            comment = "Move integer literal {} into address contained in {}"
+                            comment = comment.format(node.literal1.value, node.lval.name)
+                            # self.emitcode("MOV R11D, {}".format(node.literal1.value), comment)
+                            self.emitcode("MOV R10, [{}]".format(node.lval.memoryaddress), comment)
+                            self.emitcode("MOV [R10], WORD {}".format(node.literal1.value))
+
+                        else:
+                            print(repr(node.operator))
+                            assert False
 
                 elif isinstance(node, TACCallFunctionNode) and \
                         not isinstance(node, TACCallSystemFunctionNode):
@@ -494,7 +528,7 @@ class AssemblyGenerator:
                             assert numintparams <= 6  # TODO - remove when we can handle more
                             fullreg = intparampos_to_register(numintparams)
                             reg = get_register_slice_bybytes(fullreg, paramdef.symbol.typedef.basetype.size)
-                            self.emit_movtoregister_fromstack(reg, actualparam.paramval, comment)
+                            self.emit_movtoregister_fromstackorliteral(reg, actualparam.paramval, comment)
                         elif isinstance(paramdef.symbol.typedef.basetype, pascaltypes.RealType):
                             reg = "xmm{}".format(numrealparams)
                             numrealparams += 1
@@ -520,7 +554,7 @@ class AssemblyGenerator:
                         self.emitcode("mov rdi, _printf_intfmt")
                         param = params[-1]
                         destregister = get_register_slice_bybytes("RSI", param.paramval.typedef.basetype.size)
-                        self.emit_movtoregister_fromstack(destregister, param.paramval)
+                        self.emit_movtoregister_fromstackorliteral(destregister, param.paramval)
                         # must pass 0 (in rax) as number of floating point args since printf is variadic
                         self.emitcode("mov rax, 0")
                         self.emitcode("call printf wrt ..plt")
@@ -674,7 +708,7 @@ class AssemblyGenerator:
                         # then if it's >= than zero jump ahead, and if it's less than zero, negate it.  Jumps make
                         # code execution very slow.  This is the way CLang 7.0 handles abs() with -O3 enabled
                         comment = "parameter {} for abs()".format(str(params[-1].paramval))
-                        self.emit_movtoregister_fromstack("eax", params[-1].paramval, comment)
+                        self.emit_movtoregister_fromstackorliteral("eax", params[-1].paramval, comment)
                         self.emitcode("mov r11d, eax")
                         self.emitcode("neg eax")  # neg sets the FLAGS
                         self.emitcode("cmovl eax, r11d")  # if neg eax made eax less than zero, move r11d into eax
@@ -687,7 +721,7 @@ class AssemblyGenerator:
                         # mod in here manually.  Note that fortunately the mod equals 0 or 1 at the end, and
                         # that means we do not need a jump test.
                         comment = "parameter {} for odd()".format(str(params[-1].paramval))
-                        self.emit_movtoregister_fromstack("eax", params[-1].paramval, comment)
+                        self.emit_movtoregister_fromstackorliteral("eax", params[-1].paramval, comment)
                         self.emitcode("mov r11d, eax", "odd() is 'if ABS(x) mod 2 == 1")
                         self.emitcode("neg eax")  # neg sets the FLAGS
                         self.emitcode("cmovl eax, r11d")  # if neg eax made eax less than zero, move r11d into eax
@@ -708,14 +742,14 @@ class AssemblyGenerator:
                     elif node.label.name == "_SQRI":
                         # similarly easy - multiply the value by itself
                         comment = "parameter {} for sqr()".format(str(params[-1].paramval))
-                        self.emit_movtoregister_fromstack("eax", params[-1].paramval, comment)
+                        self.emit_movtoregister_fromstackorliteral("eax", params[-1].paramval, comment)
                         self.emitcode("imul eax, eax")
                         self.emitcode("jo _PASCAL_OVERFLOW_ERROR")
                         comment = "assign return value of function to {}".format(node.lval.name)
                         self.emit_movtostack_fromregister(node.lval, "EAX", comment)
                     elif node.label.name == "_CHRI":
                         comment = "parameter {} for chr()".format(str(params[-1].paramval))
-                        self.emit_movtoregister_fromstack("R11D", params[-1].paramval, comment)
+                        self.emit_movtoregister_fromstackorliteral("R11D", params[-1].paramval, comment)
                         self.emitcode("CMP R11D, 0")
                         self.emitcode("JL _PASCAL_CHR_ERROR")
                         self.emitcode("CMP R11D, 255")
@@ -736,7 +770,7 @@ class AssemblyGenerator:
                             self.emit_movtoregister_fromstack("R11B", params[-1].paramval, comment)
                             self.emitcode("MOVZX EAX, R11B")
                         else:
-                            self.emit_movtoregister_fromstack("EAX", params[-1].paramval)
+                            self.emit_movtoregister_fromstackorliteral("EAX", params[-1].paramval)
                         comment = "assign return value of function to {}".format(node.lval.name)
                         self.emit_movtostack_fromregister(node.lval, "EAX", comment)
                     elif node.label.name == "_SUCCO":
@@ -746,7 +780,7 @@ class AssemblyGenerator:
                         reg = get_register_slice_bybytes("RAX", node.lval.typedef.basetype.size)
                         bt = params[-1].paramval.typedef.basetype
 
-                        self.emit_movtoregister_fromstack(reg, params[-1].paramval, comment)
+                        self.emit_movtoregister_fromstackorliteral(reg, params[-1].paramval, comment)
 
                         if isinstance(bt, pascaltypes.CharacterType):
                             self.emitcode("CMP {}, 255".format(reg))
@@ -755,6 +789,8 @@ class AssemblyGenerator:
                         self.emitcode("INC {}".format(reg))
 
                         if isinstance(bt, pascaltypes.IntegerType):
+                            # todo - we may want to jo every time.  If we have a 1-byte subrange
+                            # from something..255, and we succ() when the value is 255, will it get caught
                             self.emitcode("jo _PASCAL_SUCC_PRED_ERROR")
                         elif isinstance(bt, pascaltypes.BooleanType):
                             self.emitcode("CMP {}, 1".format(reg))
@@ -762,7 +798,7 @@ class AssemblyGenerator:
                         elif isinstance(bt, pascaltypes.SubrangeType):
                             self.generate_subrangetest_code(reg, bt)
                         elif isinstance(bt, pascaltypes.CharacterType):
-                            pass # did the test for overflow above.
+                            pass  # did the test for overflow above.
                         else:
                             assert isinstance(bt, pascaltypes.EnumeratedType)
                             self.emitcode("CMP {}, {}".format(reg, str(len(bt.value_list))))
@@ -775,7 +811,7 @@ class AssemblyGenerator:
                         comment = "parameter {} for pred()".format(str(params[-1].paramval))
                         reg = get_register_slice_bybytes("RAX", node.lval.typedef.basetype.size)
 
-                        self.emit_movtoregister_fromstack(reg, params[-1].paramval, comment)
+                        self.emit_movtoregister_fromstackorliteral(reg, params[-1].paramval, comment)
                         self.emitcode("DEC {}".format(reg))
                         bt = params[-1].paramval.typedef.basetype
                         if isinstance(bt, pascaltypes.IntegerType):
@@ -815,8 +851,11 @@ class AssemblyGenerator:
                         # only valid binary operation with pointers is addition, when we are accessing
                         # structured types
                         assert node.operator == TACOperator.ADD
-                        self.emit_movtoregister_fromstack("rax", node.arg1, comment)
-                        self.emit_movtoregister_fromstack("r11d", node.arg2)  # Automatically zero-extends into r11
+
+                        self.emit_movtoregister_fromstackorliteral("rax", node.arg1, comment)
+
+                        # mov into r11d Automatically zero-extends into r11
+                        self.emit_movtoregister_fromstackorliteral("r11d", node.arg2)
 
                         self.emitcode("add rax, r11")
                         self.emitcode("jo _PASCAL_OVERFLOW_ERROR")
@@ -833,15 +872,15 @@ class AssemblyGenerator:
                             else:
                                 op = "sub"
 
-                            self.emit_movtoregister_fromstack("eax", node.arg1, comment)
-                            self.emit_movtoregister_fromstack("r11d", node.arg2)
+                            self.emit_movtoregister_fromstackorliteral("eax", node.arg1, comment)
+                            self.emit_movtoregister_fromstackorliteral("r11d", node.arg2)
                             self.emitcode("{} eax, r11d".format(op))
                             self.emitcode("jo _PASCAL_OVERFLOW_ERROR")
                             self.emit_movtostack_fromregister(node.result, "eax")
 
                         elif node.operator in (TACOperator.IDIV, TACOperator.MOD):
-                            self.emit_movtoregister_fromstack("eax", node.arg1, comment)
-                            self.emit_movtoregister_fromstack("r11d", node.arg2)
+                            self.emit_movtoregister_fromstackorliteral("eax", node.arg1, comment)
+                            self.emit_movtoregister_fromstackorliteral("r11d", node.arg2)
 
                             # Error D.45: 6.7.2.2 of ISO Standard requires testing for division by zero at runtime
                             # Error D.46: 6.7.2.2 also says it is an error if the divisor is not positive
@@ -943,8 +982,8 @@ class AssemblyGenerator:
                             if isinstance(n1type, pascaltypes.IntegerType) or \
                                     (isinstance(n1type, pascaltypes.SubrangeType) and
                                      n1type.hosttypedef.basetype.size == 4):
-                                self.emit_movtoregister_fromstack("eax", node.arg1, comment)
-                                self.emit_movtoregister_fromstack("r11d", node.arg2)
+                                self.emit_movtoregister_fromstackorliteral("eax", node.arg1, comment)
+                                self.emit_movtoregister_fromstackorliteral("r11d", node.arg2)
                                 self.emitcode("cmp eax, r11d")
                             elif isinstance(n1type, pascaltypes.BooleanType) or \
                                     isinstance(n1type, pascaltypes.CharacterType) or \
@@ -972,7 +1011,7 @@ class AssemblyGenerator:
                 else:  # pragma: no cover
                     raise ASMGeneratorError("Unknown TAC node type: {}".format(type(node)))
 
-            if totalstorageneeded > 0:
+            if totalstorageneeded > 0 or block.ismain:
                 self.emitcode("MOV RSP, RBP", "restore stack pointer")
                 self.emitcode("POP RBP")
             if not block.ismain:

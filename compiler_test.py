@@ -103,28 +103,35 @@ def generate_test_list(topic, start, end):
         testlist.append(test)
     return testlist
 
-
+ONLYTEST = ""
 def run_test_list(topic, start, end):
-    testlist = generate_test_list(topic, start, end)
-    for test in testlist:
-        pasfile = "tests/test" + test + ".pas"
-        outfile = "tests/test" + test + ".out"
-        dotest(pasfile, outfile)
+    global ONLYTEST
+    if ONLYTEST == "" or ONLYTEST == topic:
+        testlist = generate_test_list(topic, start, end)
+        for test in testlist:
+            pasfile = "tests/test" + test + ".pas"
+            outfile = "tests/test" + test + ".out"
+            dotest(pasfile, outfile)
 
 
 def run_compilefail_test_list(start, end):
-    testlist = generate_test_list("compilefail", start, end)
-    for test in testlist:
-        pasfile = "tests/" + test + ".pas"
-        outfile = "tests/" + test + ".out"
-        do_compilefailtest(pasfile, outfile)
+    global ONLYTEST
+    if ONLYTEST == "" or ONLYTEST == "compilefail":
+        testlist = generate_test_list("compilefail", start, end)
+        for test in testlist:
+            pasfile = "tests/" + test + ".pas"
+            outfile = "tests/" + test + ".out"
+            do_compilefailtest(pasfile, outfile)
 
 
-def main():
+def main(onlytest=""):
     global NUM_ATTEMPTS
     global NUM_SUCCESSES
+    global ONLYTEST
 
-    run_test_list("array", 1, 1)
+    ONLYTEST = onlytest
+
+    run_test_list("array", 1, 5)
     run_test_list("assign", 1, 1)
     run_test_list("boolean", 1, 2)
     run_test_list("bugfix", 1, 1)
@@ -183,8 +190,10 @@ def main():
 
 
 if __name__ == '__main__':  # pragma: no cover
+    onlytest = ""
     if len(sys.argv) >= 2:
         if sys.argv[1].lower() == "fpc":
             TEST_FPC_INSTEAD = True
-
-    main()
+        else:
+            onlytest = sys.argv[1].lower()
+    main(onlytest)

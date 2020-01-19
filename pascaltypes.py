@@ -226,7 +226,7 @@ class SubrangeType(OrdinalType):
         assert isinstance(hosttypedef.basetype, OrdinalType)
         super().__init__()
         self.typename = typename
-        self.size = 4
+        self.size = hosttypedef.basetype.size
         self.hosttypedef = hosttypedef
         # this is needed because Pycharm shows some inaccurate "errors" if I do not.
         assert isinstance(self.hosttypedef.basetype, OrdinalType)
@@ -266,6 +266,7 @@ class SubrangeType(OrdinalType):
     def __repr__(self):  # pragma: no cover
         retstr = "Subrange type: '{}'.  Hosttypedef: {} \n rangemin: {}  rangemax: {}"
         retstr = retstr.format(self.typename, repr(self.hosttypedef), self.rangemin, self.rangemax)
+        retstr += "\nrangemin_int: {}  rangemax_int: {}".format(str(self.rangemin_int), str(self.rangemax_int))
         return retstr
 
     def min_item(self):
@@ -327,6 +328,7 @@ class ArrayType(StructuredType):
         retstr += "Array [{}] of {} (size {} bytes)".format(repr(self.indextypedef), repr(self.componenttypedef),
                                                             self.size)
         retstr += "\n basetype size: {}".format(self.componenttypedef.basetype.size)
+
 
         return retstr
 
@@ -405,6 +407,8 @@ class TypeDef:
             ret = "TypeDef '{}' with denoter {} and hosttype of \n\t{}\n\tminimum: {}  maximum: {}"
             ret = ret.format(self.name, str(self.denoter), str(repr(self.basetype.hosttypedef)),
                              self.basetype.rangemin, self.basetype.rangemax)
+            ret += "\nrangemin_int: {}  rangemax_int: {}".format(str(self.basetype.rangemin_int), str(self.basetype.rangemax_int))
+
         else:
             ret = "TypeDef '{}' with denoter {} and basetype {}"
             ret = ret.format(self.name, str(self.denoter), str(repr(self.basetype)))

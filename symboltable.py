@@ -33,6 +33,10 @@ class Literal:
     def memoryaddress(self, addr):
         self.__memoryaddress = addr
 
+    @property
+    def name(self):
+        return str(self.value)
+
     def __str__(self):
         return str(self.value)
 
