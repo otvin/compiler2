@@ -1031,6 +1031,38 @@ class TACBlock:
         assert ast.token.tokentype == TokenType.LBRACKET
         assert len(ast.children) == 2, "TACBlock.processast_array - Array ASTs must have 2 children."
 
+        '''
+        Core Logic:
+            Step 1 - resolve the lval.  It will either be a symbol with a typedef of an array, or a 
+            pointer, that points to the typedef of an array.
+            
+            Step 2 - create a symbol that is a pointer that points to the lval array's component type.
+            If the lval is an array symbol, set lval to the address of the array.  If the lval is 
+            already a pointer, then set this symbol equal to the lval.
+            
+            Step 3 - grab the result of the index expression
+            
+            Step 4 - compute the size of the component type of the array.  Take the result of step 3,
+            subtract the index minimum of the array from that, and then multiply it by the size of the
+            component type.  If the result of step 3 is a literal, we can do the math in the compiler.
+            If the result of step 3 is a symbol, then we need to do the math at runtime.
+            
+            Step 5 - add the number of bytes result from step 4, add that to the address of the pointer
+            in step 2, and store that result in a symbol.  The typedef for the symbol should equal
+            a pointer to the componenttypedef for the array.  Return this symbol.
+        '''
+        '''
+        step1 = self.processast(ast.children[0])
+        assert isinstance(step1.typedef, pascaltypes.ArrayTypeDef) or \
+               (isinstance(step1.typedef, pascaltypes.PointerTypeDef) and 
+                isinstance(step1.typedef.pointsto_typedef.basetype, pascaltypes.ArrayType))
+        
+        if isinstance(step1.typedef, pascaltypes.ArrayTypeDef):
+            pointertypedef = step1.typedef.basetype.componenttypedef.get_pointer_to()
+        else:
+            pointertypedef = step1.typedef.pointsto_typedef.basetype.componenttypedef.get_pointer_to()
+        '''
+
         # Core logic:
         #   T0 = Resolve the lval.  It will either be a symbol with a typedef of an array, or a pointer that
         #   points to a typedef of an array.
@@ -1054,7 +1086,7 @@ class TACBlock:
         else:
             assert isinstance(T0.typedef, pascaltypes.PointerTypeDef)
             assert isinstance(T0.typedef.pointsto_typedef.basetype, pascaltypes.ArrayType)
-            T1 = Symbol(self.gettemporary(), T0.location, T0.typedef.pointsto_typedef.basetype.indextypedef.get_pointer_to())
+            T1 = Symbol(self.gettemporary(), T0.location, T0.typedef.pointsto_typedef.basetype.componenttypedef.get_pointer_to())
             self.symboltable.add(T1)
             # T1 points to same address T0 but has a different type
             self.addnode(TACUnaryNode(T1, TACOperator.ASSIGN, T0))
