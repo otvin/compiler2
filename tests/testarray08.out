@@ -1,0 +1,2 @@
+you should get an error after lower case g.
+ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefgError: array index out of range.

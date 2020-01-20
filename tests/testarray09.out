@@ -1,0 +1,7 @@
+You should see 5 rows of various false and true and then an error.
+TRUE FALSE FALSE FALSE FALSE 
+FALSE TRUE FALSE FALSE FALSE 
+FALSE FALSE TRUE FALSE FALSE 
+FALSE FALSE FALSE TRUE FALSE 
+FALSE FALSE FALSE FALSE TRUE 
+Error: array index out of range.

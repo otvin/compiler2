@@ -1,7 +1,7 @@
 import os
 from tac_ir import TACBlock, TACLabelNode, TACParamNode, TACCallSystemFunctionNode, TACUnaryLiteralNode, \
     TACOperator, TACGenerator, TACCommentNode, TACBinaryNode, TACUnaryNode, TACGotoNode, TACIFZNode, \
-    TACFunctionReturnNode, TACCallFunctionNode
+    TACFunctionReturnNode, TACCallFunctionNode, TACBinaryNodeWithBoundsCheck
 from symboltable import StringLiteral, IntegerLiteral, Symbol, Parameter, ActivationSymbol, RealLiteral, \
     FunctionResultVariableSymbol, CharacterLiteral
 from editor_settings import NUM_SPACES_IN_TAB, NUM_TABS_FOR_COMMENT
@@ -145,24 +145,12 @@ class AssemblyGenerator:
         self.emitcode("ADD RSP, 16")
 
     def emit_movtoregister_fromstack(self, destreg, symbol, comment=None):
-        # TODO - instead of hardcoded r10, have some way to get an available scratch register
         assert isinstance(symbol, Symbol)
 
-        if destreg.upper() in VALID_DWORD_REGISTER_LIST and symbol.typedef.basetype.size == 1:
-            # we can find ourselves doing pointer math where we need to multiply the value from an enumerated
-            # type by an integer representing the component size of an array.  Need to zero-extend that.  It
-            # may come up in other cases as well.
-            movinstr = "movzx"
-            bytekeyword = " byte "
-        else:
-            movinstr = "mov"
-            bytekeyword = ""
-
-        if symbol.is_byref:
-            self.emitcode("mov r10, [{}]".format(symbol.memoryaddress), comment)
-            self.emitcode("{} {}, {} [r10]".format(movinstr, destreg, bytekeyword))
-        else:
-            self.emitcode("{} {}, {} [{}]".format(movinstr, destreg, bytekeyword, symbol.memoryaddress), comment)
+        # function exists because it was written before we fixed literals.  The only difference is the assertion that
+        # we are moving a symbol not a literal, and this is done so that if literals pop up someplace unexpected
+        # we get a notice
+        self.emit_movtoregister_fromstackorliteral(destreg, symbol, comment)
 
     def emit_movtoregister_fromstackorliteral(self, destreg, symbol, comment=None):
         # TODO - instead of hardcoded r10, have some way to get an available scratch register
@@ -863,35 +851,49 @@ class AssemblyGenerator:
                         self.emit_movtostack_fromregister(node.lval, destreg, comment)
                     else:  # pragma: no cover
                         raise ASMGeneratorError("Invalid System Function: {}".format(node.label.name))
+                elif isinstance(node, TACBinaryNodeWithBoundsCheck):
+                    # currently only used for math with structured types where we have pointers
+                    assert isinstance(node.result.typedef, pascaltypes.PointerTypeDef)
+
+                    # only valid binary operation with pointers is addition, when we are accessing
+                    # structured types
+                    assert node.operator == TACOperator.ADD
+
+                    self.emit_movtoregister_fromstackorliteral("rax", node.arg1, comment)
+
+                    # mov into r11d Automatically zero-extends into r11
+                    self.emit_movtoregister_fromstackorliteral("r11d", node.arg2)
+
+                    if isinstance(node.arg2, IntegerLiteral):
+                        # bounds-checking should have been done upstream
+                        assert node.lowerbound <= int(node.arg2.value) <= node.upperbound
+                    else:
+                        # if the value in r11d is less than zero, then we tried to add a negative number, which would be
+                        # a subscript out of range.
+                        self.emitcode("CMP R11D, {}".format(str(node.lowerbound)))
+                        self.emitcode("JL _PASCAL_ARRAYINDEX_ERROR")
+
+                        # we are only adding to pointers that point to arrays.  Not adding to pointers in the middle
+                        # of arrays.  And the addition is always a multiple of the size of the component type.
+                        # So, if the number of bytes being added is greater than the size allocated to the pointer,
+                        # we have gone over and this would be an index error
+                        # TODO - assert someplace that when we're adding we're adding the right multiple.
+                        self.emitcode("CMP R11D, {}".format(str(node.upperbound)))
+                        self.emitcode("JG _PASCAL_ARRAYINDEX_ERROR")
+
+                    self.emitcode("add rax, r11")
+                    self.emitcode("jo _PASCAL_OVERFLOW_ERROR")
+                    self.emit_movtostack_fromregister(node.result, "rax")
+
                 elif isinstance(node, TACBinaryNode):
 
                     assert isinstance(node.result.typedef.basetype, pascaltypes.IntegerType) or \
                             isinstance(node.result.typedef.basetype, pascaltypes.BooleanType) or \
-                            isinstance(node.result.typedef.basetype, pascaltypes.RealType) or \
-                            isinstance(node.result.typedef, pascaltypes.PointerTypeDef)
+                            isinstance(node.result.typedef.basetype, pascaltypes.RealType)
 
                     comment = "{} := {} {} {}".format(node.result.name, node.arg1.name, node.operator, node.arg2.name)
 
-                    if isinstance(node.result.typedef, pascaltypes.PointerTypeDef):
-                        # only valid binary operation with pointers is addition, when we are accessing
-                        # structured types
-                        assert node.operator == TACOperator.ADD
-
-                        self.emit_movtoregister_fromstackorliteral("rax", node.arg1, comment)
-
-                        # mov into r11d Automatically zero-extends into r11
-                        self.emit_movtoregister_fromstackorliteral("r11d", node.arg2)
-
-                        # if the value in r11d is less than zero, then we tried to add a negative number, which would be
-                        # a subscript out of range.
-                        self.emitcode("CMP R11D, 0")
-                        self.emitcode("JL _PASCAL_ARRAYINDEX_ERROR")
-
-                        self.emitcode("add rax, r11")
-                        self.emitcode("jo _PASCAL_OVERFLOW_ERROR")
-                        self.emit_movtostack_fromregister(node.result, "rax")
-
-                    elif isinstance(node.result.typedef.basetype, pascaltypes.IntegerType):
+                    if isinstance(node.result.typedef.basetype, pascaltypes.IntegerType):
                         # TODO - handle something other than 4-byte integers
                         if node.operator in (TACOperator.MULTIPLY, TACOperator.ADD, TACOperator.SUBTRACT):
                             if node.operator == TACOperator.MULTIPLY:

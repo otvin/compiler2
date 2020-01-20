@@ -366,6 +366,26 @@ class TACBinaryNode(TACNode):
         return "{} := {} {} {}".format(str(self.result), str(self.arg1), str(self.operator), str(self.arg2))
 
 
+class TACBinaryNodeWithBoundsCheck(TACBinaryNode):
+    def __init__(self, result, operator, arg1, arg2, lowerbound, upperbound):
+        # Note - this is possibly a hack, because it's 5 arguments, but the alternative is to do a much longer
+        # string where I get the result, then write the explicit test for less than the min and greater than the
+        # max and throw the runtime error from within the TAC.  It would be the first runtime error enforced in the
+        # TAC, so I don't want to extend the TAC to do that right now.
+        assert isinstance(arg1, Symbol)
+        assert isinstance(arg1.typedef, pascaltypes.PointerTypeDef)
+        assert isinstance(lowerbound, int)
+        assert isinstance(upperbound, int)
+        super().__init__(result, operator, arg1, arg2)
+        self.lowerbound = lowerbound
+        self.upperbound = upperbound
+
+    def __str__(self):
+        ret = super().__str__()
+        ret += " [{} must have lowerbound {} and upperbound {}]".format(self.arg2.name, self.lowerbound, self.upperbound)
+        return ret
+
+
 class TACGotoNode(TACNode):
     def __init__(self, label):
         assert isinstance(label, Label)
@@ -1057,6 +1077,8 @@ class TACBlock:
         # logic here - take result of (step 3 minus the minimum index) and multiply by the component size.
         # add that to the result of step 2.
 
+        # TODO - if the array is an enumerated type (and possibly an ordinal type like char) it will not have
+        # a subrange.
         minrange = arraytypedef.basetype.indextypedef.basetype.rangemin_int
         maxrange = arraytypedef.basetype.indextypedef.basetype.rangemax_int
 
@@ -1081,7 +1103,9 @@ class TACBlock:
 
         step5 = Symbol(self.gettemporary(), step1.location, step2.typedef)
         self.symboltable.add(step5)
-        self.addnode(TACBinaryNode(step5, TACOperator.ADD, step2, step4))
+
+        self.addnode(TACBinaryNodeWithBoundsCheck(step5, TACOperator.ADD, step2, step4, 0,
+                                                  arraytypedef.basetype.size-1))
         return step5
 
     def processast_assignment(self, ast):
