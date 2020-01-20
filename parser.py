@@ -991,6 +991,20 @@ class Parser:
             ret = AST(Token(TokenType.MULTIPLY, minus.location, ""), parent_ast)
             ret.children.append(AST(Token(TokenType.SIGNED_INT, minus.location, "-1"), ret))
             ret.children.append(self.parse_term(ret))
+            # now let's see if we can collapse this down.
+            # TODO - we should support this for constants as well
+            if ret.children[1].token.tokentype == TokenType.UNSIGNED_INT:
+                ret = ret.children[1]
+                ret.token.tokentype = TokenType.SIGNED_INT
+                ret.token.value = str(-1 * int(ret.token.value))
+            elif ret.children[1].token.tokentype == TokenType.UNSIGNED_REAL:
+                ret = ret.children[1]
+                ret.token.tokentype = TokenType.SIGNED_REAL
+                ret.token.value = str(-1.0 * float(ret.token.value))
+                # TODO - we have an extra literal here because we added the unsigned literal previously
+                # do not want to remove the unsigned literal because what if we are using that literal
+
+                self.literaltable.add(RealLiteral(ret.token.value, ret.token.location))
         else:
             ret = self.parse_term(parent_ast)
 

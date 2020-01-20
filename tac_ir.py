@@ -388,30 +388,6 @@ class TACIFZNode(TACNode):
         return "{} {} GOTO {}".format(str(self.operator), str(self.val), str(self.label))
 
 
-"""
-class TACBinaryNodeLiteralLeft(TACNode):
-    def __init__(self, result, operator, literal1, arg2):
-        assert isinstance(result, Symbol)
-        assert isinstance(literal1, Literal)
-        assert isinstance(arg2, Symbol)
-        super().__init__(operator)
-        self.result = result
-        self.literal1 = literal1
-        self.arg2 = arg2
-
-
-class TACBinaryNodeLiteralRight(TACNode):
-    def __init__(self, result, operator, arg1, literal2):
-        assert isinstance(result, Symbol)
-        assert isinstance(arg1, Symbol)
-        assert isinstance(literal2, Literal)
-        super().__init__(operator)
-        self.result = result
-        self.arg1 = arg1
-        self.literal2 = literal2
-"""
-
-
 class TACBlock:
     """ For now, assume a TACBlock represents a Pascal Block.  Not entirely language-independent but
     will work.
@@ -902,6 +878,9 @@ class TACBlock:
             self.addnode(TACUnaryLiteralNode(ret, TACOperator.ASSIGN, lit))
         elif isinstance(sym, pascaltypes.EnumeratedTypeValue):
             # need to return a symbol.
+            # TODO - return the enumerated type value so that we can make it a literal here instead of a symbol
+            # assign.  Cannot return an IntegerLiteral here because then it will not assign properly to values
+            # of the enumerated type.  Likely need an EnumeratedTypeLiteral
             tmptypedef = self.symboltable.fetch(sym.typename)
             tmpsym = Symbol(self.gettemporary(), tok.location, tmptypedef)
             self.symboltable.add(tmpsym)
@@ -1078,14 +1057,21 @@ class TACBlock:
         # logic here - take result of (step 3 minus the minimum index) and multiply by the component size.
         # add that to the result of step 2.
 
+        minrange = arraytypedef.basetype.indextypedef.basetype.rangemin_int
+        maxrange = arraytypedef.basetype.indextypedef.basetype.rangemax_int
+
         if isinstance(step3, IntegerLiteral):
             # we can do the math in the compiler
-            indexpos = (int(step3.value) - arraytypedef.basetype.indextypedef.basetype.rangemin_int)
+            if int(step3.value) < minrange or int(step3.value) > maxrange:
+                errstr = "Array Index '{}' out of range in: {}".format(step3.value, step3.location)
+                raise TACException(errstr)
+
+            indexpos = (int(step3.value) - minrange)
             numbytes = indexpos * componenttypedef.basetype.size
             step4 = IntegerLiteral(str(numbytes), step1.location)
         else:
             step4a = Symbol(self.gettemporary(), step1.location, pascaltypes.SIMPLETYPEDEF_INTEGER)
-            indexmin_literal = IntegerLiteral(str(arraytypedef.basetype.indextypedef.basetype.rangemin_int), step1.location)
+            indexmin_literal = IntegerLiteral(str(minrange), step1.location)
             size_literal = IntegerLiteral(str(componenttypedef.basetype.size), step1.location)
             self.symboltable.add(step4a)
             self.addnode(TACBinaryNode(step4a, TACOperator.SUBTRACT, step3, indexmin_literal))
