@@ -1,0 +1,6 @@
+11
+should see ok 3 times then an error
+ok
+ok
+ok
+Error: array index out of range.

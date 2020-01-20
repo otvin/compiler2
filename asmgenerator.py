@@ -16,6 +16,9 @@ class ASMGeneratorError(Exception):
 VALID_REGISTER_LIST = ["RAX", "RBX", "RCX", "RDX", "RSI", "RDI", "RBP", "RSP", "R8", "R9", "R10", "R11", "R12",
                        "R13", "R14", "R15", "R16"]
 
+VALID_DWORD_REGISTER_LIST = ["EAX", "EBX", "ECX", "EDX", "ESI", "EDI", "EBP", "ESP", "R8D", "R9D", "R10D", "R11D",
+                             "R12D", "R13D", "R14D", "R15D", "R16D"]
+
 
 def get_register_slice_bybytes(register, numbytes):
     assert numbytes in [1, 2, 4, 8]
@@ -145,23 +148,44 @@ class AssemblyGenerator:
         # TODO - instead of hardcoded r10, have some way to get an available scratch register
         assert isinstance(symbol, Symbol)
 
+        if destreg.upper() in VALID_DWORD_REGISTER_LIST and symbol.typedef.basetype.size == 1:
+            # we can find ourselves doing pointer math where we need to multiply the value from an enumerated
+            # type by an integer representing the component size of an array.  Need to zero-extend that.  It
+            # may come up in other cases as well.
+            movinstr = "movzx"
+            bytekeyword = " byte "
+        else:
+            movinstr = "mov"
+            bytekeyword = ""
+
         if symbol.is_byref:
             self.emitcode("mov r10, [{}]".format(symbol.memoryaddress), comment)
-            self.emitcode("mov {}, [r10]".format(destreg))
+            self.emitcode("{} {}, {} [r10]".format(movinstr, destreg, bytekeyword))
         else:
-            self.emitcode("mov {}, [{}]".format(destreg, symbol.memoryaddress), comment)
+            self.emitcode("{} {}, {} [{}]".format(movinstr, destreg, bytekeyword, symbol.memoryaddress), comment)
 
     def emit_movtoregister_fromstackorliteral(self, destreg, symbol, comment=None):
         # TODO - instead of hardcoded r10, have some way to get an available scratch register
         assert isinstance(symbol, Symbol) or isinstance(symbol, IntegerLiteral)
+
+        if destreg.upper() in VALID_DWORD_REGISTER_LIST and symbol.typedef.basetype.size == 1:
+            # we can find ourselves doing pointer math where we need to multiply the value from an enumerated
+            # type by an integer representing the component size of an array.  Need to zero-extend that.  It
+            # may come up in other cases as well.
+            movinstr = "movzx"
+            bytekeyword = " byte "
+        else:
+            movinstr = "mov"
+            bytekeyword = ""
+
         if isinstance(symbol, IntegerLiteral):
             self.emitcode("mov {}, {}".format(destreg, symbol.value), comment)
         else:
             if symbol.is_byref:
                 self.emitcode("mov r10, [{}]".format(symbol.memoryaddress), comment)
-                self.emitcode("mov {}, [r10]".format(destreg))
+                self.emitcode("{} {}, {} [r10]".format(movinstr, destreg, bytekeyword))
             else:
-                self.emitcode("mov {}, [{}]".format(destreg, symbol.memoryaddress), comment)
+                self.emitcode("{} {}, {} [{}]".format(movinstr, destreg, bytekeyword, symbol.memoryaddress), comment)
 
     def emit_movtoxmmregister_fromstack(self, destreg, symbol, comment=None):
         assert isinstance(symbol, Symbol)
@@ -221,6 +245,7 @@ class AssemblyGenerator:
         self.emitcode('_stringerr_5 db `Error: value to chr() exceeds 0-255 range for Char type`, 0')
         self.emitcode('_stringerr_6 db `Error: succ() or pred() exceeds range for enumerated type`, 0')
         self.emitcode('_stringerr_7 db `Error: value exceeds range for subrange type`, 0')
+        self.emitcode('_stringerr_8 db `Error: array index out of range.`, 0')
         self.emitcomment("support for write() commands")
         self.emitcode('_printf_intfmt db "%d",0')
         self.emitcode('_printf_strfmt db "%s",0')
@@ -452,8 +477,8 @@ class AssemblyGenerator:
                                 val = ord(node.literal1.value)
                             else:
                                 val = node.literal1.value
-
                             tmpreg = get_register_slice_bybytes("RAX", node.lval.typedef.basetype.size)
+                            self.emitcomment('here')
                             self.emitcode("mov {}, {}".format(tmpreg, val), comment)
                             self.emit_movtostack_fromregister(node.lval, tmpreg)
                         elif node.operator == TACOperator.INTTOREAL:
@@ -857,9 +882,13 @@ class AssemblyGenerator:
                         # mov into r11d Automatically zero-extends into r11
                         self.emit_movtoregister_fromstackorliteral("r11d", node.arg2)
 
+                        # if the value in r11d is less than zero, then we tried to add a negative number, which would be
+                        # a subscript out of range.
+                        self.emitcode("CMP R11D, 0")
+                        self.emitcode("JL _PASCAL_ARRAYINDEX_ERROR")
+
                         self.emitcode("add rax, r11")
                         self.emitcode("jo _PASCAL_OVERFLOW_ERROR")
-                        self.emitcomment(repr(node.result))
                         self.emit_movtostack_fromregister(node.result, "rax")
 
                     elif isinstance(node.result.typedef.basetype, pascaltypes.IntegerType):
@@ -1043,6 +1072,9 @@ class AssemblyGenerator:
         self.emitcode("jmp _PASCAL_PRINT_ERROR")
         self.emitlabel("_PASCAL_SUBRANGE_ERROR")
         self.emitcode("mov rdi, _stringerr_7")
+        self.emitcode("jmp _PASCAL_PRINT_ERROR")
+        self.emitlabel("_PASCAL_ARRAYINDEX_ERROR")
+        self.emitcode("mov rdi, _stringerr_8")
         self.emitcode("jmp _PASCAL_PRINT_ERROR")
 
         self.emitlabel("_PASCAL_PRINT_ERROR")
