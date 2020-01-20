@@ -1074,6 +1074,12 @@ class TACBlock:
 
         step3 = self.processast(ast.children[1])
 
+        # the type of the index expression must be assignment compatible with the index type
+        # (Cooper p.115)
+        if not self.symboltable.are_assignment_compatible(indextypedef.identifier, step3.typedef.identifier):
+            raise TACException("Incorrect type for array index in {}".format(ast.children[1].token.location))
+
+
         # logic here - take result of (step 3 minus the minimum index) and multiply by the component size.
         # add that to the result of step 2.
 
