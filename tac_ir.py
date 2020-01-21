@@ -1085,8 +1085,15 @@ class TACBlock:
 
         # TODO - if the array is an enumerated type (and possibly an ordinal type like char) it will not have
         # a subrange.
-        minrange = arraytypedef.basetype.indextypedef.basetype.rangemin_int
-        maxrange = arraytypedef.basetype.indextypedef.basetype.rangemax_int
+        if isinstance(indextypedef.basetype, pascaltypes.SubrangeType):
+            minrange = indextypedef.basetype.rangemin_int
+            maxrange = indextypedef.basetype.rangemax_int
+        else:
+            assert isinstance(indextypedef.basetype, pascaltypes.OrdinalType)
+            if isinstance(indextypedef.basetype, pascaltypes.IntegerType):
+                raise TACException("Cannot have an array with index range 'integer' in {}".format(ast.token.location))
+            minrange = indextypedef.basetype.position(indextypedef.basetype.min_item())
+            maxrange = indextypedef.basetype.position(indextypedef.basetype.max_item())
 
         if isinstance(step3, IntegerLiteral):
             # we can do the math in the compiler
@@ -1272,8 +1279,8 @@ class TACBlock:
         op = maptokentype_to_tacoperator(tok.tokentype)
 
         if tok.tokentype in (TokenType.AND, TokenType.OR):
-            child1 = self.processast(ast.children[0])
-            child2 = self.processast(ast.children[1])
+            child1 = self.deref_ifneeded(self.processast(ast.children[0]))
+            child2 = self.deref_ifneeded(self.processast(ast.children[1]))
             if not isinstance(child1.typedef.basetype, pascaltypes.BooleanType) or \
                     not isinstance(child2.typedef.basetype, pascaltypes.BooleanType):
                 errstr = "Both arguments to operator '{}' must be Boolean type".format(tok.value)
@@ -1282,7 +1289,7 @@ class TACBlock:
             self.symboltable.add(ret)
             self.addnode(TACBinaryNode(ret, op, child1, child2))
         else:  # tok.tokentype == TokenType.NOT
-            child = self.processast(ast.children[0])
+            child = self.deref_ifneeded(self.processast(ast.children[0]))
             if not isinstance(child.typedef.basetype, pascaltypes.BooleanType):
                 raise TACException(tac_errstr("Operator 'not' can only be applied to Boolean factors", tok))
             ret = Symbol(self.gettemporary(), tok.location, pascaltypes.SIMPLETYPEDEF_BOOLEAN)
