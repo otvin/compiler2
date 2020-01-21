@@ -544,7 +544,7 @@ class TACBlock:
         assert is_isorequiredfunction(ast.token.tokentype)
 
         tok = ast.token
-        tmp = self.processast(ast.children[0])
+        tmp = self.deref_ifneeded(self.processast(ast.children[0]))
         lval = Symbol(self.gettemporary(), tok.location,
                       requiredfunction_returntype(tok.tokentype, tmp.typedef))
         self.symboltable.add(lval)
