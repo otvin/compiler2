@@ -21,6 +21,7 @@ resemble more common BNF terminology.
 
 # Helper Functions
 def token_errstr(tok, msg="Invalid Token:"):
+    # todo - make consistent with tac_errstr which takes token as second parameter this one has it as first
     assert isinstance(tok, Token), "Non-token generating token error {}".format(msg)
     return msg + " '{0}' in {1}".format(tok.value, str(tok.location))
 
@@ -995,16 +996,17 @@ class Parser:
             # TODO - we should support this for constants as well
             if ret.children[1].token.tokentype == TokenType.UNSIGNED_INT:
                 ret = ret.children[1]
-                ret.token.tokentype = TokenType.SIGNED_INT
-                ret.token.value = str(-1 * int(ret.token.value))
+                # if we just update ret.token, that is actually a reference to the original token
+                # in the tokenstream, which causes comments to get messed up.
+                newtok = Token(TokenType.SIGNED_INT, ret.token.location, str(-1*int(ret.token.value)))
+                ret.token = newtok
             elif ret.children[1].token.tokentype == TokenType.UNSIGNED_REAL:
                 ret = ret.children[1]
-                ret.token.tokentype = TokenType.SIGNED_REAL
-                ret.token.value = str(-1.0 * float(ret.token.value))
+                newtok = Token(TokenType.SIGNED_REAL, ret.token.location, str(-1.0 * float(ret.token.value)))
                 # TODO - we have an extra literal here because we added the unsigned literal previously
                 # do not want to remove the unsigned literal because what if we are using that literal
-
-                self.literaltable.add(RealLiteral(ret.token.value, ret.token.location))
+                self.literaltable.add(RealLiteral(newtok.value, newtok.location))
+                ret.token = newtok
         else:
             ret = self.parse_term(parent_ast)
 
