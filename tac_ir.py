@@ -1240,8 +1240,8 @@ class TACBlock:
 
         tok = ast.token
         op = maptokentype_to_tacoperator(tok.tokentype)
-        child1 = self.processast(ast.children[0])
-        child2 = self.processast(ast.children[1])
+        child1 = self.deref_ifneeded(self.processast(ast.children[0]))
+        child2 = self.deref_ifneeded(self.processast(ast.children[1]))
 
         c1type = child1.typedef.basetype
         c2type = child2.typedef.basetype
