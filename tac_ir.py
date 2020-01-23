@@ -1072,7 +1072,7 @@ class TACBlock:
         self.symboltable.add(step2)
         self.addnode(TACUnaryNode(step2, assignop, step1))
 
-        step3 = self.processast(ast.children[1])
+        step3 = self.deref_ifneeded(self.processast(ast.children[1]))
 
         # the type of the index expression must be assignment compatible with the index type
         # (Cooper p.115)
