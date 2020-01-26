@@ -382,7 +382,7 @@ class TACBinaryNodeWithBoundsCheck(TACBinaryNode):
 
     def __str__(self):
         ret = super().__str__()
-        ret += " [{} must have lowerbound {} and upperbound {}]".format(self.arg2.name, self.lowerbound, self.upperbound)
+        ret += " ; {} must have lowerbound {} and upperbound {}".format(self.arg2.name, self.lowerbound, self.upperbound)
         return ret
 
 
@@ -455,6 +455,10 @@ class TACBlock:
         if isinstance(sym, Literal):
             return sym
         elif isinstance(sym.typedef, pascaltypes.PointerTypeDef):
+            # TODO - this works fine now when the only pointers we use are arrays.  But once we have actual pointers,
+            # we won't necessarily want to deref them.  So we will need a way to test whether the sym is a real pointer
+            # or a pointer to an array value.  Maybe a subclass off of pascaltypes.PointerTypeDef?
+
             # make a new symbol that has as its base type, the base type of the pointer
             # assign deref of the pointer to the new symbol.
             basetypesym = Symbol(self.gettemporary(), sym.location, sym.typedef.pointsto_typedef)
@@ -970,11 +974,10 @@ class TACBlock:
 
         tok = ast.token
         if tok.tokentype in (TokenType.UNSIGNED_INT, TokenType.SIGNED_INT):
-            lit = IntegerLiteral(tok.value, tok.location)
+            ret = IntegerLiteral(tok.value, tok.location)
         else:
             assert tok.tokentype == TokenType.MAXINT
-            lit = IntegerLiteral(pascaltypes.STRMAXINT, tok.location)
-        ret = lit
+            ret = IntegerLiteral(pascaltypes.STRMAXINT, tok.location)
         return ret
 
     def processast_realliteral(self, ast):

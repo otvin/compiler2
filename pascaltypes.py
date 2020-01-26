@@ -289,6 +289,7 @@ class PointerType(BaseType):
         super().__init__()
         self.typename = "pointer"
         self.size = 8
+        #todo - make consistent with typedef - pointsto_typedef vs. pointstotype
         self.pointstotype = pointstotype
 
 
@@ -473,6 +474,7 @@ class PointerTypeDef(TypeDef):
     def __init__(self, identifier, denoter, basetype, pointsto_typedef):
         assert isinstance(basetype, PointerType)
         assert isinstance(pointsto_typedef, TypeDef)
+        # todo - assert that the pointsto_typedef and the basetype.pointstotype are the same
         super().__init__(identifier, denoter, basetype)
         self.pointsto_typedef = pointsto_typedef
 
