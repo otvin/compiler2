@@ -620,7 +620,7 @@ class AssemblyGenerator:
 
                             # rax has the pointer to the memory
                             arrays_to_free_after_proc_call += 1
-                            self.emitcode("PUSH RAX")
+                            self.emitcode("PUSH RAX", "store address of this array copy to free later")
 
                             numintparams += 1
                             assert numintparams <= 6
@@ -646,7 +646,8 @@ class AssemblyGenerator:
                             raise ASMGeneratorError("Invalid Parameter Type")
 
                     if arrays_to_free_after_proc_call % 2 > 0:
-                        self.emitcode("PUSH RAX", "keep stack aligned at 16 bit boundary")
+                        self.emitcode("PUSH RAX",
+                                      "bogus push to keep stack aligned at 16-bit boundary before function call")
 
                     self.emitcode("call {}".format(node.label), "call {}()".format(node.funcname))
                     if act_symbol.returntypedef is not None:

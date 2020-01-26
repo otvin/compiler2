@@ -138,7 +138,7 @@ def main(onlytest=""):
 
     ONLYTEST = onlytest
 
-    run_test_list("array", 1, 21)
+    run_test_list("array", 1, 22)
     run_test_list("assign", 1, 1)
     run_test_list("boolean", 1, 2)
     run_test_list("bugfix", 1, 1)
