@@ -41,7 +41,8 @@ Compiler2 supports the following Pascal Language features:
   *  Can create a new type that is an alias for Real, Integer, Char, or Boolean, or one that is defined as one of a previously-defined alias.
   *  Can create a new user-defined enumerated type
   *  Can create a new type that is a subrange of an Integer, Char, Boolean, or Enumerated type
-  * If create a new subrange or enumerated type when declaring a variable, the type will be created anonymously (unnamed)
+  *  Can create an array with arbitrary number of dimensions, using any ordinal or subrange as the index, but arrays can currently only be declared as global variables
+  *  If create a new subrange or enumerated type when declaring a variable, the type will be created anonymously (unnamed)
 * Global and local constants
     * Signed Real, Signed Integer, Character, or String
     * the required constants ```true```, ```false```, and ```maxint```
@@ -82,7 +83,7 @@ has made it easier to surpass the functionality of my previous attempt.
 
 ### Unit tests
 
-Compiler2 currently passes 174 unit tests, including 46 of the 60 unit tests created for Compiler, plus an additional test which represented the one known bug from Compiler.  You can execute the unit test suite by running:
+Compiler2 currently passes 194 unit tests, including 46 of the 60 unit tests created for Compiler, plus an additional test which represented the one known bug from Compiler.  You can execute the unit test suite by running:
 
 ```python3 compiler_test.py```
 

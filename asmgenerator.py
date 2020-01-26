@@ -76,7 +76,7 @@ def intparampos_to_register(pos):
     return ret
 
 
-def isIntegerOrBooleanSubrangeType(basetype):
+def is_integerorboolean_subrangetype(basetype):
     assert isinstance(basetype, pascaltypes.BaseType)
     ret = False
     if isinstance(basetype, pascaltypes.SubrangeType):
@@ -108,9 +108,7 @@ class AssemblyGenerator:
             numtabs = NUM_TABS_FOR_COMMENT - 1 - (len(s) // NUM_SPACES_IN_TAB)
             if numtabs < 0:
                 numtabs = 0
-            tabstr = ""
-            for i in range(numtabs):
-                tabstr += "\t"
+            tabstr = "\t" * numtabs
             self.emitln('\t' + s + tabstr + ';' + comment)
 
     def emitlabel(self, labelname, comment=None):
@@ -120,20 +118,16 @@ class AssemblyGenerator:
             numtabs = NUM_TABS_FOR_COMMENT - (len(labelname) // NUM_SPACES_IN_TAB)
             if numtabs < 0:
                 numtabs = 0
-            tabstr = ""
-            for i in range(numtabs):
-                tabstr += "\t"
+            tabstr = "\t" * numtabs
             self.emitln(labelname + ':' + tabstr + ';' + comment)
 
     def emitsection(self, sectionname):
         self.emitln("section .{}".format(sectionname))
 
     def emitcomment(self, commentstr, indented=False):
-
         tabstr = ""
         if indented:
-            for i in range(NUM_TABS_FOR_COMMENT):
-                tabstr += "\t"
+            tabstr = "\t" * NUM_TABS_FOR_COMMENT
         self.emitln("{}; {}".format(tabstr, commentstr))
 
     def emitpushxmmreg(self, reg):
@@ -185,7 +179,7 @@ class AssemblyGenerator:
 
     def emit_movaddresstoregister_fromstack(self, destreg, symbol, comment=None):
         assert isinstance(symbol, Symbol)
-        if symbol.is_byref:  # TODO - need to test this
+        if symbol.is_byref or isinstance(symbol.typedef, pascaltypes.ArrayTypeDef):
             self.emitcode("mov {}, [{}]".format(destreg, symbol.memoryaddress), comment)
         else:
             self.emitcode("lea {}, [{}]".format(destreg, symbol.memoryaddress), comment)
@@ -220,11 +214,14 @@ class AssemblyGenerator:
     def generate_externs(self):
         self.emitcode("extern printf")
         self.emitcode("extern putchar")
+        self.emitcode("extern calloc")
+        self.emitcode("extern free")
         self.emitcode("extern fflush")
 
     def generate_datasection(self):
         self.emitsection("data")
         self.emitcomment("error handling strings")
+        # TODO - Rename the string values to include the official pascal error codes
         self.emitcode('_stringerr_0 db `Overflow error`, 0')
         self.emitcode('_stringerr_1 db `Division by zero error`, 0')
         self.emitcode('_stringerr_2 db `Error: Divisor in Mod must be positive`, 0')
@@ -234,6 +231,8 @@ class AssemblyGenerator:
         self.emitcode('_stringerr_6 db `Error: succ() or pred() exceeds range for enumerated type`, 0')
         self.emitcode('_stringerr_7 db `Error: value exceeds range for subrange type`, 0')
         self.emitcode('_stringerr_8 db `Error: array index out of range.`, 0')
+        self.emitcode('_stringerr_9 db `Error: dynamic memory allocation failed.`, 0')
+        self.emitcode('_stringerr_10 db `Error: unable to de-allocate dynamic memory.`, 0')
         self.emitcomment("support for write() commands")
         self.emitcode('_printf_intfmt db "%d",0')
         self.emitcode('_printf_strfmt db "%s",0')
@@ -281,6 +280,15 @@ class AssemblyGenerator:
             if block.ismain:
                 self.emitlabel("main")
                 self.emitcode("finit")  # TODO - this should only be written if we use x87 anywhere.
+
+                # need to init any global variables that are arrays
+                for symname in self.tacgenerator.globalsymboltable.symbols.keys():
+                    sym = self.tacgenerator.globalsymboltable.fetch(symname)
+                    if isinstance(sym, Symbol) and isinstance(sym.typedef, pascaltypes.ArrayTypeDef):
+                        self.emitcode("mov rdi, {}".format(sym.typedef.basetype.numitemsinarray), 'Allocate memory for global array {}'.format(symname))
+                        self.emitcode("mov rsi, {}".format(sym.typedef.basetype.componenttypedef.basetype.size))
+                        self.emitcode("call _PASCAL_ALLOCATE_MEMORY")
+                        self.emitcode("mov [{}], rax".format(sym.memoryaddress))
                 tacnodelist = block.tacnodes
             else:
                 self.emitlabel(block.tacnodes[0].label.name, block.tacnodes[0].comment)
@@ -466,7 +474,6 @@ class AssemblyGenerator:
                             else:
                                 val = node.literal1.value
                             tmpreg = get_register_slice_bybytes("RAX", node.lval.typedef.basetype.size)
-                            self.emitcomment('here')
                             self.emitcode("mov {}, {}".format(tmpreg, val), comment)
                             self.emit_movtostack_fromregister(node.lval, tmpreg)
                         elif node.operator == TACOperator.INTTOREAL:
@@ -854,13 +861,14 @@ class AssemblyGenerator:
                 elif isinstance(node, TACBinaryNodeWithBoundsCheck):
                     # currently only used for math with structured types where we have pointers
                     assert isinstance(node.result.typedef, pascaltypes.PointerTypeDef)
-
                     # only valid binary operation with pointers is addition, when we are accessing
                     # structured types
                     assert node.operator == TACOperator.ADD
+                    comment = "{} := {} + {} with bounds check {} to {}"
+                    comment = comment.format(node.result.name, node.arg1.name, node.arg2.name, node.lowerbound,
+                                             node.upperbound)
 
                     self.emit_movtoregister_fromstackorliteral("rax", node.arg1, comment)
-
                     # mov into r11d Automatically zero-extends into r11
                     self.emit_movtoregister_fromstackorliteral("r11d", node.arg2)
 
@@ -972,7 +980,7 @@ class AssemblyGenerator:
                         else:
                             if isinstance(n1type, pascaltypes.BooleanType) or \
                                     isinstance(n1type, pascaltypes.IntegerType) or \
-                                    isIntegerOrBooleanSubrangeType(n1type):
+                                    is_integerorboolean_subrangetype(n1type):
                                 # TODO: Handling String types in relational operators
 
                                 # Boolean and Integer share same jump instructions
@@ -1045,12 +1053,41 @@ class AssemblyGenerator:
             if totalstorageneeded > 0 or block.ismain:
                 self.emitcode("MOV RSP, RBP", "restore stack pointer")
                 self.emitcode("POP RBP")
+            if block.ismain:
+                # deallocate global arrays
+                # TODO: refactor this loop to be something like "get global array symbols" or something
+                for symname in self.tacgenerator.globalsymboltable.symbols.keys():
+                    sym = self.tacgenerator.globalsymboltable.fetch(symname)
+                    if isinstance(sym, Symbol) and isinstance(sym.typedef, pascaltypes.ArrayTypeDef):
+                        self.emitcode("mov rdi, [{}]".format(sym.memoryaddress), "Free memory for global array {}".format(symname))
+                        self.emitcode("call _PASCAL_DISPOSE_MEMORY")
             if not block.ismain:
                 self.emitcode("RET")
 
+    def generate_helperfunctioncode(self):
+        # TODO - optimize so we only include code if features needing it are in the asm code
+        # TODO - consider moving functions into ASM files so we can build ASM unit tests.
+        self.emitlabel("_PASCAL_ALLOCATE_MEMORY")
+        self.emitcomment("takes a number of members (RDI) and a size (RSI)")
+        self.emitcomment("returns pointer to memory in RAX.")
+        # just a passthrough for CALLOC
+        # yes, calloc() initializes memory and Pascal is not supposed to do so, but calloc() is safer
+        # in that it tests for an overflow when you multiply nmemb * size whereas malloc() does not.
+        self.emitcode("call calloc wrt ..plt")
+        self.emitcode("test rax, rax")
+        self.emitcode("jle _PASCAL_CALLOC_ERROR")
+        self.emitcode("ret")
+        self.emitlabel("_PASCAL_DISPOSE_MEMORY")
+        self.emitcomment("takes a pointer to memory (RDI)")
+        # just a passthrough for FREE
+        self.emitcode("call free wrt ..plt")
+        self.emitcode("test rax, rax")
+        self.emitcode("jl _PASCAL_DISPOSE_ERROR")
+        self.emitcode("ret")
+
+
+
     def generate_errorhandlingcode(self):
-        # overflow
-        self.emitcomment("overflow error")
         self.emitlabel("_PASCAL_OVERFLOW_ERROR")
         self.emitcode("mov rdi, _stringerr_0")
         self.emitcode("jmp _PASCAL_PRINT_ERROR")
@@ -1078,6 +1115,12 @@ class AssemblyGenerator:
         self.emitlabel("_PASCAL_ARRAYINDEX_ERROR")
         self.emitcode("mov rdi, _stringerr_8")
         self.emitcode("jmp _PASCAL_PRINT_ERROR")
+        self.emitlabel("_PASCAL_CALLOC_ERROR")
+        self.emitcode("mov rdi, _stringerr_9")
+        self.emitcode("jmp _PASCAL_PRINT_ERROR")
+        self.emitlabel("_PASCAL_DISPOSE_ERROR")
+        self.emitcode("mov rdi, _stringerr_10")
+        self.emitcode("jmp _PASCAL_PRINT_ERROR")
 
         self.emitlabel("_PASCAL_PRINT_ERROR")
         self.emitcomment("required: pointer to error message in rdi")
@@ -1097,6 +1140,7 @@ class AssemblyGenerator:
         self.emitcode("global main")
         self.generate_code()
         self.emitcode("JMP _PASCAL_EXIT")
+        self.generate_helperfunctioncode()
         self.generate_errorhandlingcode()
 
     def generate_bsssection(self):
@@ -1110,8 +1154,11 @@ class AssemblyGenerator:
                         label = "_globalvar_{}".format(str(varseq))
                         varseq += 1
                         sym.memoryaddress = "rel {}".format(label)
-                        self.emitcode("{} resb {}".format(label, sym.typedef.basetype.size),
-                                      "global variable {}".format(symname))
+                        if isinstance(sym.typedef, pascaltypes.ArrayTypeDef):
+                            self.emitcode("{} resb 8".format(label), "global variable {}".format(symname))
+                        else:
+                            self.emitcode("{} resb {}".format(label, sym.typedef.basetype.size),
+                                          "global variable {}".format(symname))
 
     def generate(self, objfilename, exefilename):
         self.generate_externs()
