@@ -41,7 +41,8 @@ Compiler2 supports the following Pascal Language features:
   *  Can create a new type that is an alias for Real, Integer, Char, or Boolean, or one that is defined as one of a previously-defined alias.
   *  Can create a new user-defined enumerated type
   *  Can create a new type that is a subrange of an Integer, Char, Boolean, or Enumerated type
-  *  Can create an array with arbitrary number of dimensions, using any ordinal or subrange as the index, but arrays can currently only be declared as global variables
+  *  Can create an array with arbitrary number of dimensions, using any ordinal or subrange as the index, but arrays can currently only be declared as global variables.
+        * Note the keyword "packed" is parsed, but ignored, as only booleans and enumerated types are not already stored packed.
   *  If create a new subrange or enumerated type when declaring a variable, the type will be created anonymously (unnamed)
 * Global and local constants
     * Signed Real, Signed Integer, Character, or String
@@ -63,7 +64,7 @@ Compiler2 also has the following functionality that compiler1 did not:
 * Ability to do relational operations comparing Integer and Real types, and relational operations involving enumerated types.
 * abs(), sqr(), sin(), cos(), exp(), ln(), sqrt(), trunc(), round(), chr(), ord(), succ(), pred(), and odd()
 * Boolean operators not, or, and
-* Type Definitions, including Subrange Types and Enumerated Types
+* Type Definitions, including Subrange Types, Enumerated Types, and arrays.
 
 Compiler2 also uses the official BNF from the ISO standard, whereas Compiler1 used a BNF that I updated based on a variation I had downloaded from a random website.
 
@@ -83,7 +84,7 @@ has made it easier to surpass the functionality of my previous attempt.
 
 ### Unit tests
 
-Compiler2 currently passes 194 unit tests, including 46 of the 60 unit tests created for Compiler, plus an additional test which represented the one known bug from Compiler.  You can execute the unit test suite by running:
+Compiler2 currently passes 196 unit tests, including 46 of the 60 unit tests created for Compiler, plus an additional test which represented the one known bug from Compiler.  You can execute the unit test suite by running:
 
 ```python3 compiler_test.py```
 

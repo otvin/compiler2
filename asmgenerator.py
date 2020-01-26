@@ -285,7 +285,8 @@ class AssemblyGenerator:
                 for symname in self.tacgenerator.globalsymboltable.symbols.keys():
                     sym = self.tacgenerator.globalsymboltable.fetch(symname)
                     if isinstance(sym, Symbol) and isinstance(sym.typedef, pascaltypes.ArrayTypeDef):
-                        self.emitcode("mov rdi, {}".format(sym.typedef.basetype.numitemsinarray), 'Allocate memory for global array {}'.format(symname))
+                        self.emitcode("mov rdi, {}".format(sym.typedef.basetype.numitemsinarray),
+                                      'Allocate memory for global array {}'.format(symname))
                         self.emitcode("mov rsi, {}".format(sym.typedef.basetype.componenttypedef.basetype.size))
                         self.emitcode("call _PASCAL_ALLOCATE_MEMORY")
                         self.emitcode("mov [{}], rax".format(sym.memoryaddress))
@@ -409,18 +410,26 @@ class AssemblyGenerator:
                         # TODO - should this be move xmm register to stack?
                         self.emitcode("movsd [{}], xmm0".format(node.lval.memoryaddress))
                     elif node.operator == TACOperator.ASSIGN:
-                        reg = get_register_slice_bybytes("RAX", node.lval.typedef.basetype.size)
-
-                        # first, get the arg1 into reg.  If arg1 is a byref parameter, we need to
-                        # dereference the pointer.
-                        comment = "Move {} into {}".format(node.arg1.name, node.lval.name)
-                        self.emit_movtoregister_fromstack(reg, node.arg1, comment)
-                        if isinstance(node.lval.typedef.basetype, pascaltypes.SubrangeType):
-                            # need to validate that the value is in the range before assigning it
-                            self.generate_subrangetest_code(reg, node.lval.typedef.basetype)
-                        # now, get the value from reg into lval.  If lval is a byref parameter, we
-                        # need to dereference the pointer.
-                        self.emit_movtostack_fromregister(node.lval, reg)
+                        if isinstance(node.lval.typedef, pascaltypes.ArrayTypeDef):
+                            assert node.lval.typedef.basetype.size == node.arg1.typedef.basetype.size
+                            comment = "Copy array {} into {}".format(node.arg1.name, node.lval.name)
+                            self.emitcode("mov rdi, [{}]".format(node.lval.memoryaddress), comment)
+                            self.emitcode("mov rsi, [{}]".format(node.arg1.memoryaddress))
+                            self.emitcode("mov rcx, {}".format(node.lval.typedef.basetype.size))
+                            self.emitcode("cld")
+                            self.emitcode("rep movsb")
+                        else:
+                            reg = get_register_slice_bybytes("RAX", node.lval.typedef.basetype.size)
+                            # first, get the arg1 into reg.  If arg1 is a byref parameter, we need to
+                            # dereference the pointer.
+                            comment = "Move {} into {}".format(node.arg1.name, node.lval.name)
+                            self.emit_movtoregister_fromstack(reg, node.arg1, comment)
+                            if isinstance(node.lval.typedef.basetype, pascaltypes.SubrangeType):
+                                # need to validate that the value is in the range before assigning it
+                                self.generate_subrangetest_code(reg, node.lval.typedef.basetype)
+                            # now, get the value from reg into lval.  If lval is a byref parameter, we
+                            # need to dereference the pointer.
+                            self.emit_movtostack_fromregister(node.lval, reg)
                     elif node.operator == TACOperator.ASSIGNADDRESSOF:
                         assert isinstance(node.lval.typedef, pascaltypes.PointerTypeDef)
                         comment = "Move address of {} into {}".format(node.arg1.name, node.lval.name)
@@ -428,12 +437,22 @@ class AssemblyGenerator:
                         self.emit_movtostack_fromregister(node.lval, "RAX")
                     elif node.operator == TACOperator.ASSIGNTODEREF:
                         assert isinstance(node.lval.typedef, pascaltypes.PointerTypeDef)
-                        comment = "Mov {} to address contained in {}".format(node.arg1.name, node.lval.name)
-                        # TODO - handle Real types
-                        reg = get_register_slice_bybytes("R11", node.arg1.typedef.basetype.size)
-                        self.emit_movtoregister_fromstack(reg, node.arg1, comment)
-                        self.emitcode("MOV R10, [{}]".format(node.lval.memoryaddress))
-                        self.emitcode("MOV [R10], {}".format(reg))
+                        if isinstance(node.arg1.typedef, pascaltypes.ArrayTypeDef):
+                            # TODO likely need some assertion here to protect memory
+                            # TODO we use this same rep movsb code in two blocks, should refactor
+                            comment = "Copy array {} into {}".format(node.arg1.name, node.lval.name)
+                            self.emitcode("mov rdi, [{}]".format(node.lval.memoryaddress, comment))
+                            self.emitcode("mov rsi, [{}]".format(node.arg1.memoryaddress))
+                            self.emitcode("mov rcx, {}".format(node.arg1.typedef.basetype.size))
+                            self.emitcode("cld")
+                            self.emitcode("rep movsb")
+                        else:
+                            comment = "Mov {} to address contained in {}".format(node.arg1.name, node.lval.name)
+                            # TODO - handle Real types
+                            reg = get_register_slice_bybytes("R11", node.arg1.typedef.basetype.size)
+                            self.emit_movtoregister_fromstack(reg, node.arg1, comment)
+                            self.emitcode("MOV R10, [{}]".format(node.lval.memoryaddress))
+                            self.emitcode("MOV [R10], {}".format(reg))
                     elif node.operator == TACOperator.ASSIGNDEREFTO:
                         assert isinstance(node.arg1.typedef, pascaltypes.PointerTypeDef)
                         comment = "Mov deref of {} to {}".format(node.arg1.name, node.lval.name)
@@ -1085,8 +1104,6 @@ class AssemblyGenerator:
         self.emitcode("jl _PASCAL_DISPOSE_ERROR")
         self.emitcode("ret")
 
-
-
     def generate_errorhandlingcode(self):
         self.emitlabel("_PASCAL_OVERFLOW_ERROR")
         self.emitcode("mov rdi, _stringerr_0")
@@ -1155,7 +1172,8 @@ class AssemblyGenerator:
                         varseq += 1
                         sym.memoryaddress = "rel {}".format(label)
                         if isinstance(sym.typedef, pascaltypes.ArrayTypeDef):
-                            self.emitcode("{} resb 8".format(label), "global variable {}".format(symname))
+                            self.emitcode("{} resb 8".format(label),
+                                          "address for global array variable {}".format(symname))
                         else:
                             self.emitcode("{} resb {}".format(label, sym.typedef.basetype.size),
                                           "global variable {}".format(symname))
