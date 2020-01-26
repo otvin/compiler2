@@ -382,7 +382,8 @@ class TACBinaryNodeWithBoundsCheck(TACBinaryNode):
 
     def __str__(self):
         ret = super().__str__()
-        ret += " ; {} must have lowerbound {} and upperbound {}".format(self.arg2.name, self.lowerbound, self.upperbound)
+        ret += " ; {} must have lowerbound {} and upperbound {}"
+        ret = ret.format(self.arg2.name, self.lowerbound, self.upperbound)
         return ret
 
 
@@ -873,7 +874,7 @@ class TACBlock:
         if isinstance(sym, FunctionResultVariableSymbol):
             # need to see if it's really the result of a function, or a recursive function call
             # if it is the result of a function, the parent will be an assign and this will be the left child
-            if ast.parent.token.tokentype == TokenType.ASSIGNMENT and ast.parent.children[0]==ast:
+            if ast.parent.token.tokentype == TokenType.ASSIGNMENT and ast.parent.children[0] == ast:
                 pass
             else:
                 # we know it is a function call, so get the activation symbol, which is stored in the parent
@@ -941,13 +942,21 @@ class TACBlock:
                         errstr = errstr.format(sym.paramlist[i].symbol.name, sym.name, child.token.location)
                         raise TACException(errstr)
 
-                    # TODO - THIS NEEDS TO BE REPLACED WITH THE RULES ON PARAMETERS NOT JUST "SAME TYPE"
+                    # For variable parameters, the actual parameter must have same type as the formal parameter
                     if not ast.nearest_symboltable().are_same_type(tmp.typedef.identifier,
                                                                    sym.paramlist[i].symbol.typedef.identifier):
-                        # if tmp.typedef.basetype.typename != sym.paramlist[i].symbol.typedef.basetype.typename:
                         errstr = "Type Mismatch - parameter {} of {}() must be type {} in {}"
                         errstr = errstr.format(sym.paramlist[i].symbol.name, sym.name,
                                                str(sym.paramlist[i].symbol.typedef.denoter), child.token.location)
+                        raise TACException(errstr)
+                else:
+                    # For value parameters, the actual parameter must be assignment compatible with the formal
+                    # parameter
+                    if not ast.nearest_symboltable().are_assignment_compatible(
+                            sym.paramlist[i].symbol.typedef.identifier, tmp.typedef.identifier):
+                        errstr = "Type Mismatch - {} is not assignment compatible with parameter {} of {}() in {}"
+                        errstr = errstr.format(tmp.typedef.denoter,
+                                               sym.paramlist[i].symbol.name, sym.name, child.token.location)
                         raise TACException(errstr)
 
                 if isinstance(tmp.typedef.basetype, pascaltypes.IntegerType) and \
@@ -1056,8 +1065,8 @@ class TACBlock:
 
         step1 = self.processast(ast.children[0])
         assert isinstance(step1.typedef, pascaltypes.ArrayTypeDef) or \
-               (isinstance(step1.typedef, pascaltypes.PointerTypeDef) and 
-                isinstance(step1.typedef.pointsto_typedef.basetype, pascaltypes.ArrayType))
+            (isinstance(step1.typedef, pascaltypes.PointerTypeDef) and
+             isinstance(step1.typedef.pointsto_typedef, pascaltypes.ArrayTypeDef))
         
         if isinstance(step1.typedef, pascaltypes.ArrayTypeDef):
             arraytypedef = step1.typedef
@@ -1081,7 +1090,6 @@ class TACBlock:
         # (Cooper p.115)
         if not self.symboltable.are_assignment_compatible(indextypedef.identifier, step3.typedef.identifier):
             raise TACException("Incorrect type for array index in {}".format(ast.children[1].token.location))
-
 
         # logic here - take result of (step 3 minus the minimum index) and multiply by the component size.
         # add that to the result of step 2.
@@ -1145,7 +1153,8 @@ class TACBlock:
         if isinstance(rval, pascaltypes.EnumeratedTypeValue):
             comment = "Convert literal {} to integer value {}".format(rval.identifier, rval.value)
             self.addnode(TACCommentNode(comment))
-            self.addnode(TACUnaryLiteralNode(lval, TACOperator.ASSIGN, IntegerLiteral(str(rval.value), ast.children[1].token.location)))
+            self.addnode(TACUnaryLiteralNode(lval, TACOperator.ASSIGN,
+                                             IntegerLiteral(str(rval.value), ast.children[1].token.location)))
         else:
             if isinstance(rval, ConstantSymbol) or isinstance(rval, IntegerLiteral):
                 t2value = rval.value

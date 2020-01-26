@@ -473,8 +473,24 @@ class SymbolTable:
             # as None is assigned at the BaseType level
             assert t1_originaltypedef.denoter.typename is not None
             assert t2_originaltypedef.denoter.typename is not None
+
             if t1_originaltypedef.denoter.typename.lower() == t2_originaltypedef.denoter.typename.lower():
-                ret = True
+                if t1_originaltypedef.denoter.typename.lower() == "array":
+                    assert isinstance(t1_originaltypedef.denoter, pascaltypes.ArrayType)
+                    assert isinstance(t2_originaltypedef.denoter, pascaltypes.ArrayType)
+                    # both t1 and t2 are arrays, need to see if they are in turn same type of array
+                    t1od = t1_originaltypedef.denoter
+                    t2od = t2_originaltypedef.denoter  # save some typing
+                    if t1_originalsymtable.are_same_type(t1od.indextypedef.identifier, t2od.indextypedef.identifier) \
+                            and t1_originalsymtable.are_same_type(t1od.componenttypedef.identifier,
+                                                                  t2od.componenttypedef.identifier) \
+                            and t1od.ispacked == t2od.ispacked:
+                        ret = True
+                    else:
+                        ret = False
+
+                else:
+                    ret = True
             else:
                 ret = False
 
@@ -586,6 +602,7 @@ class SymbolTable:
             ret = True
         else:
             ret = False
+
         return ret
 
 
