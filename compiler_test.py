@@ -92,6 +92,13 @@ def do_compilefailtest(infilename, resultfilename):
             print("FAIL: {0}".format(infilename))
             print(e)
 
+def do_compilefail_bugfixtest(numstr):
+    # some bugfix tests are compile fail tests
+    global ONLYTEST
+    if ONLYTEST == "" or ONLYTEST == "bugfix":
+        pasfile = "tests/testbugfix" + numstr + ".pas"
+        outfile = "tests/testbugfix" + numstr + ".out"
+        do_compilefailtest(pasfile, outfile)
 
 def generate_test_list(topic, start, end):
     testlist = []
@@ -135,6 +142,7 @@ def main(onlytest=""):
     run_test_list("assign", 1, 1)
     run_test_list("boolean", 1, 2)
     run_test_list("bugfix", 1, 1)
+    do_compilefail_bugfixtest("02")
     # note testbyref06 in Compiler2 was "known_bug1.pas" in the old Compiler suite
     run_test_list("byref", 1, 6)
     run_test_list("char", 1, 3)
