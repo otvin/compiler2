@@ -1,1 +1,1 @@
-Type Mismatch - array is not assignment compatible with parameter a of printlittlearr() in file:tests/compilefail59.pas line:17    column:20 
+Error D.7: Type Mismatch - array is not assignment compatible with parametera of printlittlearr() in file:tests/compilefail59.pas line:17    column:20 

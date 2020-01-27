@@ -3,4 +3,4 @@ should be -2: -2
 should be True: TRUE
 should be False: FALSE
 next line should fail:
-Error: succ() or pred() exceeds range for enumerated type
+Error D.38 or D.39: succ() or pred() exceeds range for enumerated type

@@ -3,4 +3,4 @@ now it's pear
 now it's banana
 now it's cherry
 next line should fail with an error
-Error: succ() or pred() exceeds range for enumerated type
+Error D.38 or D.39: succ() or pred() exceeds range for enumerated type

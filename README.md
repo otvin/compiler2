@@ -134,7 +134,29 @@ var m:mysubrange;
 begin
     m := a253;
     m := succ(m);  {this fails as out of range but should succeed}
-    
-
 ```
+
+### ISO Standard Errors
+Section 3.1 of the ISO Standard defines an Error as "A violation by a program of the requirements of this International Standard that a processor is permitted to leave undetected."  Section 5.1(f) of the standard says that, for each error, the processor has to report whether the error is detected at compile-time, detected at run-time, or not detected at all.  While compiler2 is nowhere near an ISO-compatible processor, it does detect many of the errors from the standard.  These are documented in the table below.
+
+There are 60 total errors in the ISO standard.  Compiler2 handles 13 of them, and partially handles 1 more.  The remaining errors apply to not-yet-implemented language features or are not detected.
+
+| Error | Ref. Section|Description| How Handled|
+|------|---------|---------|-------------|
+|D.1|6.5.3.2|For an indexed-variable closest-containing a single index-expression, it is an error if the value of the index-expression is not assignment-compatible with the index-type of the array-type.|Detected at compile-time|
+|D.7|6.6.3.2|It is an error if the value of each corresponding actual value parameter is not assignment-compatible with the type possessed by the formal-parameter.|Detected at compile-time|
+|D.33|6.6.6.2|For ln(x), it is an error if x is not greater than zero.|Detected at runtime|
+|D.34|6.6.6.2|For sqrt(x), it is an error if x is negative.|Detected at runtime|
+|D.37|6.6.6.3|For chr(x), the function returns a result of char-type that is the value whose ordinal number is equal to the value of the expression x if such a character value exists.  It is an error if such a character value does not exist.|Detected at runtime|
+|D.38|6.6.6.4|For succ(x), the function yields a value whose ordinal number is one greater than that of x, if such a value exists.  It is an error if such a value does not exist.|Detected at runtime|
+|D.39|6.6.6.4|For pred(x), the function yields a value whose ordinal number is one less than that of x, if such a value exists.  It is an error if such a value does not exist.|Detected at runtime|
+|D.44|6.7.2.2|A term of the form x/y is an error if y is zero.|Detected at runtime|
+|D.45|6.7.2.2|A term of the form i div j is an error if j is zero.|Detected at runtime|
+|D.46|6.7.2.2|A term of the form i mod j is an error if j is zero or negative.|Detected at runtime|
+|D.48|6.7.3|It is an error if the result of an activation of a function is undefined upon completion of the algorithm of the activation|Partially Detected at Compile-time. All functions must contain at least one assignment to the return value, but there is no check to see that it executes.|
+|D.49|6.8.2.2|For an assignment-statement, it is an error if the expression is of an ordinal-type whose value is not assignment-compatible with the type possessed by the variable or function identifier|Detected at compile-time|
+|D.52|6.8.3.9|For a for-statement, it is an error if the value of the initial-value is not assignment-compatible with the type possessed by the control-variable if the statement of the for-statement is executed|Detected at runtime, but reported as a generic value exceeds range for subrange, not D.52 specifically|
+|D.53|6.8.3.9|For a for-statement, it is an error if the value of the final-value is not assignment-compatible with the type possessed by the control-variable if the statement of the for-statement is executed.|Detected at runtime, but reported as a generic value exceeds range for subrange, not D.53 specifically|
+
+
 

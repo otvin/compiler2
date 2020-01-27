@@ -3,4 +3,4 @@ ln(10) = 2.3026: 2.302585092994
 ln(3.718) = 1.3132: 1.313185889299
 ln(98765.432) = 11.5005: 11.500502943972
 next line should error
-Error: Cannot take ln() of number less than or equal to zero
+Error D.33: Cannot take ln() of number less than or equal to zero

@@ -95,4 +95,4 @@
 126: ~
 127: 
 and this should fail with an error:
-Error: value to chr() exceeds 0-255 range for Char type
+Error D.37: value to chr() exceeds 0-255 range for Char type

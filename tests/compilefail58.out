@@ -1,1 +1,1 @@
-Incorrect type for array index in file:tests/compilefail58.pas line:18    column:7  
+Error D.1: Incorrect type for array index in file:tests/compilefail58.pas line:18    column:7  

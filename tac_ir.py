@@ -538,7 +538,7 @@ class TACBlock:
         if tok.tokentype == TokenType.FUNCTION:
             function_has_returnvalue = self.validate_function_returnsvalue(str_procname, ast)
             if not function_has_returnvalue:
-                errstr = 'Function {} must have a return value'.format(str_procname)
+                errstr = 'Error D.48: Function {} must have a return value'.format(str_procname)
                 raise TACException(tac_errstr(errstr, tok))
             self.addnode(TACFunctionReturnNode(self.symboltable.fetch(str_procname)))
         else:
@@ -929,7 +929,6 @@ class TACBlock:
 
             for i in range(0, len(ast.children)):
                 child = ast.children[i]
-                # TODO - check type of the parameters for a match, more than just real vs. int
                 tmp = self.processast(child)
 
                 if sym.paramlist[i].is_byref:
@@ -954,7 +953,8 @@ class TACBlock:
                     # parameter
                     if not ast.nearest_symboltable().are_assignment_compatible(
                             sym.paramlist[i].symbol.typedef.identifier, tmp.typedef.identifier):
-                        errstr = "Type Mismatch - {} is not assignment compatible with parameter {} of {}() in {}"
+                        errstr = "Error D.7: Type Mismatch - {} is not assignment compatible with parameter"
+                        errstr += "{} of {}() in {}"
                         errstr = errstr.format(tmp.typedef.denoter,
                                                sym.paramlist[i].symbol.name, sym.name, child.token.location)
                         raise TACException(errstr)
@@ -1089,7 +1089,8 @@ class TACBlock:
         # the type of the index expression must be assignment compatible with the index type
         # (Cooper p.115)
         if not self.symboltable.are_assignment_compatible(indextypedef.identifier, step3.typedef.identifier):
-            raise TACException("Incorrect type for array index in {}".format(ast.children[1].token.location))
+            # Error D.1 comes from 6.5.3.2 of the ISO standard
+            raise TACException("Error D.1: Incorrect type for array index in {}".format(ast.children[1].token.location))
 
         # logic here - take result of (step 3 minus the minimum index) and multiply by the component size.
         # add that to the result of step 2.
@@ -1165,6 +1166,9 @@ class TACBlock:
                                                                        rval.typedef.identifier, t2value):
                 if t2value is not None:
                     errstr = "Cannot assign value '{}' of type {} to type {}"
+                    if isinstance(rval.typedef.basetype, pascaltypes.OrdinalType):
+                        # the error in 6.8.2.2 is specific to ordinal types.
+                        errstr = "Error D.49: " + errstr
                     errstr = errstr.format(t2value, rval.typedef.identifier, lval_reftypedef.identifier)
                 else:
                     errstr = "Cannot assign {} type to {}".format(rval.typedef.identifier, lval_reftypedef.identifier)
