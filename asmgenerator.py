@@ -407,6 +407,21 @@ class AssemblyGenerator:
                             regslice = get_register_slice_bybytes(paramreg, param.symbol.typedef.basetype.size)
                             self.emitcode("mov [{}], {}".format(localsym.memoryaddress, regslice),
                                           "Copy parameter {} to stack".format(param.symbol.name))
+
+                    # allocate space for local variable arrays
+                    for symname in block.symboltable.symbols.keys():
+                        if block.paramlist.fetch(symname) is None:
+                            localsym = block.symboltable.symbols[symname]
+                            if isinstance(localsym, Symbol) and not isinstance(localsym, FunctionResultVariableSymbol):
+                                if isinstance(localsym.typedef, pascaltypes.ArrayTypeDef):
+                                    # TODO - duplicate code from allocating for global arrays, should refactor
+                                    self.emitcode("mov rdi, {}".format(localsym.typedef.basetype.numitemsinarray),
+                                                  'Allocate memory for local array {}'.format(symname))
+                                    self.emitcode(
+                                        "mov rsi, {}".format(localsym.typedef.basetype.componenttypedef.basetype.size))
+                                    self.emitcode("call _PASCAL_ALLOCATE_MEMORY")
+                                    self.emitcode("mov [{}], rax".format(localsym.memoryaddress))
+
                 else:
                     for symname in block.symboltable.symbols.keys():
                         localsym = block.symboltable.symbols[symname]
@@ -1162,7 +1177,16 @@ class AssemblyGenerator:
                         self.emitcode("mov rdi, [{}]".format(sym.memoryaddress),
                                       "Free memory for global array {}".format(symname))
                         self.emitcode("call _PASCAL_DISPOSE_MEMORY")
-            if not block.ismain:
+            else:
+                # deallocate local arrays
+                for symname in block.symboltable.symbols.keys():
+                    if block.paramlist.fetch(symname) is None:
+                        localsym = block.symboltable.symbols[symname]
+                        if isinstance(localsym, Symbol) and not isinstance(localsym, FunctionResultVariableSymbol):
+                            if isinstance(localsym.typedef, pascaltypes.ArrayTypeDef):
+                                self.emitcode("mov rdi, [{}]".format(localsym.memoryaddress),
+                                              "Free memory for local array {}".format(symname))
+                                self.emitcode("call _PASCAL_DISPOSE_MEMORY")
                 self.emitcode("RET")
 
     def generate_helperfunctioncode(self):
