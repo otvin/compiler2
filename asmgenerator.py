@@ -256,7 +256,6 @@ class AssemblyGenerator:
     def generate_datasection(self):
         self.emitsection("data")
         self.emitcomment("error handling strings")
-        # TODO - Rename the string values to include the official pascal error codes
         self.emitcode('_stringerr_0 db `Overflow error`, 0')
         self.emitcode('_stringerr_1 db `Error D.44 or D.45: Division by zero error`, 0')
         self.emitcode('_stringerr_2 db `Error D.46: Divisor in Mod must be positive`, 0')
@@ -447,6 +446,7 @@ class AssemblyGenerator:
                     if isinstance(node.returnval, Symbol):
                         # do the function returning stuff here
                         # the "ret" itself is emitted below.
+                        # TODO - Detect if the return value was not set, and error if it wasn't.
                         if isinstance(node.returnval.typedef.basetype, pascaltypes.IntegerType):
                             self.emitcode("mov EAX, [{}]".format(node.returnval.memoryaddress), "set up return value")
                         elif isinstance(node.returnval.typedef.basetype, pascaltypes.BooleanType):
@@ -502,7 +502,8 @@ class AssemblyGenerator:
                             self.emit_memcopy(node.lval, node.arg1, node.arg1.typedef.basetype.size, comment, False)
                         else:
                             comment = "Mov {} to address contained in {}".format(node.arg1.name, node.lval.name)
-                            # TODO - handle Real types
+                            # Note - this works with reals just fine, because we will movsd into an xmm register
+                            # before doing anything with them.
                             reg = get_register_slice_bybytes("R11", node.arg1.typedef.basetype.size)
                             self.emit_movtoregister_fromstack(reg, node.arg1, comment)
                             self.emitcode("MOV R10, [{}]".format(node.lval.memoryaddress))
@@ -901,7 +902,10 @@ class AssemblyGenerator:
 
                         comment = "parameter {} for ord()".format(str(params[-1].paramval))
                         if params[-1].paramval.typedef.basetype.size == 1:
-                            # TODO - this can easily be done in a single mov statement
+                            # TODO - this can easily be done in a single mov statement of the form
+                            # movzx EAX, byte [rbp-8]
+                            # or whatever - but need to decide whether it's worth hacking up
+                            # emit_movtoregister_fromstack to handle this one-off.
                             self.emit_movtoregister_fromstack("R11B", params[-1].paramval, comment)
                             self.emitcode("MOVZX EAX, R11B")
                         else:
