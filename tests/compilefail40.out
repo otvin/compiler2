@@ -1,1 +1,1 @@
-Cannot mix char and Enumerated type: car with relational operator
+Cannot compare types 'char' and 'transport' with relational operator in file:tests/compilefail40.pas line:15    column:10 
