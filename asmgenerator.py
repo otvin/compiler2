@@ -1090,9 +1090,7 @@ class AssemblyGenerator:
                         n1type = node.arg1.typedef.basetype
                         n2type = node.arg2.typedef.basetype
 
-                        if not block.symboltable.are_compatible(n1type.typename, n2type.typename):  # pragma: no cover
-                            raise ASMGeneratorError("Cannot mix {} and {} with relational operator".format(str(n1type),
-                                                                                                           str(n2type)))
+                        assert block.symboltable.are_compatible(n1type.typename, n2type.typename)
 
                         if node.operator in (TACOperator.AND, TACOperator.OR):
                             assert isinstance(n1type, pascaltypes.BooleanType)

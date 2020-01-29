@@ -1266,12 +1266,17 @@ class TACBlock:
         # types, or one operand shall be of real-type and the other of integer-type.  Table 6, has
         # simple-types, pointer-types, and string-types allowed in the comparisons..
 
-        # TODO - REPLACE WITH COMPATIBILITY TEST
-
-        if isinstance(c1type, pascaltypes.BooleanType) and not isinstance(c2type, pascaltypes.BooleanType):
-            raise TACException(tac_errstr("Cannot compare Boolean to non-Boolean", tok))
-        if isinstance(c2type, pascaltypes.BooleanType) and not isinstance(c1type, pascaltypes.BooleanType):
-            raise TACException(tac_errstr("Cannot compare Boolean to non-Boolean", tok))
+        if not self.symboltable.are_compatible(child1.typedef.identifier, child2.typedef.identifier):
+            if isinstance(c1type, pascaltypes.IntegerType) and isinstance(c2type, pascaltypes.RealType):
+                pass
+            elif isinstance(c2type, pascaltypes.IntegerType) and isinstance(c1type, pascaltypes.RealType):
+                pass
+            elif isinstance(c1type, pascaltypes.BooleanType) or isinstance(c2type, pascaltypes.BooleanType):
+                raise TACException(tac_errstr("Cannot compare Boolean to non-Boolean", tok))
+            else:
+                errstr = "Cannot compare types '{}' and '{}' with relational operator"
+                errstr = errstr.format(child1.typedef.identifier, child2.typedef.identifier)
+                raise TACException(tac_errstr(errstr, tok))
 
         if isinstance(c1type, pascaltypes.IntegerType) and isinstance(c2type, pascaltypes.RealType):
             newchild1 = self.process_sym_inttoreal(child1)
