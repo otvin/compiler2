@@ -20,8 +20,7 @@ resemble more common BNF terminology.
 
 
 # Helper Functions
-def token_errstr(tok, msg="Invalid Token:"):
-    # todo - make consistent with tac_errstr which takes token as second parameter this one has it as first
+def token_errstr(msg, tok):
     assert isinstance(tok, Token), "Non-token generating token error {}".format(msg)
     return msg + " '{0}' in {1}".format(tok.value, str(tok.location))
 
@@ -436,7 +435,7 @@ class Parser:
         if type_token.tokentype not in (TokenType.INTEGER, TokenType.REAL, TokenType.BOOLEAN,
                                         TokenType.CHAR, TokenType.IDENTIFIER):
             errstr = "Invalid type identifier '{}'".format(type_token.value)
-            raise ParseException(token_errstr(type_token, errstr))
+            raise ParseException(token_errstr(errstr, type_token))
 
         if type_token.tokentype == TokenType.IDENTIFIER:
             symboltypedef = parent_ast.symboltable.fetch(type_token.value)
@@ -518,7 +517,7 @@ class Parser:
             try:
                 parent_ast.symboltable.add(newetv)
             except SymbolException:
-                errstr = token_errstr(idtoken, "Identifier redefined: '{}'".format(idtoken.value))
+                errstr = token_errstr("Identifier redefined: '{}'".format(idtoken.value), idtoken)
                 raise ParseException(errstr)
 
         newbasetype = pascaltypes.EnumeratedType(typename, etvlist)
@@ -542,7 +541,7 @@ class Parser:
             tmptok = self.tokenstream.peektoken()  # used for error messages
             newtypedef = self.parse_typedenoter(parent_ast)
             if not isinstance(newtypedef.basetype, pascaltypes.OrdinalType):
-                raise ParseException(token_errstr(tmptok, "Invalid type for array index"))
+                raise ParseException(token_errstr("Invalid type for array index"), tmptok)
             ret.append(newtypedef)
             if self.tokenstream.peektokentype() == TokenType.COMMA:
                 self.getexpectedtoken(TokenType.COMMA)
@@ -615,7 +614,7 @@ class Parser:
 
         else:
             tok = self.tokenstream.eattoken()
-            raise ParseException(token_errstr(tok, "Invalid Structured Type {}".format(tok.value)))
+            raise ParseException(token_errstr("Invalid Structured Type {}".format(tok.value)), tok)
 
     def parse_typedenoter(self, parent_ast, optionaltypename=""):
         # 6.4.1 <type-denoter> ::= <type-identifier> | <new-type>
@@ -885,7 +884,7 @@ class Parser:
                         ret.token.tokentype = TokenType.LBRACKET
                         # and now we go back to the arrayloop, parsing the expression
                     else:
-                        raise ParseException(token_errstr(nexttok))
+                        raise ParseException(token_errstr("Invalid Token:", nexttok))
             else:
                 mainloopdone = True
 
@@ -966,7 +965,7 @@ class Parser:
                     return self.parse_variableaccess(parent_ast)
             else:
                 errtok = self.tokenstream.eattoken()
-                raise ParseException(token_errstr(errtok, "Invalid <unsigned-constant>"))
+                raise ParseException(token_errstr("Invalid <unsigned-constant>", errtok))
         return ret
 
     def parse_term(self, parent_ast):
@@ -1127,7 +1126,7 @@ class Parser:
     def parse_gotostatement(self, parent_ast):
         assert parent_ast is not None
         assert self.tokenstream.peektokentype() == TokenType.GOTO, "Parser_parse_gotostatement called without goto"
-        raise ParseException(token_errstr(self.tokenstream.eattoken()), "goto not handled at this time")
+        raise ParseException(token_errstr("goto not handled at this time", self.tokenstream.eattoken()))
 
     def parse_actualparameterlist(self, parent_ast):
         # 6.7.3 - <actual-parameter-list> ::= "(" <actual-parameter> {"," <actual-parameter>} ")"
@@ -1214,23 +1213,23 @@ class Parser:
             next_tokenname = self.tokenstream.peektoken().value
             tmpsym = parent_ast.nearest_symboldefinition(next_tokenname)
             if tmpsym is None:
-                raise ParseException(token_errstr(self.tokenstream.peektoken(), "Identifier undefined"))
+                raise ParseException(token_errstr("Identifier undefined", self.tokenstream.peektoken()))
             elif isinstance(tmpsym, ActivationSymbol):
                 if tmpsym.returntypedef is not None:
                     errstr = "Cannot invoke function without assigning its return value: "
-                    raise ParseException(token_errstr(self.tokenstream.eattoken(), errstr))
+                    raise ParseException(token_errstr(errstr, self.tokenstream.eattoken()))
                 return self.parse_procedurestatement(parent_ast)
             elif isinstance(tmpsym, VariableSymbol):
                 return self.parse_assignmentstatement(parent_ast)
             elif isinstance(tmpsym, ConstantSymbol):
                 errstr = "Cannot assign to constant".format(next_tokenname)
-                raise ParseException(token_errstr(self.tokenstream.eattoken(), errstr))
+                raise ParseException(token_errstr(errstr, self.tokenstream.eattoken()))
             else:
                 tok = self.tokenstream.eattoken()
                 errstr = "Identifier '{}' seen at {}, unclear how to parse".format(tok.value, tok.location)
                 raise ParseException(errstr)
         else:
-            raise ParseException(token_errstr(self.tokenstream.eattoken()))
+            raise ParseException(token_errstr("Invalid Token:", self.tokenstream.eattoken()))
 
     def parse_ifstatement(self, parent_ast):
         # 6.8.3.4 <if-statement> ::= "if" <Boolean-expression> "then" <statement> [else-part]
@@ -1316,7 +1315,7 @@ class Parser:
         ret.comment = self.tokenstream.printstarttoend()
         nexttwo = self.tokenstream.peekmultitokentype(2)
         if nexttwo[0] != TokenType.IDENTIFIER:
-            errstr = token_errstr(self.tokenstream.eattoken(), "Identifier expected following 'for' statement")
+            errstr = token_errstr("Identifier expected following 'for' statement", self.tokenstream.eattoken())
             raise ParseException(errstr)
         if nexttwo[1] != TokenType.ASSIGNMENT:
             self.tokenstream.eattoken()  # eat the identifier
@@ -1328,7 +1327,7 @@ class Parser:
 
         if self.tokenstream.peektokentype() not in (TokenType.TO, TokenType.DOWNTO):
             tmptok = self.tokenstream.eattoken()
-            errstr = token_errstr(tmptok, "'to' or 'downto' expected, instead saw {}".format(tmptok.value))
+            errstr = token_errstr("'to' or 'downto' expected, instead saw {}".format(tmptok.value), tmptok)
             raise ParseException(errstr)
 
         self.tokenstream.setstartpos()
@@ -1492,16 +1491,16 @@ class Parser:
                         if self.tokenstream.peektokentype() != TokenType.RPAREN:
                             self.getexpectedtoken(TokenType.COMMA)
                     else:
-                        raise ParseException(token_errstr(tok, "Duplicate program parameter"))
+                        raise ParseException(token_errstr("Duplicate program parameter", tok))
                 elif tok.tokentype == TokenType.OUTPUT:
                     if ASTAttributes.PROGRAM_OUTPUT not in ret.attrs.keys():
                         ret.attrs[ASTAttributes.PROGRAM_OUTPUT] = True
                         if self.tokenstream.peektokentype() != TokenType.RPAREN:
                             self.getexpectedtoken(TokenType.COMMA)
                     else:
-                        raise ParseException(token_errstr(tok, "Duplicate program parameter"))
+                        raise ParseException(token_errstr("Duplicate program parameter", tok))
                 else:
-                    raise ParseException(token_errstr(tok, "Invalid program parameter"))
+                    raise ParseException(token_errstr("Invalid program parameter", tok))
             self.getexpectedtoken(TokenType.RPAREN)
         self.getexpectedtoken(TokenType.SEMICOLON)
         ret.children = self.parse_block(ret)
