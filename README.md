@@ -84,7 +84,7 @@ has made it easier to surpass the functionality of my previous attempt.
 
 ### Unit tests
 
-Compiler2 currently passes 205 unit tests, including 46 of the 60 unit tests created for Compiler, plus an additional test which represented the one known bug from Compiler.  You can execute the unit test suite by running:
+Compiler2 currently passes 206 unit tests, including 46 of the 60 unit tests created for Compiler, plus an additional test which represented the one known bug from Compiler.  You can execute the unit test suite by running:
 
 ```python3 compiler_test.py```
 
@@ -123,18 +123,8 @@ Johnson, M. and Zelenski, J. "Three Address Code Examples" - handout from Stanfo
 
 ### Known bugs
 
-Minor (found Jan 19, 2020) - if an enumerated type has over 130 values, and a subrange of that type is created that has more than 129 values, if a succ() operation is called that would return a value greater than the 128th element in the subrange, the succ() fails when it should succeed.
+None
 
-Sample code:
-
-```
-type myenumtype=(a1, a2, a3, a4, ...etc... , a255);
-    mysubrange=(a1 .. a254);
-var m:mysubrange;
-begin
-    m := a253;
-    m := succ(m);  {this fails as out of range but should succeed}
-```
 
 ### ISO Standard Errors
 Section 3.1 of the ISO Standard defines an Error as "A violation by a program of the requirements of this International Standard that a processor is permitted to leave undetected."  Section 5.1(f) of the standard says that, for each error, the processor has to report whether the error is detected at compile-time, detected at run-time, or not detected at all.  While compiler2 is nowhere near an ISO-compatible processor, it does detect many of the errors from the standard.  These are documented in the table below.

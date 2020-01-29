@@ -299,11 +299,19 @@ class AssemblyGenerator:
 
     def generate_subrangetest_code(self, reg, subrange_basetype):
         assert isinstance(subrange_basetype, pascaltypes.SubrangeType)
+        if subrange_basetype.size == 1:
+            # single-byte subranges use unsigned comparisons; integer (4-byte) subranges use signed comparisons.
+            jumpless = "JB"
+            jumpgreater = "JA"
+        else:
+            jumpless = "JL"
+            jumpgreater = "JG"
+
         comment = "Validate we are within proper range"
         self.emitcode("CMP {}, {}".format(reg, subrange_basetype.rangemin_int), comment)
-        self.emitcode("JL _PASCAL_SUBRANGE_ERROR")
+        self.emitcode("{} _PASCAL_SUBRANGE_ERROR".format(jumpless))
         self.emitcode("CMP {}, {}".format(reg, subrange_basetype.rangemax_int))
-        self.emitcode("JG _PASCAL_SUBRANGE_ERROR")
+        self.emitcode("{} _PASCAL_SUBRANGE_ERROR".format(jumpgreater))
 
     def generate_code(self):
         params = []  # this is a stack of parameters

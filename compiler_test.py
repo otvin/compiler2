@@ -144,6 +144,7 @@ def main(onlytest=""):
     run_test_list("bugfix", 1, 1)
     do_compilefail_bugfixtest("02")
     # note testbyref06 in Compiler2 was "known_bug1.pas" in the old Compiler suite
+    run_test_list("bugfix", 3, 3)
     run_test_list("byref", 1, 6)
     run_test_list("char", 1, 3)
     run_test_list("comments", 1, 1)
