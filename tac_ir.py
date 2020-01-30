@@ -62,7 +62,6 @@
 
     TODO:
         Memory allocation (new/dispose)
-        Array References
         Read/Readln from console
         Read/Write from/to files
 """
@@ -210,7 +209,7 @@ def requiredfunction_returntype(tokentype, paramtypedef):
     # Remaining functions in 6.6.6.2 return reals
     # Transfer functions in 6.6.6.3 return ints
     # ord() in 6.6.6.4 returns int.
-    # chr() in 6.6.6.4 returns char - TODO - support character type
+    # chr() in 6.6.6.4 returns char
     # functions in 6.6.6.5 return Boolean
     if tokentype in (TokenType.ABS, TokenType.SQR, TokenType.SUCC, TokenType.PRED):
         # this is a bit of hackery but it works
@@ -351,7 +350,6 @@ class TACUnaryLiteralNode(TACNode):
         return "{} {} {}".format(str(self.lval), str(self.operator), litval)
 
 
-# TODO if there is something other than T0 := T1 <oper> T2 then need to pass in the first operator too
 class TACBinaryNode(TACNode):
     def __init__(self, result, operator, arg1, arg2):
         assert isinstance(result, Symbol)
@@ -897,6 +895,8 @@ class TACBlock:
                 lit = CharacterLiteral(sym.value, tok.location)
             elif isinstance(sym.typedef.basetype, pascaltypes.RealType):
                 lit = RealLiteral(sym.value, tok.location)
+            elif isinstance(sym.typedef.basetype, pascaltypes.EnumeratedType):
+                lit = IntegerLiteral(str(sym.typedef.basetype.position(sym.value)), tok.location)
             else:
                 assert isinstance(sym.typedef.basetype, pascaltypes.IntegerType)
                 lit = IntegerLiteral(sym.value, tok.location)

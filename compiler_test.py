@@ -120,7 +120,6 @@ def run_test_list(topic, start, end):
             outfile = "tests/test" + test + ".out"
             dotest(pasfile, outfile)
 
-
 def run_compilefail_test_list(start, end):
     global ONLYTEST
     if ONLYTEST == "" or ONLYTEST == "compilefail":
@@ -148,7 +147,7 @@ def main(onlytest=""):
     run_test_list("byref", 1, 6)
     run_test_list("char", 1, 3)
     run_test_list("comments", 1, 1)
-    run_test_list("const", 1, 5)
+    run_test_list("const", 1, 6)
     run_test_list("divide", 1, 1)
     run_test_list("for", 1, 5)
     run_test_list("fpmath", 1, 7)

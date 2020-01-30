@@ -166,7 +166,6 @@ class FunctionResultVariableSymbol(VariableSymbol):
 
 class ConstantSymbol(Symbol):
     def __init__(self, name, location, typedef, value):
-        # only valid constants are maxint, integers, character strings, booleans, and reals per 6.3 of the iso standard
         assert isinstance(typedef, pascaltypes.TypeDef)
         assert (isinstance(typedef.basetype, pascaltypes.OrdinalType)
                 or isinstance(typedef.basetype, pascaltypes.RealType)
