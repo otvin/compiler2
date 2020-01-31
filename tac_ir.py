@@ -879,28 +879,32 @@ class TACBlock:
                 sym = self.symboltable.parent.fetch(tok.value)
 
         if isinstance(sym, ConstantSymbol):
-            ret = Symbol(self.gettemporary(), tok.location, sym.typedef)
-            self.symboltable.add(ret)
-            if isinstance(sym.typedef.basetype, pascaltypes.BooleanType):
-                # the value of the symbol will always be a string
-                assert sym.value.lower() in ("true", "false")
-                if sym.value.lower() == 'true':
-                    tokval = "1"
-                else:
-                    tokval = "0"
-                lit = BooleanLiteral(tokval, tok.location)
-            elif isinstance(sym.typedef.basetype, pascaltypes.StringLiteralType):
-                lit = StringLiteral(sym.value, tok.location)
-            elif isinstance(sym.typedef.basetype, pascaltypes.CharacterType):
-                lit = CharacterLiteral(sym.value, tok.location)
-            elif isinstance(sym.typedef.basetype, pascaltypes.RealType):
-                lit = RealLiteral(sym.value, tok.location)
-            elif isinstance(sym.typedef.basetype, pascaltypes.EnumeratedType):
-                lit = IntegerLiteral(str(sym.typedef.basetype.position(sym.value)), tok.location)
+            # optimization for integers - we can just return the literal itself instead of an assignment to
+            # a local symbol.
+            if isinstance(sym.typedef.basetype, pascaltypes.IntegerType):
+                return IntegerLiteral(sym.value, tok.location)
             else:
-                assert isinstance(sym.typedef.basetype, pascaltypes.IntegerType)
-                lit = IntegerLiteral(sym.value, tok.location)
-            self.addnode(TACUnaryLiteralNode(ret, TACOperator.ASSIGN, lit))
+                ret = Symbol(self.gettemporary(), tok.location, sym.typedef)
+                self.symboltable.add(ret)
+                if isinstance(sym.typedef.basetype, pascaltypes.BooleanType):
+                    # the value of the symbol will always be a string
+                    assert sym.value.lower() in ("true", "false")
+                    if sym.value.lower() == 'true':
+                        tokval = "1"
+                    else:
+                        tokval = "0"
+                    lit = BooleanLiteral(tokval, tok.location)
+                elif isinstance(sym.typedef.basetype, pascaltypes.StringLiteralType):
+                    lit = StringLiteral(sym.value, tok.location)
+                elif isinstance(sym.typedef.basetype, pascaltypes.CharacterType):
+                    lit = CharacterLiteral(sym.value, tok.location)
+                elif isinstance(sym.typedef.basetype, pascaltypes.RealType):
+                    lit = RealLiteral(sym.value, tok.location)
+                else:
+                    assert isinstance(sym.typedef.basetype, pascaltypes.EnumeratedType)
+                    lit = IntegerLiteral(str(sym.typedef.basetype.position(sym.value)), tok.location)
+
+                self.addnode(TACUnaryLiteralNode(ret, TACOperator.ASSIGN, lit))
         elif isinstance(sym, pascaltypes.EnumeratedTypeValue):
             # need to return a symbol.
             # TODO - return the enumerated type value so that we can make it a literal here instead of a symbol

@@ -92,7 +92,6 @@ class ASTAttributes(Enum):
     PROGRAM_OUTPUT = auto()  # was the program-parameter OUTPUT provided
 
 
-# TODO - should an AST be a container with AST Nodes inside?
 class AST:
     def __init__(self, token, parent, comment=""):
         assert(isinstance(token, Token)), "AST.__init__: AST requires a token"
@@ -217,25 +216,11 @@ class Parser:
         # value of the constant will be a string
         # optionalconstid is if you are using this to parse a constant definition, it enables us to catch
         # a self-referencing constant definition.
-        # TODO - define constant of enumerated type
-        #
         #
         # 6.3 <constant> ::= [sign] (<unsigned-number> | <constant-identifier>) | <character-string>
         # 6.1.5 <sign> ::= "+" | "-"
         # 6.3 <constant-identifier> ::= <identifier>
         # 6.1.7 <character-string> ::= "'" <string-element> {<string-element>} "'"
-
-        # Note - this appears to state that you cannot have a constant of a user-defined type, but you can
-        # do:
-        #   const pi = 3.14; negpi = -pi;
-        # <constant-identifier> can be an identifier of another constant, or one of the required constants
-        #   maxint, true, or false.
-        # TODO - This seems legal.  Perhaps when I wrote the above I did it because constants come before types in
-        # blocks.
-        #
-        # type fruit=(apple,pear,banana);
-        # procedure foo();
-        #   const myfruit = apple;
         #
         # p.65 of [Cooper] states that if a constant has a sign then the next token must be
         # a real, an integer, or a real/integer constant.  That can't be captured in the BNF.
@@ -992,7 +977,6 @@ class Parser:
             ret.children.append(AST(Token(TokenType.SIGNED_INT, minus.location, "-1"), ret))
             ret.children.append(self.parse_term(ret))
             # now let's see if we can collapse this down.
-            # TODO - we should support this for constants as well
             if ret.children[1].token.tokentype == TokenType.UNSIGNED_INT:
                 ret = ret.children[1]
                 # if we just update ret.token, that is actually a reference to the original token
