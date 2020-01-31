@@ -247,28 +247,31 @@ class TokenStream:
         self.tokenlist = []
         self.pos = 0
         # TODO - see if we can do something with slices here.
-        self.printstartpos = 0
-        self.printendpos = 0
+        self.printstartpos = []
+        self.printendpos = []
 
     def setstartpos(self):
-        self.printstartpos = self.pos
+        self.printstartpos.append(self.pos)
 
     def setendpos(self):
-        self.printendpos = self.pos
+        self.printendpos.append(self.pos)
 
     def printstarttoend(self):
         # TODO - there is a more pythonic way of doing this I am certain
         ret = ""
-        i = self.printstartpos
-        while i < self.printendpos:
+        start = self.printstartpos[-1]
+        end = self.printendpos[-1]
+
+        i = start
+        while i < end:
             if self.tokenlist[i].tokentype == TokenType.CHARSTRING:
                 ret += "'" + self.tokenlist[i].value + "'"
             else:
                 ret += self.tokenlist[i].value
             ret += " "
             i += 1
-        self.printstartpos = 0
-        self.printendpos = 0
+        del self.printstartpos[-1]
+        del self.printendpos[-1]
         return ret
 
     def addtoken(self, token):

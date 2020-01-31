@@ -1165,15 +1165,12 @@ class Parser:
         # 6.6.1 - <procedure-identifier> ::= <identifier>
         assert self.tokenstream.peektokentype() == TokenType.IDENTIFIER, \
             "Parser.parseprocedurestatement called and identifier not next token."
-
-        # TODO - fix the setstartpos/setendpos so that comments can nest, and we can get the comments for
-        # code inside the parameter list parsing.  For now, cannot do that.
         self.tokenstream.setstartpos()
         ret = AST(self.getexpectedtoken(TokenType.IDENTIFIER), parent_ast)
-        self.tokenstream.setendpos()
-        ret.comment = "Call procedure: {}".format(self.tokenstream.printstarttoend())
         if self.tokenstream.peektokentype() == TokenType.LPAREN:
             self.parse_actualparameterlist(ret)
+        self.tokenstream.setendpos()
+        ret.comment = "Call procedure: {}".format(self.tokenstream.printstarttoend())
         return ret
 
     def parse_simplestatement(self, parent_ast):
@@ -1295,8 +1292,6 @@ class Parser:
 
         self.tokenstream.setstartpos()
         ret = AST(self.getexpectedtoken(TokenType.FOR), parent_ast)
-        self.tokenstream.setendpos()
-        ret.comment = self.tokenstream.printstarttoend()
         nexttwo = self.tokenstream.peekmultitokentype(2)
         if nexttwo[0] != TokenType.IDENTIFIER:
             errstr = token_errstr("Identifier expected following 'for' statement", self.tokenstream.eattoken())
@@ -1322,6 +1317,8 @@ class Parser:
         todowntoast.children.append(finalvalueast)
         ret.children.append(todowntoast)
         self.getexpectedtoken(TokenType.DO)
+        self.tokenstream.setendpos()
+        ret.comment = self.tokenstream.printstarttoend()
         ret.children.append(self.parse_statement(ret))
 
         return ret
