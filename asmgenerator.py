@@ -313,6 +313,186 @@ class AssemblyGenerator:
         self.emitcode("CMP {}, {}".format(reg, subrange_basetype.rangemax_int))
         self.emitcode("{} _PASCAL_SUBRANGE_ERROR".format(jumpgreater))
 
+    def generate_parameter_comments(self, block):
+        assert isinstance(block, TACBlock)
+        for param in block.paramlist:
+            localsym = block.symboltable.fetch(param.symbol.name)
+            self.emitcomment("Parameter {} - [{}]".format(param.symbol.name, localsym.memoryaddress), True)
+
+    def generate_localvar_comments(self, block):
+        assert isinstance(block, TACBlock)
+        for symname in block.symboltable.symbols.keys():
+            if block.ismain or block.paramlist.fetch(symname) is None:
+                localsym = block.symboltable.symbols[symname]
+                if isinstance(localsym, Symbol):
+                    if isinstance(localsym, FunctionResultVariableSymbol):
+                        self.emitcomment("Function Result - [{}]".format(localsym.memoryaddress), True)
+                    else:
+                        self.emitcomment("Local Variable {} - [{}]".format(symname, localsym.memoryaddress), True)
+
+    def generate_array_variable_memory_allocation_code(self, sym):
+        assert isinstance(sym, Symbol)
+        assert isinstance(sym.typedef, pascaltypes.ArrayTypeDef)
+        self.emitcode("mov rdi, {}".format(sym.typedef.basetype.numitemsinarray),
+                      'Allocate memory for array {}'.format(sym.name))
+        self.emitcode("mov rsi, {}".format(sym.typedef.basetype.componenttypedef.basetype.size))
+        self.emitcode("call _PASCAL_ALLOCATE_MEMORY")
+        self.emitcode("mov [{}], rax".format(sym.memoryaddress))
+
+    def generate_paramlist_to_stack_code(self, block):
+        assert isinstance(block, TACBlock)
+        numintparams = 0
+        numrealparams = 0
+        for param in block.paramlist:
+            localsym = block.symboltable.fetch(param.symbol.name)
+            # TODO - this will break when we have so many parameters that they will get
+            # passed on the stack instead of in a register.
+            if isinstance(param.symbol.typedef, pascaltypes.ArrayTypeDef):
+                # array parameters are always the address of the array.  If it is byref, the caller
+                # will pass in the address of the original array.  If it is byval, the caller will copy
+                # the array and provide the address of the copy.  In either case, we just move the
+                # parameter to the stack as-is.
+                numintparams += 1
+                paramreg = intparampos_to_register(numintparams)
+                if param.is_byref:
+                    comment = "Copy address of variable array parameter {} to stack"
+                else:
+                    comment = "Copy address of array parameter {} to stack"
+                comment = comment.format(param.symbol.name)
+                self.emitcode("mov [{}], {}".format(localsym.memoryaddress, paramreg, comment))
+            elif param.is_byref:
+                numintparams += 1
+                paramreg = intparampos_to_register(numintparams)
+                self.emitcode("mov [{}], {}".format(localsym.memoryaddress, paramreg),
+                              "Copy variable parameter {} to stack".format(param.symbol.name))
+            elif isinstance(param.symbol.typedef.basetype, pascaltypes.RealType):
+                paramreg = "xmm{}".format(numrealparams)
+                numrealparams += 1
+                # the param memory address is one of the xmm registers.
+                self.emitcode("movq [{}], {}".format(localsym.memoryaddress, paramreg),
+                              "Copy parameter {} to stack".format(param.symbol.name))
+            else:
+                # the param memory address is a register
+                numintparams += 1
+                paramreg = intparampos_to_register(numintparams)
+                regslice = get_register_slice_bybytes(paramreg, param.symbol.typedef.basetype.size)
+                self.emitcode("mov [{}], {}".format(localsym.memoryaddress, regslice),
+                              "Copy parameter {} to stack".format(param.symbol.name))
+
+    def generate_procfunc_call_code(self, block, node, params):
+        assert isinstance(block, TACBlock)
+        assert isinstance(node, TACCallFunctionNode)
+        assert not isinstance(node, TACCallSystemFunctionNode)
+        assert len(params) >= node.numparams
+        localparamlist = params[(-1 * node.numparams):]
+        numintparams = 0
+        numrealparams = 0
+        act_symbol = block.symboltable.parent.fetch(node.funcname)
+        assert isinstance(act_symbol, ActivationSymbol)
+        assert node.numparams == len(act_symbol.paramlist)  # type mismatches are caught upstream
+
+        # localparamlist has a list of TACParamNodes - that has information of what is going in.
+        # act_symbol.paramlist has the information of where it goes
+        # remove this comment once code is done
+
+        arrays_to_free_after_proc_call = 0
+        for parampos in range(0, node.numparams):
+            # remember - pointers count as int parameters
+            actualparam = localparamlist[parampos]
+            paramdef = act_symbol.paramlist[parampos]
+            assert isinstance(actualparam, TACParamNode)
+            assert isinstance(paramdef, Parameter)
+
+            if paramdef.is_byref:
+                comment = "Parameter {} for {} ({}, ByRef)".format(paramdef.symbol.name,
+                                                                   act_symbol.name,
+                                                                   str(paramdef.symbol.typedef.denoter))
+            else:
+                comment = "Parameter {} for {} ({})".format(paramdef.symbol.name,
+                                                            act_symbol.name,
+                                                            str(paramdef.symbol.typedef.denoter))
+
+            if paramdef.is_byref and actualparam.paramval.is_byref:
+                # if the formal parameter is byref and actual parameter is byref, then just pass the
+                # value of the actual parameter on through, as that value is a memory address.
+                numintparams += 1
+                assert numintparams <= 6
+                reg = intparampos_to_register(numintparams)
+                self.emitcode("mov {}, [{}]".format(reg, actualparam.paramval.memoryaddress), comment)
+            elif paramdef.is_byref and isinstance(paramdef.symbol.typedef, pascaltypes.ArrayTypeDef):
+                # arrays are already references, so just pass the value of the actual parameter
+                # on through, exactly same as the case above.
+                numintparams += 1
+                assert numintparams <= 6
+                reg = intparampos_to_register(numintparams)
+                self.emitcode("mov {}, [{}]".format(reg, actualparam.paramval.memoryaddress), comment)
+            elif paramdef.is_byref:
+                numintparams += 1
+                assert numintparams <= 6
+                reg = intparampos_to_register(numintparams)  # we use all 64 bytes for pointers
+                self.emitcode("LEA {}, [{}]".format(reg, actualparam.paramval.memoryaddress), comment)
+            elif isinstance(paramdef.symbol.typedef, pascaltypes.ArrayTypeDef):
+                # need to create a copy of the array and pass that in.
+                pstb = paramdef.symbol.typedef.basetype
+                assert isinstance(pstb, pascaltypes.ArrayType)
+                self.emitcode("PUSH RDI", "create copy of array {}".format(actualparam.paramval.name))
+                self.emitcode("PUSH RSI")
+                self.emitcode("MOV RDI, {}".format(pstb.numitemsinarray))
+                self.emitcode("MOV RSI, {}".format(pstb.componenttypedef.basetype.size))
+                self.emitcode("call _PASCAL_ALLOCATE_MEMORY")
+                self.emitcode("POP RSI")
+                self.emitcode("POP RDI")
+
+                # rax has the pointer to the memory
+                arrays_to_free_after_proc_call += 1
+                self.emitcode("PUSH RAX", "store address of this array copy to free later")
+
+                numintparams += 1
+                assert numintparams <= 6
+                reg = intparampos_to_register(numintparams)
+                self.emitcode("MOV {}, RAX".format(reg))
+                self.emit_memcopy(reg, actualparam.paramval, paramdef.symbol.typedef.basetype.size,
+                                  "", True)
+            elif isinstance(paramdef.symbol.typedef.basetype, pascaltypes.IntegerType) or \
+                    isinstance(paramdef.symbol.typedef.basetype, pascaltypes.BooleanType) or \
+                    isinstance(paramdef.symbol.typedef.basetype, pascaltypes.CharacterType) or \
+                    isinstance(paramdef.symbol.typedef.basetype, pascaltypes.SubrangeType) or \
+                    isinstance(paramdef.symbol.typedef.basetype, pascaltypes.EnumeratedType):
+                numintparams += 1
+                assert numintparams <= 6  # TODO - remove when we can handle more
+                fullreg = intparampos_to_register(numintparams)
+                reg = get_register_slice_bybytes(fullreg, paramdef.symbol.typedef.basetype.size)
+                self.emit_movtoregister_fromstackorliteral(reg, actualparam.paramval, comment)
+            elif isinstance(paramdef.symbol.typedef.basetype, pascaltypes.RealType):
+                reg = "xmm{}".format(numrealparams)
+                numrealparams += 1
+                assert numrealparams <= 8
+                self.emit_movtoxmmregister_fromstack(reg, actualparam.paramval, comment)
+            else:
+                raise ASMGeneratorError("Invalid Parameter Type")
+
+        if arrays_to_free_after_proc_call % 2 > 0:
+            self.emitcode("PUSH RAX",
+                          "bogus push to keep stack aligned at 16-bit boundary before function call")
+
+        self.emitcode("call {}".format(node.label), "call {}()".format(node.funcname))
+        if act_symbol.returntypedef is not None:
+            # return value is now in either RAX or XMM0 - need to store it in right place
+            comment = "assign return value of function to {}".format(node.lval.name)
+            if isinstance(act_symbol.returntypedef.basetype, pascaltypes.IntegerType):
+                self.emitcode("MOV [{}], EAX".format(node.lval.memoryaddress), comment)
+            elif isinstance(act_symbol.returntypedef.basetype, pascaltypes.BooleanType):
+                self.emitcode("MOV [{}], AL".format(node.lval.memoryaddress), comment)
+            else:
+                self.emitcode("MOVSD [{}], XMM0".format(node.lval.memoryaddress), comment)
+        del params[(-1 * node.numparams):]
+
+        if arrays_to_free_after_proc_call % 2 > 0:
+            self.emitcode("POP RAX", "undo stack-alignment push from above")
+            for i in range(arrays_to_free_after_proc_call):
+                self.emitcode("POP RDI", "free memory from array value parameter")
+                self.emitcode("CALL _PASCAL_DISPOSE_MEMORY")
+
     def generate_code(self):
         params = []  # this is a stack of parameters
 
@@ -351,59 +531,9 @@ class AssemblyGenerator:
                     totalstorageneeded += 16 - (totalstorageneeded % 16)
                 self.emitcode("SUB RSP, " + str(totalstorageneeded), "allocate local storage")
                 if not block.ismain:
-
-                    numintparams = 0
-                    numrealparams = 0
-
-                    # this is just to put the comments above all the code, making the asm more readable.
-                    for param in block.paramlist:
-                        localsym = block.symboltable.fetch(param.symbol.name)
-                        self.emitcomment("Parameter {} - [{}]".format(param.symbol.name, localsym.memoryaddress), True)
-                    for symname in block.symboltable.symbols.keys():
-                        if block.paramlist.fetch(symname) is None:
-                            localsym = block.symboltable.symbols[symname]
-                            if isinstance(localsym, Symbol):
-                                if isinstance(localsym, FunctionResultVariableSymbol):
-                                    self.emitcomment("Function Result - [{}]".format(localsym.memoryaddress), True)
-                                else:
-                                    self.emitcomment("Local Variable {} - [{}]".format(symname,
-                                                                                       localsym.memoryaddress), True)
-
-                    for param in block.paramlist:
-                        localsym = block.symboltable.fetch(param.symbol.name)
-                        # TODO - this will break when we have so many parameters that they will get
-                        # passed on the stack instead of in a register.
-                        if isinstance(param.symbol.typedef, pascaltypes.ArrayTypeDef):
-                            # array parameters are always the address of the array.  If it is byref, the caller
-                            # will pass in the address of the original array.  If it is byval, the caller will copy
-                            # the array and provide the address of the copy.  In either case, we just move the
-                            # parameter to the stack as-is.
-                            numintparams += 1
-                            paramreg = intparampos_to_register(numintparams)
-                            if param.is_byref:
-                                comment = "Copy address of variable array parameter {} to stack"
-                            else:
-                                comment = "Copy address of array parameter {} to stack"
-                            comment = comment.format(param.symbol.name)
-                            self.emitcode("mov [{}], {}".format(localsym.memoryaddress, paramreg, comment))
-                        elif param.is_byref:
-                            numintparams += 1
-                            paramreg = intparampos_to_register(numintparams)
-                            self.emitcode("mov [{}], {}".format(localsym.memoryaddress, paramreg),
-                                          "Copy variable parameter {} to stack".format(param.symbol.name))
-                        elif isinstance(param.symbol.typedef.basetype, pascaltypes.RealType):
-                            paramreg = "xmm{}".format(numrealparams)
-                            numrealparams += 1
-                            # the param memory address is one of the xmm registers.
-                            self.emitcode("movq [{}], {}".format(localsym.memoryaddress, paramreg),
-                                          "Copy parameter {} to stack".format(param.symbol.name))
-                        else:
-                            # the param memory address is a register
-                            numintparams += 1
-                            paramreg = intparampos_to_register(numintparams)
-                            regslice = get_register_slice_bybytes(paramreg, param.symbol.typedef.basetype.size)
-                            self.emitcode("mov [{}], {}".format(localsym.memoryaddress, regslice),
-                                          "Copy parameter {} to stack".format(param.symbol.name))
+                    self.generate_parameter_comments(block)
+                    self.generate_localvar_comments(block)
+                    self.generate_paramlist_to_stack_code(block)
 
                     # allocate space for local variable arrays
                     for symname in block.symboltable.symbols.keys():
@@ -411,32 +541,17 @@ class AssemblyGenerator:
                             localsym = block.symboltable.symbols[symname]
                             if isinstance(localsym, Symbol) and not isinstance(localsym, FunctionResultVariableSymbol):
                                 if isinstance(localsym.typedef, pascaltypes.ArrayTypeDef):
-                                    # TODO - duplicate code from allocating for global arrays, should refactor
-                                    self.emitcode("mov rdi, {}".format(localsym.typedef.basetype.numitemsinarray),
-                                                  'Allocate memory for local array {}'.format(symname))
-                                    self.emitcode(
-                                        "mov rsi, {}".format(localsym.typedef.basetype.componenttypedef.basetype.size))
-                                    self.emitcode("call _PASCAL_ALLOCATE_MEMORY")
-                                    self.emitcode("mov [{}], rax".format(localsym.memoryaddress))
+                                    self.generate_array_variable_memory_allocation_code(localsym)
 
-                else:  # block.ismain == True
+                else:
+                    self.generate_localvar_comments(block)
                     # need to init any global variables that are arrays
                     for symname in self.tacgenerator.globalsymboltable.symbols.keys():
                         sym = self.tacgenerator.globalsymboltable.fetch(symname)
                         if isinstance(sym, Symbol) and isinstance(sym.typedef, pascaltypes.ArrayTypeDef):
-                            self.emitcode("mov rdi, {}".format(sym.typedef.basetype.numitemsinarray),
-                                          'Allocate memory for global array {}'.format(symname))
-                            self.emitcode("mov rsi, {}".format(sym.typedef.basetype.componenttypedef.basetype.size))
-                            self.emitcode("call _PASCAL_ALLOCATE_MEMORY")
-                            self.emitcode("mov [{}], rax".format(sym.memoryaddress))
+                            self.generate_array_variable_memory_allocation_code(sym)
 
-                    for symname in block.symboltable.symbols.keys():
-                        localsym = block.symboltable.symbols[symname]
-                        if isinstance(localsym, FunctionResultVariableSymbol):
-                            self.emitcomment("Function Result - [{}]".format(localsym.memoryaddress), True)
-                        else:
-                            self.emitcomment("Local Variable {} - [{}]".format(symname,
-                                                                               localsym.memoryaddress), True)
+
             for node in tacnodelist:
                 if isinstance(node, TACCommentNode):
                     self.emitcomment(node.comment)
@@ -572,7 +687,6 @@ class AssemblyGenerator:
                             assert isinstance(node.lval.typedef.pointsto_typedef.basetype, pascaltypes.IntegerType)
                             comment = "Move integer literal {} into address contained in {}"
                             comment = comment.format(node.literal1.value, node.lval.name)
-                            # self.emitcode("MOV R11D, {}".format(node.literal1.value), comment)
                             self.emitcode("MOV R10, [{}]".format(node.lval.memoryaddress), comment)
                             self.emitcode("MOV [R10], DWORD {}".format(node.literal1.value))
 
@@ -582,115 +696,7 @@ class AssemblyGenerator:
 
                 elif isinstance(node, TACCallFunctionNode) and \
                         not isinstance(node, TACCallSystemFunctionNode):
-                    assert len(params) >= node.numparams
-                    localparamlist = params[(-1 * node.numparams):]
-                    numintparams = 0
-                    numrealparams = 0
-                    act_symbol = block.symboltable.parent.fetch(node.funcname)
-                    assert isinstance(act_symbol, ActivationSymbol)
-                    assert node.numparams == len(act_symbol.paramlist)  # type mismatches are caught upstream
-
-                    # localparamlist has a list of TACParamNodes - that has information of what is going in.
-                    # act_symbol.paramlist has the information of where it goes
-                    # remove this comment once code is done
-
-                    arrays_to_free_after_proc_call = 0
-                    for parampos in range(0, node.numparams):
-                        # remember - pointers count as int parameters
-                        actualparam = localparamlist[parampos]
-                        paramdef = act_symbol.paramlist[parampos]
-                        assert isinstance(actualparam, TACParamNode)
-                        assert isinstance(paramdef, Parameter)
-
-                        if paramdef.is_byref:
-                            comment = "Parameter {} for {} ({}, ByRef)".format(paramdef.symbol.name,
-                                                                               act_symbol.name,
-                                                                               str(paramdef.symbol.typedef.denoter))
-                        else:
-                            comment = "Parameter {} for {} ({})".format(paramdef.symbol.name,
-                                                                        act_symbol.name,
-                                                                        str(paramdef.symbol.typedef.denoter))
-
-                        if paramdef.is_byref and actualparam.paramval.is_byref:
-                            # if the formal parameter is byref and actual parameter is byref, then just pass the
-                            # value of the actual parameter on through, as that value is a memory address.
-                            numintparams += 1
-                            assert numintparams <= 6
-                            reg = intparampos_to_register(numintparams)
-                            self.emitcode("mov {}, [{}]".format(reg, actualparam.paramval.memoryaddress), comment)
-                        elif paramdef.is_byref and isinstance(paramdef.symbol.typedef, pascaltypes.ArrayTypeDef):
-                            # arrays are already references, so just pass the value of teh actual parameter
-                            # on through, exactly same as the case above.
-                            numintparams += 1
-                            assert numintparams <= 6
-                            reg = intparampos_to_register(numintparams)
-                            self.emitcode("mov {}, [{}]".format(reg, actualparam.paramval.memoryaddress), comment)
-                        elif paramdef.is_byref:
-                            numintparams += 1
-                            assert numintparams <= 6
-                            reg = intparampos_to_register(numintparams)  # we use all 64 bytes for pointers
-                            self.emitcode("LEA {}, [{}]".format(reg, actualparam.paramval.memoryaddress), comment)
-                        elif isinstance(paramdef.symbol.typedef, pascaltypes.ArrayTypeDef):
-                            # need to create a copy of the array and pass that in.
-                            pstb = paramdef.symbol.typedef.basetype
-                            assert isinstance(pstb, pascaltypes.ArrayType)
-                            self.emitcode("PUSH RDI", "create copy of array {}".format(actualparam.paramval.name))
-                            self.emitcode("PUSH RSI")
-                            self.emitcode("MOV RDI, {}".format(pstb.numitemsinarray))
-                            self.emitcode("MOV RSI, {}".format(pstb.componenttypedef.basetype.size))
-                            self.emitcode("call _PASCAL_ALLOCATE_MEMORY")
-                            self.emitcode("POP RSI")
-                            self.emitcode("POP RDI")
-
-                            # rax has the pointer to the memory
-                            arrays_to_free_after_proc_call += 1
-                            self.emitcode("PUSH RAX", "store address of this array copy to free later")
-
-                            numintparams += 1
-                            assert numintparams <= 6
-                            reg = intparampos_to_register(numintparams)
-                            self.emitcode("MOV {}, RAX".format(reg))
-                            self.emit_memcopy(reg, actualparam.paramval, paramdef.symbol.typedef.basetype.size,
-                                              "", True)
-                        elif isinstance(paramdef.symbol.typedef.basetype, pascaltypes.IntegerType) or \
-                                isinstance(paramdef.symbol.typedef.basetype, pascaltypes.BooleanType) or \
-                                isinstance(paramdef.symbol.typedef.basetype, pascaltypes.CharacterType) or \
-                                isinstance(paramdef.symbol.typedef.basetype, pascaltypes.SubrangeType) or \
-                                isinstance(paramdef.symbol.typedef.basetype, pascaltypes.EnumeratedType):
-                            numintparams += 1
-                            assert numintparams <= 6  # TODO - remove when we can handle more
-                            fullreg = intparampos_to_register(numintparams)
-                            reg = get_register_slice_bybytes(fullreg, paramdef.symbol.typedef.basetype.size)
-                            self.emit_movtoregister_fromstackorliteral(reg, actualparam.paramval, comment)
-                        elif isinstance(paramdef.symbol.typedef.basetype, pascaltypes.RealType):
-                            reg = "xmm{}".format(numrealparams)
-                            numrealparams += 1
-                            assert numrealparams <= 8
-                            self.emit_movtoxmmregister_fromstack(reg, actualparam.paramval, comment)
-                        else:
-                            raise ASMGeneratorError("Invalid Parameter Type")
-
-                    if arrays_to_free_after_proc_call % 2 > 0:
-                        self.emitcode("PUSH RAX",
-                                      "bogus push to keep stack aligned at 16-bit boundary before function call")
-
-                    self.emitcode("call {}".format(node.label), "call {}()".format(node.funcname))
-                    if act_symbol.returntypedef is not None:
-                        # return value is now in either RAX or XMM0 - need to store it in right place
-                        comment = "assign return value of function to {}".format(node.lval.name)
-                        if isinstance(act_symbol.returntypedef.basetype, pascaltypes.IntegerType):
-                            self.emitcode("MOV [{}], EAX".format(node.lval.memoryaddress), comment)
-                        elif isinstance(act_symbol.returntypedef.basetype, pascaltypes.BooleanType):
-                            self.emitcode("MOV [{}], AL".format(node.lval.memoryaddress), comment)
-                        else:
-                            self.emitcode("MOVSD [{}], XMM0".format(node.lval.memoryaddress), comment)
-                    del params[(-1 * node.numparams):]
-
-                    if arrays_to_free_after_proc_call % 2 > 0:
-                        self.emitcode("POP RAX", "undo stack-alignment push from above")
-                        for i in range(arrays_to_free_after_proc_call):
-                            self.emitcode("POP RDI", "free memory from array value parameter")
-                            self.emitcode("CALL _PASCAL_DISPOSE_MEMORY")
+                    self.generate_procfunc_call_code(block, node, params)
 
                 elif isinstance(node, TACCallSystemFunctionNode):
                     if node.label.name == "_WRITEI":
