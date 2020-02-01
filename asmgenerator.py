@@ -655,6 +655,7 @@ class AssemblyGenerator:
                         elif isinstance(paramdef.symbol.typedef.basetype, pascaltypes.IntegerType) or \
                                 isinstance(paramdef.symbol.typedef.basetype, pascaltypes.BooleanType) or \
                                 isinstance(paramdef.symbol.typedef.basetype, pascaltypes.CharacterType) or \
+                                isinstance(paramdef.symbol.typedef.basetype, pascaltypes.SubrangeType) or \
                                 isinstance(paramdef.symbol.typedef.basetype, pascaltypes.EnumeratedType):
                             numintparams += 1
                             assert numintparams <= 6  # TODO - remove when we can handle more
@@ -936,8 +937,6 @@ class AssemblyGenerator:
                         self.emitcode("INC {}".format(reg))
 
                         if isinstance(bt, pascaltypes.IntegerType):
-                            # todo - we may want to jo every time.  If we have a 1-byte subrange
-                            # from something..255, and we succ() when the value is 255, will it get caught
                             self.emitcode("jo _PASCAL_SUCC_PRED_ERROR")
                         elif isinstance(bt, pascaltypes.BooleanType):
                             self.emitcode("CMP {}, 1".format(reg))
