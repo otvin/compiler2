@@ -322,16 +322,6 @@ class AssemblyGenerator:
             if block.ismain:
                 self.emitlabel("main")
                 self.emitcode("finit")  # TODO - this should only be written if we use x87 anywhere.
-
-                # need to init any global variables that are arrays
-                for symname in self.tacgenerator.globalsymboltable.symbols.keys():
-                    sym = self.tacgenerator.globalsymboltable.fetch(symname)
-                    if isinstance(sym, Symbol) and isinstance(sym.typedef, pascaltypes.ArrayTypeDef):
-                        self.emitcode("mov rdi, {}".format(sym.typedef.basetype.numitemsinarray),
-                                      'Allocate memory for global array {}'.format(symname))
-                        self.emitcode("mov rsi, {}".format(sym.typedef.basetype.componenttypedef.basetype.size))
-                        self.emitcode("call _PASCAL_ALLOCATE_MEMORY")
-                        self.emitcode("mov [{}], rax".format(sym.memoryaddress))
                 tacnodelist = block.tacnodes
             else:
                 self.emitlabel(block.tacnodes[0].label.name, block.tacnodes[0].comment)
@@ -429,7 +419,17 @@ class AssemblyGenerator:
                                     self.emitcode("call _PASCAL_ALLOCATE_MEMORY")
                                     self.emitcode("mov [{}], rax".format(localsym.memoryaddress))
 
-                else:
+                else:  # block.ismain == True
+                    # need to init any global variables that are arrays
+                    for symname in self.tacgenerator.globalsymboltable.symbols.keys():
+                        sym = self.tacgenerator.globalsymboltable.fetch(symname)
+                        if isinstance(sym, Symbol) and isinstance(sym.typedef, pascaltypes.ArrayTypeDef):
+                            self.emitcode("mov rdi, {}".format(sym.typedef.basetype.numitemsinarray),
+                                          'Allocate memory for global array {}'.format(symname))
+                            self.emitcode("mov rsi, {}".format(sym.typedef.basetype.componenttypedef.basetype.size))
+                            self.emitcode("call _PASCAL_ALLOCATE_MEMORY")
+                            self.emitcode("mov [{}], rax".format(sym.memoryaddress))
+
                     for symname in block.symboltable.symbols.keys():
                         localsym = block.symboltable.symbols[symname]
                         if isinstance(localsym, FunctionResultVariableSymbol):
@@ -1175,9 +1175,7 @@ class AssemblyGenerator:
                 else:  # pragma: no cover
                     raise ASMGeneratorError("Unknown TAC node type: {}".format(type(node)))
 
-            if totalstorageneeded > 0 or block.ismain:
-                self.emitcode("MOV RSP, RBP", "restore stack pointer")
-                self.emitcode("POP RBP")
+
             if block.ismain:
                 # deallocate global arrays
                 # TODO: refactor this loop to be something like "get global array symbols" or something
@@ -1197,6 +1195,12 @@ class AssemblyGenerator:
                                 self.emitcode("mov rdi, [{}]".format(localsym.memoryaddress),
                                               "Free memory for local array {}".format(symname))
                                 self.emitcode("call _PASCAL_DISPOSE_MEMORY")
+
+            if totalstorageneeded > 0 or block.ismain:
+                self.emitcode("MOV RSP, RBP", "restore stack pointer")
+                self.emitcode("POP RBP")
+
+            if not block.ismain:
                 self.emitcode("RET")
 
     def generate_helperfunctioncode(self):
