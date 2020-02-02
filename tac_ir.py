@@ -617,7 +617,7 @@ class TACBlock:
             if not (isinstance(bt, pascaltypes.StringLiteralType) or isinstance(bt, pascaltypes.RealType) or
                     isinstance(bt, pascaltypes.BooleanType) or isinstance(bt, pascaltypes.IntegerType) or
                     isinstance(bt, pascaltypes.CharacterType) or
-                    (isinstance(bt, pascaltypes.ArrayType) and bt.is_string_type())):
+                    bt.is_string_type()):
                 errstr = tac_errstr("Invalid type {} passed to {}".format(tmp.typedef.name, tok.value), tok)
                 raise TACException(errstr)
 
@@ -630,7 +630,7 @@ class TACBlock:
                 self.addnode(TACCallSystemFunctionNode(Label("_WRITEB"), 1))
             elif isinstance(bt, pascaltypes.IntegerType):
                 self.addnode(TACCallSystemFunctionNode(Label("_WRITEI"), 1))
-            elif isinstance(bt, pascaltypes.ArrayType) and bt.is_string_type():
+            elif bt.is_string_type():
                 self.addnode(TACCallSystemFunctionNode(Label("_WRITEST"), 1))
             else:
                 self.addnode(TACCallSystemFunctionNode(Label("_WRITEC"), 1))

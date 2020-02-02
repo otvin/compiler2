@@ -504,7 +504,7 @@ class SymbolTable:
         #    or neither are packed
         # 4) T1 and T2 are string types with same number of components.
 
-        # Today we only support the first two conditions.
+        # Today we support the first, third, and fourth conditoins.
 
         if self.are_same_type(t1_identifier, t2_identifier):
             return True
@@ -537,6 +537,9 @@ class SymbolTable:
                             return False
                     else:
                         return False
+            elif t1_typedef.basetype.is_string_type() and t2_typedef.basetype.is_string_type() \
+                and t1_typedef.basetype.numitemsinarray == t2_typedef.basetype.numitemsinarray:
+                    return True
             else:
                 return False
 
@@ -598,6 +601,8 @@ class SymbolTable:
                 # they must be non-overlapping subranges or such, so are not assignment compatible.
                 ret = False
         elif isinstance(t1type, pascaltypes.RealType) and isinstance(t2type, pascaltypes.IntegerType):
+            ret = True
+        elif t1type.is_string_type() and t2type.is_string_type() and self.are_compatible(t1_identifier, t2_identifier):
             ret = True
         else:
             ret = False

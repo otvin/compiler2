@@ -7,6 +7,9 @@ class BaseType:
         self.size = 0
         self.typename = None
 
+    def is_string_type(self):
+        return False
+
     def __str__(self):
         return self.typename
 
