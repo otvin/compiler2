@@ -428,13 +428,21 @@ SIMPLETYPEDEF_INTEGER = TypeDef("integer", IntegerType(), IntegerType())
 SIMPLETYPEDEF_BOOLEAN = TypeDef("boolean", BooleanType(), BooleanType())
 SIMPLETYPEDEF_REAL = TypeDef("real", RealType(), RealType())
 SIMPLETYPEDEF_CHAR = TypeDef("char", CharacterType(), CharacterType())
+# unlike the other three, "string" is not a Pascal reserved word, so a user may make a type
+# named "String."  So we put the leading underscore, since that is not a legal Pascal identifier.
+# We need this simple typedef to allow for the exceptions around string literals being passed around
+# as if they were string-types with number components equal to their length.
+SIMPLETYPEDEF_STRING = TypeDef("_string", StringLiteralType(), StringLiteralType())
 
 
 class StringLiteralTypeDef(TypeDef):
     def __init__(self):
         # pascal literals never have spaces, so the user can never create a type
-        # named "string literal" to cause an issue with this type.
-        super().__init__('string literal', StringLiteralType(), StringLiteralType())
+        # named "_string literal" to cause an issue with this type.  Needs to have the
+        # leading underscore because compatibility functions strip off the "literal" at the
+        # end to get the base type's identifier, so _string literal will become _string.
+        # _string has a leading underscore for reasons described above.
+        super().__init__('_string literal', StringLiteralType(), StringLiteralType())
 
 
 class RealLiteralTypeDef(TypeDef):

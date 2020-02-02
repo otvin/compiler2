@@ -324,7 +324,7 @@ class SymbolTable:
         ret_typedef = None
 
         # HACK - due to the way I defined literals with type name "integer literal" "real literal" etc,
-        # I can find the type by removind the " literal" from the end.
+        # I can find the type by removing the " literal" from the end.
         if type_identifier[-7:] == "literal":
             type_identifier = type_identifier[:-8]
 
@@ -383,6 +383,7 @@ class SymbolTable:
         self.add(pascaltypes.SIMPLETYPEDEF_BOOLEAN)
         self.add(pascaltypes.SIMPLETYPEDEF_REAL)
         self.add(pascaltypes.SIMPLETYPEDEF_CHAR)
+        self.add(pascaltypes.SIMPLETYPEDEF_STRING)
 
     def are_same_type(self, t1_identifier, t2_identifier):
         # Most of the code that works with types only cares about the base type itself - how the type is laid out
@@ -495,7 +496,7 @@ class SymbolTable:
 
         return ret
 
-    def are_compatible(self, t1_identifier, t2_identifier):
+    def are_compatible(self, t1_identifier, t2_identifier, optional_t1_sym = None, optional_t2_sym = None):
         # per 6.4.5 of the ISO standard, as explained on p.10 of Cooper, two types are compatible if:
         # 1) T1 and T2 are the same type
         # 2) T1 and T2 are both Ordinal Types and one is subrange of the other, or both are subranges of the
@@ -504,9 +505,17 @@ class SymbolTable:
         #    or neither are packed
         # 4) T1 and T2 are string types with same number of components.
 
-        # Today we support the first, third, and fourth conditoins.
+        # Today we support the first, third, and fourth conditions.
 
-        if self.are_same_type(t1_identifier, t2_identifier):
+        if t1_identifier == "_string literal":
+            assert isinstance(optional_t1_sym, ConstantSymbol)
+        if t2_identifier == "_string literal":
+            assert isinstance(optional_t2_sym, ConstantSymbol)
+
+        if t1_identifier == "_string literal" and t2_identifier == "_string literal":
+            # need to do this before the are_same_type() else that will return true.
+            return (len(optional_t1_sym.value) == len(optional_t2_sym.value))
+        elif self.are_same_type(t1_identifier, t2_identifier):
             return True
         else:
             t1_symtab, t1_typedef = self.fetch_originalsymtable_andtypedef(t1_identifier)
@@ -540,6 +549,10 @@ class SymbolTable:
             elif t1_typedef.basetype.is_string_type() and t2_typedef.basetype.is_string_type() \
                 and t1_typedef.basetype.numitemsinarray == t2_typedef.basetype.numitemsinarray:
                     return True
+            elif t1_typedef.basetype.is_string_type() and t2_identifier == "_string literal":
+                return (t1_typedef.basetype.numitemsinarray == len(optional_t2_sym.value))
+            elif t1_identifier == "_string literal" and t2_typedef.basetype.is_string_type():
+                return (len(optional_t1_sym.value) == t2_typedef.basetype.numitemsinarray)
             else:
                 return False
 
@@ -604,6 +617,8 @@ class SymbolTable:
             ret = True
         elif t1type.is_string_type() and t2type.is_string_type() and self.are_compatible(t1_identifier, t2_identifier):
             ret = True
+        elif t1type.is_string_type() and isinstance(t2type, pascaltypes.StringLiteralType):
+            ret = (t1type.numitemsinarray == len(optional_t2_value))
         else:
             ret = False
 

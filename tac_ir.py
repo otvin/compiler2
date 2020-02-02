@@ -880,14 +880,13 @@ class TACBlock:
             else:
                 # we know it is a function call, so get the activation symbol, which is stored in the parent
                 sym = self.symboltable.parent.fetch(tok.value)
-
         if isinstance(sym, ConstantSymbol):
             # optimization for integers - we can just return the literal itself instead of an assignment to
             # a local symbol.
             if isinstance(sym.typedef.basetype, pascaltypes.IntegerType):
                 return IntegerLiteral(sym.value, tok.location)
             else:
-                ret = Symbol(self.gettemporary(), tok.location, sym.typedef)
+                ret = ConstantSymbol(self.gettemporary(), tok.location, sym.typedef, sym.value)
                 self.symboltable.add(ret)
                 if isinstance(sym.typedef.basetype, pascaltypes.BooleanType):
                     # the value of the symbol will always be a string
@@ -958,8 +957,13 @@ class TACBlock:
                 else:
                     # For value parameters, the actual parameter must be assignment compatible with the formal
                     # parameter
+                    if isinstance(tmp, ConstantSymbol):
+                        optval = tmp.value
+                    else:
+                        optval = None
+
                     if not ast.nearest_symboltable().are_assignment_compatible(
-                            sym.paramlist[i].symbol.typedef.identifier, tmp.typedef.identifier):
+                            sym.paramlist[i].symbol.typedef.identifier, tmp.typedef.identifier, optval):
                         errstr = "Error D.7: Type Mismatch - {} is not assignment compatible with parameter"
                         errstr += "{} of {}() in {}"
                         errstr = errstr.format(tmp.typedef.denoter,
@@ -1271,9 +1275,13 @@ class TACBlock:
 
         # 6.7.2.5 of the ISO standard says that the operands of relational operators shall be of compatible
         # types, or one operand shall be of real-type and the other of integer-type.  Table 6, has
-        # simple-types, pointer-types, and string-types allowed in the comparisons..
+        # simple-types, pointer-types, and string-types allowed in the comparisons.
 
-        if not self.symboltable.are_compatible(child1.typedef.identifier, child2.typedef.identifier):
+        # special case for string literals - symboltable.are_compatible() just looks at the identifiers,
+        # which works fine for every time other than string literals doing relational comparisons.  For
+        # string literals we need to look at the length to know if they are compatible.
+
+        if not self.symboltable.are_compatible(child1.typedef.identifier, child2.typedef.identifier, child1, child2):
             if isinstance(c1type, pascaltypes.IntegerType) and isinstance(c2type, pascaltypes.RealType):
                 pass
             elif isinstance(c2type, pascaltypes.IntegerType) and isinstance(c1type, pascaltypes.RealType):

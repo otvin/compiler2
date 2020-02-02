@@ -19,10 +19,10 @@ _PASCAL_PRINTSTRINGTYPE:						;Procedure printstringtype(s:array, k:integer)
 ;----------
 ;
 ;   _PASCAL_PRINTSTRINGTYPE
-;       - writes the contents of a string-type (packed array of chars) to screen
+;       - writes the contents of a string-type (packed array of chars) or string literal to screen
 ;----------
 ;   RDI: Address of the string-type array to be printed
-;   RSI: Length of the string-type array
+;   ESI: Length of the string-type array
 ;----------
 ; Returns: None
 ;----------

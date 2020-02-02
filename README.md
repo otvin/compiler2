@@ -37,24 +37,26 @@ Compiler2 supports the following Pascal Language features:
     * Signed Integer variables and literals (32-bit)
     * Boolean variables and literals (8-bit)
     * Character variables and literals (8-bit)
+    * Arrays (including string-types)
 * Type Definitions
   *  Can create a new type that is an alias for Real, Integer, Char, or Boolean, or one that is defined as one of a previously-defined alias.
   *  Can create a new user-defined enumerated type
   *  Can create a new type that is a subrange of an Integer, Char, Boolean, or Enumerated type
   *  Can create an array type with arbitrary number of dimensions, using any ordinal or subrange as the index
         * Note the keyword "packed" is parsed, but ignored, as only booleans and enumerated types are not already stored packed.
+        * Per the ISO standard, an array of 2 or more chars that is defined "packed" will be treated as a string-type.  
   *  If create a new subrange or enumerated type when declaring a variable, the type will be created anonymously (unnamed)
 * Global and local constants
     * Signed Real, Signed Integer, Character, or String
     * the required constants ```true```, ```false```, and ```maxint```
 * Write() and Writeln() to stdout
-    * each take a comma-separated list of one or more parameters, with each parameter a variable, a math expression, a numeric literal, a character literal, a string literal, or a constant.'
+    * each take a comma-separated list of one or more parameters, with each parameter a variable, a math expression, a numeric literal, a character literal, a string literal, an array that is a string-type, or a constant.
 * Comments
 
  
 ### Commentary
 
-At this point, Compiler2 has all features from Compiler1 except for String support.  However, the String type in the original compiler is not ISO standard, it was modeled after Turbo Pascal.
+At this point, Compiler2 has all features from Compiler1 except for the non-standard "Concat()" function from Compiler1.  However, the String type in the original compiler is not ISO standard, it was modeled after Turbo Pascal, and Concat() would not work as a built-in.  
 
 Compiler2 also has the following functionality that compiler1 did not:
 * Boolean and Character types
@@ -76,6 +78,8 @@ there are many register-allocation algorithms that can be applied to the TAC in 
 to determine where different symbols lived in memory.  In Compiler2 everything lives on the stack.  GCC does the same thing if optimizations are all turned off; you will
 notice that, for example, after a function is invoked, GCC copies all function parameters to the stack.  My opinion is that this design
 has made it easier to surpass the functionality of my previous attempt. 
+
+One of the cool things that I have done is used the compiler to generate assembly code for functions that are easy to write in Pascal but hard to write by hand in assembly.  One is code that prints a string-type array to screen, and another compares two strings lexicographically.  I have committed both the Pascal files and the resulting .asm files.  
  
  
 ### To run it:
@@ -84,7 +88,7 @@ has made it easier to surpass the functionality of my previous attempt.
 
 ### Unit tests
 
-Compiler2 currently passes 209 unit tests, including 46 of the 60 unit tests created for Compiler, plus an additional test which represented the one known bug from Compiler.  You can execute the unit test suite by running:
+Compiler2 currently passes 218 unit tests, including the 48 (of 60) unit tests created for Compiler which did not use Concat() and an additional test which represented the one known bug from Compiler.  You can execute the unit test suite by running:
 
 ```python3 compiler_test.py```
 
@@ -92,12 +96,13 @@ Current code coverage:
 
 | File | Coverage |
 |------|---------:|
-|asm_generator.py|97%|
+|asm_generator.py|98%|
+|editor_settings.py|100%|
 |filelocation.py|100%|
 |lexer.py|88%|
 |parser.py|93%|
-|pascaltypes.py|81%|
-|symboltable.py|89%|
+|pascaltypes.py|91%|
+|symboltable.py|92%|
 |tac_ir.py|92%|
 
 _Code for exceptions that should never occur are excluded.  Regular compiler errors e.g. syntax errors in Pascal code are covered via "compilefail" tests.  Code written for future features, e.g. the code that handles 64-bit integers in spots, does count against code coverage, so I do not forget to add them back to the code to be tested._

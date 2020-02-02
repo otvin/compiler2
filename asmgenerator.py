@@ -3,7 +3,7 @@ from tac_ir import TACBlock, TACLabelNode, TACParamNode, TACCallSystemFunctionNo
     TACOperator, TACGenerator, TACCommentNode, TACBinaryNode, TACUnaryNode, TACGotoNode, TACIFZNode, \
     TACFunctionReturnNode, TACCallFunctionNode, TACBinaryNodeWithBoundsCheck
 from symboltable import StringLiteral, IntegerLiteral, Symbol, Parameter, ActivationSymbol, RealLiteral, \
-    FunctionResultVariableSymbol, CharacterLiteral
+    FunctionResultVariableSymbol, CharacterLiteral, ConstantSymbol
 from editor_settings import NUM_SPACES_IN_TAB, NUM_TABS_FOR_COMMENT
 import pascaltypes
 
@@ -217,7 +217,9 @@ class AssemblyGenerator:
         assert isinstance(destsym, Symbol) or (isinstance(destsym, str) and destsym.upper() in VALID_REGISTER_LIST)
         assert numbytes > 0
         assert isinstance(sourcesym.typedef, pascaltypes.PointerTypeDef) or \
-            isinstance(sourcesym.typedef, pascaltypes.ArrayTypeDef)
+            isinstance(sourcesym.typedef, pascaltypes.ArrayTypeDef) or \
+            isinstance(sourcesym.typedef, pascaltypes.StringLiteralTypeDef)
+
         if isinstance(destsym, Symbol):
             assert isinstance(destsym.typedef, pascaltypes.PointerTypeDef) or \
                    isinstance(destsym.typedef, pascaltypes.ArrayTypeDef)
@@ -254,8 +256,9 @@ class AssemblyGenerator:
         self.emitcode("extern fflush")
 
         self.emitcode("extern _PASCAL_PRINTSTRINGTYPE","from compiler2_system_io.asm")
+        self.emitcode("extern _PASCAL_STRINGCOMPARE", "from compiler2_stringcompare.asm")
 
-        self.emitcode("global _PASCAL_OVERFLOW_ERROR", "needed by compiler2_system_io.asm")
+        self.emitcode("global _PASCAL_OVERFLOW_ERROR", "needed by compiler2_*.asm")
 
     def generate_datasection(self):
         self.emitsection("data")
@@ -273,7 +276,6 @@ class AssemblyGenerator:
         self.emitcode('_stringerr_10 db `Error: unable to de-allocate dynamic memory.`, 0')
         self.emitcomment("support for write() commands")
         self.emitcode('_printf_intfmt db "%d",0')
-        self.emitcode('_printf_strfmt db "%s",0')
         # TODO - this is not pascal-compliant, as should be fixed characters right-justified
         # but is better than the C default of 6 digits to the right of the decimal.
         self.emitcode('_printf_realfmt db "%.12f",0')
@@ -601,9 +603,9 @@ class AssemblyGenerator:
                         self.emitcode("movsd [{}], xmm0".format(node.lval.memoryaddress))
                     elif node.operator == TACOperator.ASSIGN:
                         if isinstance(node.lval.typedef, pascaltypes.ArrayTypeDef):
-                            assert node.lval.typedef.basetype.size == node.arg1.typedef.basetype.size
+                            assert node.lval.typedef.basetype.size == node.arg1.typedef.basetype.size or (node.lval.typedef.basetype.is_string_type() and isinstance(node.arg1.typedef, pascaltypes.StringLiteralTypeDef))
                             comment = "Copy array {} into {}".format(node.arg1.name, node.lval.name)
-                            self.emit_memcopy(node.lval, node.arg1, node.arg1.typedef.basetype.size, comment, False)
+                            self.emit_memcopy(node.lval, node.arg1, node.lval.typedef.basetype.size, comment, False)
                         else:
                             reg = get_register_slice_bybytes("RAX", node.lval.typedef.basetype.size)
                             # first, get the arg1 into reg.  If arg1 is a byref parameter, we need to
@@ -723,10 +725,11 @@ class AssemblyGenerator:
                         self.emitcode("call printf wrt ..plt")
                         del params[-1]
                     elif node.label.name == "_WRITESL":
-                        self.emitcode("mov rdi, _printf_strfmt")
-                        self.emit_movtoregister_fromstack("RSI", params[-1].paramval)
-                        self.emitcode("mov rax, 0")
-                        self.emitcode("call printf wrt ..plt")
+                        p = params[-1].paramval
+                        assert isinstance(p, ConstantSymbol)
+                        self.emitcode("mov rdi, [{}]".format(p.memoryaddress))
+                        self.emitcode("mov esi, {}".format(len(p.value)))
+                        self.emitcode("call _PASCAL_PRINTSTRINGTYPE", "in compiler2_system_io.asm")
                         del params[-1]
                     elif node.label.name == "_WRITEST":
                         p = params[-1].paramval
@@ -734,7 +737,7 @@ class AssemblyGenerator:
                         assert isinstance(p.typedef, pascaltypes.ArrayTypeDef)
                         assert p.typedef.basetype.is_string_type()
                         self.emitcode("mov rdi, [{}]".format(p.memoryaddress))
-                        self.emitcode("mov rsi, {}".format(p.typedef.basetype.numitemsinarray))
+                        self.emitcode("mov esi, {}".format(p.typedef.basetype.numitemsinarray))
                         self.emitcode("call _PASCAL_PRINTSTRINGTYPE", "in compiler2_system_io.asm")
                         del params[-1]
                     elif node.label.name == "_WRITEC":
@@ -742,19 +745,19 @@ class AssemblyGenerator:
                         self.emitcode("call putchar wrt ..plt")
                         del params[-1]
                     elif node.label.name == "_WRITEB":
-                        self.emitcode("mov rdi, _printf_strfmt")
                         self.emit_movtoregister_fromstack("al", params[-1].paramval)
                         self.emitcode("test al, al")
                         labelfalse = self.getnextlabel()
                         labelprint = self.getnextlabel()
                         self.emitcode("je {}".format(labelfalse))
-                        self.emitcode("mov rsi, _printf_true")
+                        self.emitcode("mov rdi, _printf_true")
+                        self.emitcode("mov rsi, 4")
                         self.emitcode("jmp {}".format(labelprint))
                         self.emitlabel(labelfalse)
-                        self.emitcode("mov rsi, _printf_false")
+                        self.emitcode("mov rdi, _printf_false")
+                        self.emitcode("mov rsi, 5")
                         self.emitlabel(labelprint)
-                        self.emitcode("mov rax, 0")
-                        self.emitcode("call printf wrt ..plt")
+                        self.emitcode("call _PASCAL_PRINTSTRINGTYPE", "in compiler2_system_io.asm")
                         del params[-1]
                     elif node.label.name == "_WRITECRLF":
                         self.emitcode("mov rdi, _printf_newln")
@@ -1108,7 +1111,8 @@ class AssemblyGenerator:
                         n1type = node.arg1.typedef.basetype
                         n2type = node.arg2.typedef.basetype
 
-                        assert block.symboltable.are_compatible(n1type.typename, n2type.typename)
+                        assert block.symboltable.are_compatible(node.arg1.typedef.identifier,
+                                                                node.arg2.typedef.identifier, node.arg1, node.arg2)
 
                         if node.operator in (TACOperator.AND, TACOperator.OR):
                             assert isinstance(n1type, pascaltypes.BooleanType)
@@ -1121,12 +1125,45 @@ class AssemblyGenerator:
                                 self.emitcode("or al, r11b")
                             self.emit_movtostack_fromregister(node.result, "AL")
                         else:
+                            if n1type.is_string_type() or isinstance(n1type, pascaltypes.StringLiteralType):
+                                self.emitcode("MOV RDI, [{}]".format(node.arg1.memoryaddress), comment)
+                                self.emitcode("MOV RSI, [{}]".format(node.arg2.memoryaddress))
+                                if n1type.is_string_type():
+                                    length = n1type.numitemsinarray
+                                else:
+                                    assert isinstance(node.arg1, ConstantSymbol)
+                                    length = len(node.arg1.value)
+                                self.emitcode("MOV EDX, {}".format(str(length)))
+                                self.emitcode("CALL _PASCAL_STRINGCOMPARE")
+                                self.emitcode("TEST AL, AL")
+                            elif isinstance(n1type, pascaltypes.IntegerType) or \
+                                    (isinstance(n1type, pascaltypes.SubrangeType) and
+                                     n1type.hosttypedef.basetype.size == 4):
+                                self.emit_movtoregister_fromstackorliteral("eax", node.arg1, comment)
+                                self.emit_movtoregister_fromstackorliteral("r11d", node.arg2)
+                                self.emitcode("cmp eax, r11d")
+                            elif isinstance(n1type, pascaltypes.BooleanType) or \
+                                    isinstance(n1type, pascaltypes.CharacterType) or \
+                                    isinstance(n1type, pascaltypes.EnumeratedType) or \
+                                    (isinstance(n1type, pascaltypes.SubrangeType) and
+                                     n1type.hosttypedef.basetype.size == 1):
+                                self.emit_movtoregister_fromstack("al", node.arg1, comment)
+                                self.emit_movtoregister_fromstack("r11b", node.arg2)
+                                self.emitcode("cmp al, r11b")
+                            else:  # has to be real; we errored above if any other type
+                                assert isinstance(n1type, pascaltypes.RealType)
+                                self.emit_movtoxmmregister_fromstack("xmm0", node.arg1)
+                                self.emit_movtoxmmregister_fromstack("xmm8", node.arg2)
+                                self.emitcode("ucomisd xmm0, xmm8")
+
                             if isinstance(n1type, pascaltypes.BooleanType) or \
                                     isinstance(n1type, pascaltypes.IntegerType) or \
-                                    is_integerorboolean_subrangetype(n1type):
-                                # TODO: Handling String types in relational operators
+                                    is_integerorboolean_subrangetype(n1type) or \
+                                    n1type.is_string_type() or \
+                                    isinstance(n1type, pascaltypes.StringLiteralType):
 
-                                # Boolean and Integer share same jump instructions
+                                # Boolean and Integer share same jump instructions, and strings
+                                # are set up to do an integer comparison by this point
                                 if node.operator == TACOperator.EQUALS:
                                     jumpinstr = "JE"
                                 elif node.operator == TACOperator.NOTEQUAL:
@@ -1161,25 +1198,7 @@ class AssemblyGenerator:
                                 else:  # pragma: no cover
                                     raise ASMGeneratorError("Invalid Relational Operator {}".format(node.operator))
 
-                            if isinstance(n1type, pascaltypes.IntegerType) or \
-                                    (isinstance(n1type, pascaltypes.SubrangeType) and
-                                     n1type.hosttypedef.basetype.size == 4):
-                                self.emit_movtoregister_fromstackorliteral("eax", node.arg1, comment)
-                                self.emit_movtoregister_fromstackorliteral("r11d", node.arg2)
-                                self.emitcode("cmp eax, r11d")
-                            elif isinstance(n1type, pascaltypes.BooleanType) or \
-                                    isinstance(n1type, pascaltypes.CharacterType) or \
-                                    isinstance(n1type, pascaltypes.EnumeratedType) or \
-                                    (isinstance(n1type, pascaltypes.SubrangeType) and
-                                     n1type.hosttypedef.basetype.size == 1):
-                                self.emit_movtoregister_fromstack("al", node.arg1, comment)
-                                self.emit_movtoregister_fromstack("r11b", node.arg2)
-                                self.emitcode("cmp al, r11b")
-                            else:  # has to be real; we errored above if any other type
-                                assert isinstance(n1type, pascaltypes.RealType)
-                                self.emit_movtoxmmregister_fromstack("xmm0", node.arg1)
-                                self.emit_movtoxmmregister_fromstack("xmm8", node.arg2)
-                                self.emitcode("ucomisd xmm0, xmm8")
+
 
                             labeltrue = self.getnextlabel()
                             labeldone = self.getnextlabel()
@@ -1323,5 +1342,6 @@ class AssemblyGenerator:
         self.generate_textsection()
         self.asmfile.close()
         os.system("nasm -f elf64 -F dwarf -g -o compiler2_system_io.o compiler2_system_io.asm")
+        os.system("nasm -f elf64 -F dwarf -g -o compiler2_stringcompare.o compiler2_stringcompare.asm")
         os.system("nasm -f elf64 -F dwarf -g -o {} {}".format(objfilename, self.asmfilename))
-        os.system("gcc {} -o {} compiler2_system_io.o".format(objfilename, exefilename))
+        os.system("gcc {} -o {} compiler2_system_io.o compiler2_stringcompare.o".format(objfilename, exefilename))

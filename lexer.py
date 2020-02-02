@@ -98,8 +98,6 @@ class TokenType(Enum):
     TRUE = 'true'
     FALSE = 'false'
     CHAR = 'char'
-    # "string" is technically not a required identifier, but we are supporting it in this implementation
-    STRING = 'string'
 
     # File types are defined in section 6.4.3.5 of the ISO standard
     TEXT = 'text'
@@ -194,7 +192,7 @@ TOKENTYPE_LOOKUP = {
     'real': TokenType.REAL, 'record': TokenType.RECORD, 'repeat': TokenType.REPEAT,
     'reset': TokenType.RESET, 'rewrite': TokenType.REWRITE, 'round': TokenType.ROUND,
     'sin': TokenType.SIN, 'set': TokenType.SET, 'sqr': TokenType.SQR, 'sqrt': TokenType.SQRT,
-    'string': TokenType.STRING, 'succ': TokenType.SUCC,
+    'succ': TokenType.SUCC,
     'text': TokenType.TEXT, 'then': TokenType.THEN, 'to': TokenType.TO, 'trunc': TokenType.TRUNC,
     'true': TokenType.TRUE, 'type': TokenType.TYPE, 'unpack': TokenType.UNPACK,
     'until': TokenType.UNTIL, 'var': TokenType.VAR, 'while': TokenType.WHILE, 'with': TokenType.WITH,

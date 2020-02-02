@@ -167,16 +167,17 @@ def main(onlytest=""):
     run_test_list("recursion", 1, 1)
     run_test_list("relop", 1, 6)
     run_test_list("repeat", 1, 2)
-    run_test_list("scope", 1, 1)
-    run_test_list("scope", 3, 3)
+    run_test_list("scope", 1, 3)
     run_test_list("sqrt", 1, 2)
-    run_test_list("string", 5, 6)
+    run_test_list("string", 1, 1)
+    run_test_list("string", 3, 3)
+    run_test_list("string", 5, 10)
     run_test_list("typedef", 1, 12)
     run_test_list("while", 1, 3)
     run_test_list("write", 1, 1)
     run_test_list("writeln", 1, 3)
 
-    run_compilefail_test_list(1, 60)
+    run_compilefail_test_list(1, 61)
 
     # tests from old compiler not yet running in compiler2
     # dotest("tests/testconcat01.pas", "tests/testconcat01.out")
@@ -188,10 +189,7 @@ def main(onlytest=""):
     # dotest("tests/testproc02.pas", "tests/testproc02.out")
     # dotest("tests/testproc03.pas", "tests/testproc03.out")
     # dotest("tests/testproc04.pas", "tests/testproc04.out")
-    # dotest("tests/testscope02.pas", "tests/testscope02.out")
-    # dotest("tests/teststring01.pas", "tests/teststring01.out")
     # dotest("tests/teststring02.pas", "tests/teststring02.out")
-    # dotest("tests/teststring03.pas", "tests/teststring03.out")
     # dotest("tests/teststring04.pas", "tests/teststring04.out")
 
     print("Tests Attempted: " + str(NUM_ATTEMPTS))
