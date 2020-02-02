@@ -616,19 +616,22 @@ class TACBlock:
 
             if not (isinstance(bt, pascaltypes.StringLiteralType) or isinstance(bt, pascaltypes.RealType) or
                     isinstance(bt, pascaltypes.BooleanType) or isinstance(bt, pascaltypes.IntegerType) or
-                    isinstance(bt, pascaltypes.CharacterType)):
+                    isinstance(bt, pascaltypes.CharacterType) or
+                    (isinstance(bt, pascaltypes.ArrayType) and bt.is_string_type())):
                 errstr = tac_errstr("Invalid type {} passed to {}".format(tmp.typedef.name, tok.value), tok)
                 raise TACException(errstr)
 
             self.addnode(TACParamNode(tmp))
             if isinstance(bt, pascaltypes.StringLiteralType):
-                self.addnode(TACCallSystemFunctionNode(Label("_WRITES"), 1))
+                self.addnode(TACCallSystemFunctionNode(Label("_WRITESL"), 1))
             elif isinstance(bt, pascaltypes.RealType):
                 self.addnode(TACCallSystemFunctionNode(Label("_WRITER"), 1))
             elif isinstance(bt, pascaltypes.BooleanType):
                 self.addnode(TACCallSystemFunctionNode(Label("_WRITEB"), 1))
             elif isinstance(bt, pascaltypes.IntegerType):
                 self.addnode(TACCallSystemFunctionNode(Label("_WRITEI"), 1))
+            elif isinstance(bt, pascaltypes.ArrayType) and bt.is_string_type():
+                self.addnode(TACCallSystemFunctionNode(Label("_WRITEST"), 1))
             else:
                 self.addnode(TACCallSystemFunctionNode(Label("_WRITEC"), 1))
         if tok.tokentype == TokenType.WRITELN:

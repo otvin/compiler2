@@ -253,6 +253,10 @@ class AssemblyGenerator:
         self.emitcode("extern free")
         self.emitcode("extern fflush")
 
+        self.emitcode("extern _PASCAL_PRINTSTRINGTYPE","from compiler2_system_io.asm")
+
+        self.emitcode("global _PASCAL_OVERFLOW_ERROR", "needed by compiler2_system_io.asm")
+
     def generate_datasection(self):
         self.emitsection("data")
         self.emitcomment("error handling strings")
@@ -718,11 +722,20 @@ class AssemblyGenerator:
                         self.emitcode("mov rax, 1", "1 floating point param")
                         self.emitcode("call printf wrt ..plt")
                         del params[-1]
-                    elif node.label.name == "_WRITES":
+                    elif node.label.name == "_WRITESL":
                         self.emitcode("mov rdi, _printf_strfmt")
                         self.emit_movtoregister_fromstack("RSI", params[-1].paramval)
                         self.emitcode("mov rax, 0")
                         self.emitcode("call printf wrt ..plt")
+                        del params[-1]
+                    elif node.label.name == "_WRITEST":
+                        p = params[-1].paramval
+                        assert isinstance(p, Symbol)
+                        assert isinstance(p.typedef, pascaltypes.ArrayTypeDef)
+                        assert p.typedef.basetype.is_string_type()
+                        self.emitcode("mov rdi, [{}]".format(p.memoryaddress))
+                        self.emitcode("mov rsi, {}".format(p.typedef.basetype.numitemsinarray))
+                        self.emitcode("call _PASCAL_PRINTSTRINGTYPE", "in compiler2_system_io.asm")
                         del params[-1]
                     elif node.label.name == "_WRITEC":
                         self.emit_movtoregister_fromstack("RDI", params[-1].paramval)
@@ -1309,5 +1322,6 @@ class AssemblyGenerator:
         self.generate_datasection()
         self.generate_textsection()
         self.asmfile.close()
+        os.system("nasm -f elf64 -F dwarf -g -o compiler2_system_io.o compiler2_system_io.asm")
         os.system("nasm -f elf64 -F dwarf -g -o {} {}".format(objfilename, self.asmfilename))
-        os.system("gcc {} -o {}".format(objfilename, exefilename))
+        os.system("gcc {} -o {} compiler2_system_io.o".format(objfilename, exefilename))

@@ -322,6 +322,19 @@ class ArrayType(StructuredType):
 
         self.size = self.numitemsinarray * self.componenttypedef.basetype.size
 
+    def is_string_type(self):
+        # 6.4.3.2 of the ISO standard states that a string type must be packed, have an index type
+        # that is an integer subrange that has 1 as its smallest value and a number greater than 1 as its largest
+        # value, and it's component-type is a denotation of the char type.
+        if self.ispacked and isinstance(self.indextypedef.basetype, SubrangeType) and \
+                isinstance(self.indextypedef.basetype.hosttypedef.basetype, IntegerType) and \
+                self.indexmin == "1" and self.numitemsinarray >= 2 and \
+                isinstance(self.componenttypedef.basetype, CharacterType):
+            return True
+        else:
+            return False
+
+
     def __repr__(self):  # pragma: no cover
         retstr = ""
         if self.ispacked:
@@ -329,18 +342,10 @@ class ArrayType(StructuredType):
         retstr += "Array [{}] of {} (size {} bytes)".format(repr(self.indextypedef), repr(self.componenttypedef),
                                                             self.size)
         retstr += "\n basetype size: {}".format(self.componenttypedef.basetype.size)
-
+        if self.is_string_type():
+            retstr += "\nString Type"
 
         return retstr
-
-
-class StringType(ArrayType):
-    # def __init__(self, maxindex):
-    #    # super().__init__(CharacterType(), 1, maxindex)
-    #    # self.ispacked = True
-    #    # self.typename = "string"
-    pass
-
 
 class RecordType(StructuredType):
     pass
