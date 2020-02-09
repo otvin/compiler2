@@ -19,6 +19,27 @@ VALID_REGISTER_LIST = ["RAX", "RBX", "RCX", "RDX", "RSI", "RDI", "RBP", "RSP", "
 VALID_DWORD_REGISTER_LIST = ["EAX", "EBX", "ECX", "EDX", "ESI", "EDI", "EBP", "ESP", "R8D", "R9D", "R10D", "R11D",
                              "R12D", "R13D", "R14D", "R15D", "R16D"]
 
+class PascalError:
+    def __init__(self, errorstr, label):
+        assert isinstance(errorstr, str)
+        assert isinstance(label, str)
+        self.errorstr = errorstr
+        self.label = label
+
+PASCALERRORS = {}
+PASCALERRORS[0] = PascalError("Overflow error", "_PASCAL_OVERFLOW_ERROR")
+PASCALERRORS[1] = PascalError("Error D.44 or D.45: Division by zero error", "_PASCAL_DIVZERO_ERROR")
+PASCALERRORS[2] = PascalError("Error D.46: Divisor in Mod must be positive", "_PASCAL_MOD_ERROR")
+PASCALERRORS[3] = PascalError("Error D.34: Cannot take sqrt() of negative number", "_PASCAL_SQRT_ERROR")
+PASCALERRORS[4] = PascalError("Error D.33: Cannot take ln() of number less than or equal to zero", "_PASCAL_LN_ERROR")
+PASCALERRORS[5] = PascalError("Error D.37: value to chr() exceeds 0-255 range for Char type", "_PASCAL_CHR_ERROR")
+PASCALERRORS[6] = PascalError("Error D.38 or D.39: succ() or pred() exceeds range for enumerated type", 
+                              "_PASCAL_SUCC_PRED_ERROR")
+PASCALERRORS[7] = PascalError("Error: value exceeds range for subrange type", "_PASCAL_SUBRANGE_ERROR")
+PASCALERRORS[8] = PascalError("Error: array index out of range.", "_PASCAL_ARRAYINDEX_ERROR")
+PASCALERRORS[9] = PascalError("Error: dynamic memory allocation failed.", "_PASCAL_CALLOC_ERROR")
+PASCALERRORS[10] = PascalError("Error: unable to de-allocate dynamic memory.", "_PASCAL_DISPOSE_ERROR")
+
 
 def get_register_slice_bybytes(register, numbytes):
     assert numbytes in [1, 2, 4, 8]
@@ -249,7 +270,6 @@ class AssemblyGenerator:
         return ret
 
     def generate_externs(self):
-        self.emitcode("extern printf")  # only used to print _PASCAL_ERRORs
         self.emitcode("extern fprintf")
         self.emitcode("extern fputc")
         self.emitcode("extern calloc")
@@ -263,19 +283,12 @@ class AssemblyGenerator:
         self.emitcode("global _PASCAL_OVERFLOW_ERROR", "needed by compiler2_*.asm")
 
     def generate_datasection(self):
+        global PASCALERRORS
+
         self.emitsection("data")
         self.emitcomment("error handling strings")
-        self.emitcode('_stringerr_0 db `Overflow error`, 0')
-        self.emitcode('_stringerr_1 db `Error D.44 or D.45: Division by zero error`, 0')
-        self.emitcode('_stringerr_2 db `Error D.46: Divisor in Mod must be positive`, 0')
-        self.emitcode('_stringerr_3 db `Error D.34: Cannot take sqrt() of negative number`, 0')
-        self.emitcode('_stringerr_4 db `Error D.33: Cannot take ln() of number less than or equal to zero`, 0')
-        self.emitcode('_stringerr_5 db `Error D.37: value to chr() exceeds 0-255 range for Char type`, 0')
-        self.emitcode('_stringerr_6 db `Error D.38 or D.39: succ() or pred() exceeds range for enumerated type`, 0')
-        self.emitcode('_stringerr_7 db `Error: value exceeds range for subrange type`, 0')
-        self.emitcode('_stringerr_8 db `Error: array index out of range.`, 0')
-        self.emitcode('_stringerr_9 db `Error: dynamic memory allocation failed.`, 0')
-        self.emitcode('_stringerr_10 db `Error: unable to de-allocate dynamic memory.`, 0')
+        for i in PASCALERRORS.keys():
+            self.emitcode('_pascalerr_{} db `{}`, 0'.format(str(i), PASCALERRORS[i].errorstr))
         self.emitcomment("support for write() commands")
         self.emitcode('_printf_intfmt db "%d",0')
         # TODO - this is not pascal-compliant, as should be fixed characters right-justified
@@ -1298,47 +1311,29 @@ class AssemblyGenerator:
         self.emitcode("ret")
 
     def generate_errorhandlingcode(self):
-        self.emitlabel("_PASCAL_OVERFLOW_ERROR")
-        self.emitcode("mov rdi, _stringerr_0")
-        self.emitcode("jmp _PASCAL_PRINT_ERROR")
-        self.emitlabel("_PASCAL_DIVZERO_ERROR")
-        self.emitcode("mov rdi, _stringerr_1")
-        self.emitcode("jmp _PASCAL_PRINT_ERROR")
-        self.emitlabel("_PASCAL_MOD_ERROR")
-        self.emitcode("mov rdi, _stringerr_2")
-        self.emitcode("jmp _PASCAL_PRINT_ERROR")
-        self.emitlabel("_PASCAL_SQRT_ERROR")
-        self.emitcode("mov rdi, _stringerr_3")
-        self.emitcode("jmp _PASCAL_PRINT_ERROR")
-        self.emitlabel("_PASCAL_LN_ERROR")
-        self.emitcode("mov rdi, _stringerr_4")
-        self.emitcode("jmp _PASCAL_PRINT_ERROR")
-        self.emitlabel("_PASCAL_CHR_ERROR")
-        self.emitcode("mov rdi, _stringerr_5")
-        self.emitcode("jmp _PASCAL_PRINT_ERROR")
-        self.emitlabel("_PASCAL_SUCC_PRED_ERROR")
-        self.emitcode("mov rdi, _stringerr_6")
-        self.emitcode("jmp _PASCAL_PRINT_ERROR")
-        self.emitlabel("_PASCAL_SUBRANGE_ERROR")
-        self.emitcode("mov rdi, _stringerr_7")
-        self.emitcode("jmp _PASCAL_PRINT_ERROR")
-        self.emitlabel("_PASCAL_ARRAYINDEX_ERROR")
-        self.emitcode("mov rdi, _stringerr_8")
-        self.emitcode("jmp _PASCAL_PRINT_ERROR")
-        self.emitlabel("_PASCAL_CALLOC_ERROR")
-        self.emitcode("mov rdi, _stringerr_9")
-        self.emitcode("jmp _PASCAL_PRINT_ERROR")
-        self.emitlabel("_PASCAL_DISPOSE_ERROR")
-        self.emitcode("mov rdi, _stringerr_10")
-        self.emitcode("jmp _PASCAL_PRINT_ERROR")
+        global PASCALERRORS
+
+        for i in PASCALERRORS.keys():
+            self.emitlabel(PASCALERRORS[i].label)
+            self.emitcode("mov rsi, _pascalerr_{}".format(str(i)))
+            self.emitcode("mov rdx, {}".format(len(PASCALERRORS[i].errorstr)))
+            self.emitcode("jmp _PASCAL_PRINT_ERROR")
 
         self.emitlabel("_PASCAL_PRINT_ERROR")
-        self.emitcomment("required: pointer to error message in rdi")
-        self.emitcode("mov rax, 0")
-        # TODO - replace call to printf with a syscall to stderr, because "output" may not have been defined.
-        # not moving to fprintf in case output isn't defined.
-        self.emitcode("call printf wrt ..plt")
+        self.emitcomment("required: pointer to error message in rsi, length of message in rdx")
+        self.emitcode("PUSH RSI")
+        self.emitcode("PUSH RDX")  # we pushed 16-bytes so we are still aligned
+        self.emitcode("XOR RDI, RDI", "need to flush any buffered output before printing the error")
+        self.emitcode("CALL fflush wrt ..plt")
+        self.emitcode("POP RDX")
+        self.emitcode("POP RSI")
+        # uses syscalls here because we don't know if "output" was defined
+        self.emitcode("mov rax, 1")
+        self.emitcode("mov rdi, 1", "1 = stdout")
+        self.emitcode("syscall")
         self.emitcode("jmp _PASCAL_EXIT")
+
+    def generate_programterminationcode(self):
         self.emitcomment("exit program")
         self.emitlabel("_PASCAL_EXIT")
         self.emitcomment("Need to flush the stdout buffer, as exiting does not do it.")
@@ -1354,6 +1349,7 @@ class AssemblyGenerator:
         self.emitcode("JMP _PASCAL_EXIT")
         self.generate_helperfunctioncode()
         self.generate_errorhandlingcode()
+        self.generate_programterminationcode()
 
     def generate_bsssection(self):
         if len(self.tacgenerator.globalsymboltable.symbols.keys()) > 0:
