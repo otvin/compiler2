@@ -1,4 +1,4 @@
-program testmath02;
+program testmath02(output);
 
 begin
     writeln('six times seven equals: ');

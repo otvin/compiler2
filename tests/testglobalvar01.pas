@@ -1,4 +1,4 @@
-program testglobalvar01;
+program testglobalvar01(output);
 var
     fred : integer;
     joe : integer;

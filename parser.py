@@ -2,7 +2,7 @@ from enum import Enum, unique, auto
 from lexer import TokenType, Token, TokenStream, LexerException
 from symboltable import StringLiteral, LiteralTable, SymbolTable, VariableSymbol, ParameterList, \
     ActivationSymbol, FunctionResultVariableSymbol, Parameter, SymbolException, ConstantSymbol, RealLiteral, \
-    CharacterLiteral
+    CharacterLiteral, ProgramParameterSymbol
 import pascaltypes
 
 '''
@@ -103,8 +103,6 @@ class AST:
         self.parent = parent  # pointer back to the parent node in the AST
         self.symboltable = None  # will only be defined for Procedure, Function, and Program tokens
         self.paramlist = None  # will only be defined for Procedure and Function tokens
-        # TODO - is self.attrs really needed, or is it just for the three Program-level attributes?
-        self.attrs = {}  # different types of tokens require different attributes
 
     def initsymboltable(self):
         self.symboltable = SymbolTable()
@@ -825,7 +823,7 @@ class Parser:
 
         ident_token = self.tokenstream.eattoken()
         sym = parent_ast.nearest_symboldefinition(ident_token.value)
-        assert isinstance(sym, VariableSymbol)
+        assert isinstance(sym, VariableSymbol), "non-variable access: {}".format(sym.name)
 
         # if the identifier is an array, we could see one of a few valid things. Assume the array variable
         # is named myarr and has 2 dimensions.  We could see myarr by itself - meaning it's being passed into a
@@ -1461,27 +1459,20 @@ class Parser:
         # this will be the symbol table for globals
         ret.initsymboltable()
         tok = self.getexpectedtoken(TokenType.IDENTIFIER)
-        ret.attrs[ASTAttributes.PROGRAM_NAME] = tok.value
         if self.tokenstream.peektokentype() == TokenType.LPAREN:
             self.getexpectedtoken(TokenType.LPAREN)
             while self.tokenstream.peektokentype() != TokenType.RPAREN:
                 tok = self.tokenstream.eattoken()
                 if tok.tokentype == TokenType.INPUT:
-                    if ASTAttributes.PROGRAM_INPUT not in ret.attrs.keys():
-                        ret.attrs[ASTAttributes.PROGRAM_INPUT] = True
-                        if self.tokenstream.peektokentype() != TokenType.RPAREN:
-                            self.getexpectedtoken(TokenType.COMMA)
-                    else:
-                        raise ParseException(token_errstr("Duplicate program parameter", tok))
+                    tftd = pascaltypes.TextFileTypeDef("input", pascaltypes.TextFileType(), pascaltypes.TextFileType())
+                    ret.symboltable.add(ProgramParameterSymbol("input", tok.location, tftd))
                 elif tok.tokentype == TokenType.OUTPUT:
-                    if ASTAttributes.PROGRAM_OUTPUT not in ret.attrs.keys():
-                        ret.attrs[ASTAttributes.PROGRAM_OUTPUT] = True
-                        if self.tokenstream.peektokentype() != TokenType.RPAREN:
-                            self.getexpectedtoken(TokenType.COMMA)
-                    else:
-                        raise ParseException(token_errstr("Duplicate program parameter", tok))
-                else:
-                    raise ParseException(token_errstr("Invalid program parameter", tok))
+                    tftd = pascaltypes.TextFileTypeDef("output", pascaltypes.TextFileType(), pascaltypes.TextFileType())
+                    ret.symboltable.add(ProgramParameterSymbol("output", tok.location, tftd))
+                elif tok.tokentype == TokenType.IDENTIFIER:
+                    # when we run into the definition of this, we will change the componenttypedef if it is not text
+                    ftd = pascaltypes.FileTypeDef(tok.value, pascaltypes.TextFileType(), pascaltypes.TextFileType())
+                    ret.symboltable.add(ProgramParameterSymbol(tok.value, tok.location, ftd))
             self.getexpectedtoken(TokenType.RPAREN)
         self.getexpectedtoken(TokenType.SEMICOLON)
         ret.children = self.parse_block(ret)

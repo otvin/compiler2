@@ -359,7 +359,26 @@ class SetType(StructuredType):
 
 
 class FileType(StructuredType):
-    pass
+    def __init__(self, componenttypedef):
+        assert isinstance(componenttypedef, TypeDef)
+        # cannot have a File of Files.
+        assert not isinstance(componenttypedef.basetype, FileType)
+        super().__init__()
+        self.componenttypedef = componenttypedef
+        # FileType layout = 8 bytes for the FILE* followed by 1 byte for the mode-type
+        # mode-type = 0 : file not initialized
+        # mode-type = 1 : generation
+        # mode-type = 2 : inspection
+        self.size = 9 + self.componenttypedef.basetype.size
+        # todo - if this works for self.typename then maybe try it for the typename of arrays?
+        self.typename = "file of {}".format(self.componenttypedef.basetype.typename)
+
+
+class TextFileType(FileType):
+    def __init__(self):
+        # for now, a text file will be a typedef of chars
+        super().__init__(SIMPLETYPEDEF_CHAR)
+        self.typename = "textfile"
 
 
 class ActivationType(BaseType):
@@ -502,4 +521,16 @@ class StructuredTypeDef(TypeDef):
 class ArrayTypeDef(StructuredTypeDef):
     def __init__(self, identifier, denoter, basetype):
         assert isinstance(basetype, ArrayType)
+        super().__init__(identifier, denoter, basetype)
+
+
+class FileTypeDef(StructuredTypeDef):
+    def __init__(self, identifier, denoter, basetype):
+        assert isinstance(basetype, FileType)
+        super().__init__(identifier, denoter, basetype)
+
+
+class TextFileTypeDef(FileTypeDef):
+    def __init__(self, identifier, denoter, basetype):
+        assert isinstance(basetype, TextFileType)
         super().__init__(identifier, denoter, basetype)

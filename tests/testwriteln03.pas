@@ -1,4 +1,4 @@
-program testwriteln03;
+program testwriteln03(output);
 {test passing multiple arguments to write/writeln}
 begin {main}
   writeln('hello ', 'world');

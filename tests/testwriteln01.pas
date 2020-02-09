@@ -1,4 +1,4 @@
-program test1;
+program test1(output);
 
 begin
     writeln(9999);

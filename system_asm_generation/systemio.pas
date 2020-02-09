@@ -12,15 +12,19 @@ To use:
 
 	4) remove the bounds-checking code.
 
+	5) use the address of fileptr ([RBP-16]) to pass into fputc as the first parameter, as the code generated will use stdout by default.
+
 }
 
 type
 	Length = 1..10;
 	mystring = packed array[Length] of char;
 
-var alpha:mystring;
 
-procedure printstringtype(s:mystring; k:integer);
+var alpha:mystring;
+	i:integer;
+
+procedure printstringtype(var fileptr:integer; s:mystring; k:integer);
 var i:integer;
 begin
 	i := 1;
@@ -44,7 +48,7 @@ begin
 	alpha[5] := 'o';
 	alpha[6] := '!';
 
-	printstringtype(alpha, 10);
+	printstringtype(i, alpha, 10);
 	writeln;
 end.
 

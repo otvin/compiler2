@@ -3,7 +3,7 @@ from tac_ir import TACBlock, TACLabelNode, TACParamNode, TACCallSystemFunctionNo
     TACOperator, TACGenerator, TACCommentNode, TACBinaryNode, TACUnaryNode, TACGotoNode, TACIFZNode, \
     TACFunctionReturnNode, TACCallFunctionNode, TACBinaryNodeWithBoundsCheck
 from symboltable import StringLiteral, IntegerLiteral, Symbol, Parameter, ActivationSymbol, RealLiteral, \
-    FunctionResultVariableSymbol, CharacterLiteral, ConstantSymbol
+    FunctionResultVariableSymbol, CharacterLiteral, ConstantSymbol, ProgramParameterSymbol
 from editor_settings import NUM_SPACES_IN_TAB, NUM_TABS_FOR_COMMENT
 import pascaltypes
 
@@ -250,10 +250,11 @@ class AssemblyGenerator:
 
     def generate_externs(self):
         self.emitcode("extern printf")
-        self.emitcode("extern putchar")
+        self.emitcode("extern fputc")
         self.emitcode("extern calloc")
         self.emitcode("extern free")
         self.emitcode("extern fflush")
+        self.emitcode("extern stdout")
 
         self.emitcode("extern _PASCAL_PRINTSTRINGTYPE","from compiler2_system_io.asm")
         self.emitcode("extern _PASCAL_STRINGCOMPARE", "from compiler2_stringcompare.asm")
@@ -499,6 +500,32 @@ class AssemblyGenerator:
                 self.emitcode("POP RDI", "free memory from array value parameter")
                 self.emitcode("CALL _PASCAL_DISPOSE_MEMORY")
 
+    def generate_globalfile_initializationcode(self):
+        for symname in self.tacgenerator.globalsymboltable.symbols.keys():
+            sym = self.tacgenerator.globalsymboltable.fetch(symname)
+            if isinstance(sym, ProgramParameterSymbol):
+                if sym.name == "output":
+                    self.emitcode("mov r11, stdout", "initialize global textfile variable 'output'")
+                    self.emitcode("mov rax, [r11]")
+                    self.emitcode("mov [rel _globalvar_output], rax")
+                    self.emitcode("mov rax, [rel _globalvar_output]")
+                    self.emitcode("add rax, 8")
+                    self.emitcode("mov [rax], byte 1")
+                    self.emitcode("inc rax")
+                    self.emitcode("mov [rax], byte 0")
+                elif sym.name == "input":
+                    self.emitcode("mov r11, stdin", "initialize global textfile variable 'input'")
+                    self.emitcode("mov rax, [r11]")
+                    self.emitcode("mov [rel _globalvar_output], rax")
+                    self.emitcode("mov rax, [rel _globalvar_input]")
+                    self.emitcode("add rax, 8")
+                    self.emitcode("mov [rax], byte 2")
+                    self.emitcode("inc rax")
+                    self.emitcode("mov [rax], byte 0")
+                else:
+                    errstr = "Invalid program parameter '{}' in {}".format(sym.name, sym.location)
+                    raise ASMGeneratorError(errstr)
+
     def generate_code(self):
         params = []  # this is a stack of parameters
 
@@ -507,6 +534,7 @@ class AssemblyGenerator:
 
             if block.ismain:
                 self.emitlabel("main")
+                self.generate_globalfile_initializationcode()
                 self.emitcode("finit")  # TODO - this should only be written if we use x87 anywhere.
                 tacnodelist = block.tacnodes
             else:
@@ -727,8 +755,9 @@ class AssemblyGenerator:
                     elif node.label.name == "_WRITESL":
                         p = params[-1].paramval
                         assert isinstance(p, ConstantSymbol)
-                        self.emitcode("mov rdi, [{}]".format(p.memoryaddress))
-                        self.emitcode("mov esi, {}".format(len(p.value)))
+                        self.emitcode("mov rdi, [rel _globalvar_output]")
+                        self.emitcode("mov rsi, [{}]".format(p.memoryaddress))
+                        self.emitcode("mov edx, {}".format(len(p.value)))
                         self.emitcode("call _PASCAL_PRINTSTRINGTYPE", "in compiler2_system_io.asm")
                         del params[-1]
                     elif node.label.name == "_WRITEST":
@@ -736,13 +765,15 @@ class AssemblyGenerator:
                         assert isinstance(p, Symbol)
                         assert isinstance(p.typedef, pascaltypes.ArrayTypeDef)
                         assert p.typedef.basetype.is_string_type()
-                        self.emitcode("mov rdi, [{}]".format(p.memoryaddress))
-                        self.emitcode("mov esi, {}".format(p.typedef.basetype.numitemsinarray))
+                        self.emitcode("mov rdi, [rel _globalvar_output]")
+                        self.emitcode("mov rsi, [{}]".format(p.memoryaddress))
+                        self.emitcode("mov edx, {}".format(p.typedef.basetype.numitemsinarray))
                         self.emitcode("call _PASCAL_PRINTSTRINGTYPE", "in compiler2_system_io.asm")
                         del params[-1]
                     elif node.label.name == "_WRITEC":
                         self.emit_movtoregister_fromstack("RDI", params[-1].paramval)
-                        self.emitcode("call putchar wrt ..plt")
+                        self.emitcode("mov rsi, [rel _globalvar_output]")
+                        self.emitcode("call fputc wrt ..plt")
                         del params[-1]
                     elif node.label.name == "_WRITEB":
                         self.emit_movtoregister_fromstack("al", params[-1].paramval)
@@ -750,13 +781,14 @@ class AssemblyGenerator:
                         labelfalse = self.getnextlabel()
                         labelprint = self.getnextlabel()
                         self.emitcode("je {}".format(labelfalse))
-                        self.emitcode("mov rdi, _printf_true")
-                        self.emitcode("mov rsi, 4")
+                        self.emitcode("mov rsi, _printf_true")
+                        self.emitcode("mov edx, 4")
                         self.emitcode("jmp {}".format(labelprint))
                         self.emitlabel(labelfalse)
-                        self.emitcode("mov rdi, _printf_false")
-                        self.emitcode("mov rsi, 5")
+                        self.emitcode("mov rsi, _printf_false")
+                        self.emitcode("mov edx, 5")
                         self.emitlabel(labelprint)
+                        self.emitcode("mov rdi, [rel _globalvar_output]")
                         self.emitcode("call _PASCAL_PRINTSTRINGTYPE", "in compiler2_system_io.asm")
                         del params[-1]
                     elif node.label.name == "_WRITECRLF":
@@ -1323,17 +1355,19 @@ class AssemblyGenerator:
             varseq = 0
             for symname in self.tacgenerator.globalsymboltable.symbols.keys():
                 sym = self.tacgenerator.globalsymboltable.fetch(symname)
-                if isinstance(sym, Symbol):
-                    if not isinstance(sym, ActivationSymbol):
+                if isinstance(sym, Symbol) and not isinstance(sym, ActivationSymbol):
+                    if isinstance(sym, ProgramParameterSymbol):
+                        label = "_globalvar_{}".format(sym.name)
+                    else:
                         label = "_globalvar_{}".format(str(varseq))
                         varseq += 1
-                        sym.memoryaddress = "rel {}".format(label)
-                        if isinstance(sym.typedef, pascaltypes.ArrayTypeDef):
-                            self.emitcode("{} resb 8".format(label),
-                                          "address for global array variable {}".format(symname))
-                        else:
-                            self.emitcode("{} resb {}".format(label, sym.typedef.basetype.size),
-                                          "global variable {}".format(symname))
+                    sym.memoryaddress = "rel {}".format(label)
+                    if isinstance(sym.typedef, pascaltypes.ArrayTypeDef):
+                        self.emitcode("{} resb 8".format(label),
+                                      "address for global array variable {}".format(symname))
+                    else:
+                        self.emitcode("{} resb {}".format(label, sym.typedef.basetype.size),
+                                      "global variable {}".format(symname))
 
     def generate(self, objfilename, exefilename):
         self.generate_externs()

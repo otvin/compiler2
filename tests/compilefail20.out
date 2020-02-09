@@ -1,1 +1,1 @@
-Duplicate program parameter 'input' in file:tests/compilefail20.pas line:1     column:38 
+Symbol Redefined: input in file:tests/compilefail20.pas line:1     column:38 

@@ -1,4 +1,4 @@
-program testwrite01;
+program testwrite01(output);
 begin
   write('hi');
   write(' hi');

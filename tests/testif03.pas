@@ -1,4 +1,4 @@
-program testif03;
+program testif03(output);
 var
     numSuccess:Integer;
     a:Integer;

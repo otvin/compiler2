@@ -1,4 +1,4 @@
-program testif02;
+program testif02(output);
 var
     fred : integer;
     joe : integer;

@@ -205,6 +205,12 @@ class ActivationSymbol(Symbol):
             raise TypeError("Invalid label")
 
 
+class ProgramParameterSymbol(Symbol):
+    def __init__(self, name, location, typedef):
+        assert isinstance(typedef, pascaltypes.FileTypeDef)
+        super().__init__(name, location, typedef)
+
+
 class Label:
     # TODO - is a label a standalone thing or is a label something that modifies another statement?
 

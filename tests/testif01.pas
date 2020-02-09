@@ -1,4 +1,4 @@
-program testif01;
+program testif01(output);
 
 begin
     if 3 < 5 then
