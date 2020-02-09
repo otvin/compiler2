@@ -1,4 +1,4 @@
-program testcomments01;
+program testcomments01(output);
 
 begin
     writeln(4 + {comment} 2);

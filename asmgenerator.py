@@ -249,7 +249,8 @@ class AssemblyGenerator:
         return ret
 
     def generate_externs(self):
-        self.emitcode("extern printf")
+        self.emitcode("extern printf")  # only used to print _PASCAL_ERRORs
+        self.emitcode("extern fprintf")
         self.emitcode("extern fputc")
         self.emitcode("extern calloc")
         self.emitcode("extern free")
@@ -736,21 +737,23 @@ class AssemblyGenerator:
                     if node.label.name == "_WRITEI":
                         if node.numparams != 1:  # pragma: no cover
                             raise ASMGeneratorError("Invalid numparams to _WRITEI")
-                        self.emitcode("mov rdi, _printf_intfmt")
+                        self.emitcode("mov rdi, [rel _globalvar_output]")
+                        self.emitcode("mov rsi, _printf_intfmt")
                         param = params[-1]
-                        destregister = get_register_slice_bybytes("RSI", param.paramval.typedef.basetype.size)
+                        destregister = get_register_slice_bybytes("RDX", param.paramval.typedef.basetype.size)
                         self.emit_movtoregister_fromstackorliteral(destregister, param.paramval)
-                        # must pass 0 (in rax) as number of floating point args since printf is variadic
+                        # must pass 0 (in rax) as number of floating point args since fprintf is variadic
                         self.emitcode("mov rax, 0")
-                        self.emitcode("call printf wrt ..plt")
+                        self.emitcode("call fprintf wrt ..plt")
                         del params[-1]
                     elif node.label.name == "_WRITER":
                         if node.numparams != 1:  # pragma: no cover
                             raise ASMGeneratorError("Invalid numparams to _WRITER")
-                        self.emitcode("mov rdi, _printf_realfmt")
+                        self.emitcode("mov rdi, [rel _globalvar_output]")
+                        self.emitcode("mov rsi, _printf_realfmt")
                         self.emit_movtoxmmregister_fromstack("xmm0", params[-1].paramval)
                         self.emitcode("mov rax, 1", "1 floating point param")
-                        self.emitcode("call printf wrt ..plt")
+                        self.emitcode("call fprintf wrt ..plt")
                         del params[-1]
                     elif node.label.name == "_WRITESL":
                         p = params[-1].paramval
@@ -792,9 +795,10 @@ class AssemblyGenerator:
                         self.emitcode("call _PASCAL_PRINTSTRINGTYPE", "in compiler2_system_io.asm")
                         del params[-1]
                     elif node.label.name == "_WRITECRLF":
-                        self.emitcode("mov rdi, _printf_newln")
+                        self.emitcode("mov rdi, [rel _globalvar_output]")
+                        self.emitcode("mov rsi, _printf_newln")
                         self.emitcode("mov rax, 0")
-                        self.emitcode("call printf wrt ..plt")
+                        self.emitcode("call fprintf wrt ..plt")
                         self.emitcode("XOR RDI, RDI", "Flush standard output when we do a writeln")
                         self.emitcode("CALL fflush wrt ..plt")
                         self.emitcode("")
@@ -1331,6 +1335,8 @@ class AssemblyGenerator:
         self.emitlabel("_PASCAL_PRINT_ERROR")
         self.emitcomment("required: pointer to error message in rdi")
         self.emitcode("mov rax, 0")
+        # TODO - replace call to printf with a syscall to stderr, because "output" may not have been defined.
+        # not moving to fprintf in case output isn't defined.
         self.emitcode("call printf wrt ..plt")
         self.emitcode("jmp _PASCAL_EXIT")
         self.emitcomment("exit program")

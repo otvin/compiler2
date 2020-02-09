@@ -1039,6 +1039,11 @@ class Parser:
                 ret.children.append(AST(self.getexpectedtoken(TokenType.OUTPUT), parent_ast))
                 self.getexpectedtoken(TokenType.COMMA)
 
+            # TODO - this is a temporary error check
+            if not parent_ast.nearest_symboltable().existsanywhere("output"):
+                raise ParseException("{}() called without 'output' defined in {}".format(ret.token.value,
+                                                                                         ret.token.location))
+
             done = False
             while not done:
                 ret.children.append(self.parse_expression(ret))
@@ -1460,19 +1465,21 @@ class Parser:
         ret.initsymboltable()
         tok = self.getexpectedtoken(TokenType.IDENTIFIER)
         if self.tokenstream.peektokentype() == TokenType.LPAREN:
+            position = 1
             self.getexpectedtoken(TokenType.LPAREN)
             while self.tokenstream.peektokentype() != TokenType.RPAREN:
                 tok = self.tokenstream.eattoken()
                 if tok.tokentype == TokenType.INPUT:
                     tftd = pascaltypes.TextFileTypeDef("input", pascaltypes.TextFileType(), pascaltypes.TextFileType())
-                    ret.symboltable.add(ProgramParameterSymbol("input", tok.location, tftd))
+                    ret.symboltable.add(ProgramParameterSymbol("input", tok.location, tftd, position))
                 elif tok.tokentype == TokenType.OUTPUT:
                     tftd = pascaltypes.TextFileTypeDef("output", pascaltypes.TextFileType(), pascaltypes.TextFileType())
-                    ret.symboltable.add(ProgramParameterSymbol("output", tok.location, tftd))
+                    ret.symboltable.add(ProgramParameterSymbol("output", tok.location, tftd, position))
                 elif tok.tokentype == TokenType.IDENTIFIER:
                     # when we run into the definition of this, we will change the componenttypedef if it is not text
                     ftd = pascaltypes.FileTypeDef(tok.value, pascaltypes.TextFileType(), pascaltypes.TextFileType())
-                    ret.symboltable.add(ProgramParameterSymbol(tok.value, tok.location, ftd))
+                    ret.symboltable.add(ProgramParameterSymbol(tok.value, tok.location, ftd, position))
+                position += 1
             self.getexpectedtoken(TokenType.RPAREN)
         self.getexpectedtoken(TokenType.SEMICOLON)
         ret.children = self.parse_block(ret)

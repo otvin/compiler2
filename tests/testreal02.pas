@@ -1,4 +1,4 @@
-program testreal02;
+program testreal02(output);
 
 begin
     writeln(1.2 + 2.3);

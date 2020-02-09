@@ -1,4 +1,4 @@
-program testwrite01;
+program testmath01(output);
 
 begin
     writeln(6 * 3 + 2);

@@ -206,9 +206,12 @@ class ActivationSymbol(Symbol):
 
 
 class ProgramParameterSymbol(Symbol):
-    def __init__(self, name, location, typedef):
+    def __init__(self, name, location, typedef, position):
         assert isinstance(typedef, pascaltypes.FileTypeDef)
+        assert isinstance(position, int)
+        assert position >= 1
         super().__init__(name, location, typedef)
+        self.position = position
 
 
 class Label:

@@ -1,0 +1,1 @@
+writeln() called without 'output' defined in file:tests/compilefail62.pas line:5     column:5  
