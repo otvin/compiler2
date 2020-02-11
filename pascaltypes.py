@@ -2,27 +2,48 @@ class PascalTypeException(Exception):
     pass
 
 
+# Note: if you change the size of integer from 4 bytes to something else, these constants need to change
+MAXINT = 2147483647
+NEGMAXINT = -1 * MAXINT
+STRMAXINT = str(MAXINT)
+STRNEGMAXINT = str(NEGMAXINT)
+
+
 class BaseType:
-    def __init__(self):
+    def __init__(self, identifier, denoter=None):
+        # denoter may be None but may also be a BaseType.  For example:
+        #
+        # type
+        #   i = integer;
+        #   c = i;
+        #
+        # type i would be an IntegerType() with identifier i and denoter None.
+        # type c would be an IntegerType() with identifier c and denoter the type object of i.
+        assert isinstance(identifier, str)
+        assert denoter is None or isinstance(denoter, BaseType)
+
         self.size = 0
-        self.typename = None
+        self.identifier = identifier.lower()
+        self.denoter = denoter
 
     def is_string_type(self):
         return False
 
+    def get_pointer_to(self):
+        # returns a new pointertype that is a pointer to the current type
+        return PointerType("_ptrto_{}".format(self.identifier), self)
+
     def __str__(self):
-        return self.typename
+        return self.identifier
 
-    def __repr__(self):
-        return self.typename
+    def __repr__(self):  # pragma: no cover
+        return "Type '{}' with denoter {}".format(self.identifier, repr(self.denoter))
 
-
-class StringLiteralType(BaseType):
-    # this is a bit hacky, but allows us to pass around string literals in places that require pascal types
-    def __init__(self):
-        super().__init__()
-        self.typename = "string literal"
-        self.size = 8
+    # allows us to use Types in Symbol tables, and yet keep the vocabulary in the Type such that it matches
+    # the terminology in the ISO standard
+    @property
+    def name(self):
+        return self.identifier
 
 
 class SimpleType(BaseType):
@@ -30,8 +51,8 @@ class SimpleType(BaseType):
 
 
 class OrdinalType(SimpleType):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, identifier, denoter=None):
+        super().__init__(identifier, denoter)
 
     def __getitem__(self, n):  # pragma: no cover
         # this is a pure virtual function
@@ -54,18 +75,9 @@ class OrdinalType(SimpleType):
         raise NotImplementedError("max_item() not implemented")
 
 
-# Putting these constants here because if we change the size of the Integer, we would need to change
-# the constants.
-MAXINT = 2147483647
-NEGMAXINT = -1 * MAXINT
-STRMAXINT = str(MAXINT)
-STRNEGMAXINT = str(NEGMAXINT)
-
-
 class IntegerType(OrdinalType):
-    def __init__(self):
-        super().__init__()
-        self.typename = "integer"
+    def __init__(self, identifier="integer", denoter=None):
+        super().__init__(identifier, denoter)
         self.size = 4
 
     def __getitem__(self, n):
@@ -90,9 +102,8 @@ class IntegerType(OrdinalType):
 
 
 class CharacterType(OrdinalType):
-    def __init__(self):
-        super().__init__()
-        self.typename = "char"
+    def __init__(self, identifier="char", denoter=None):
+        super().__init__(identifier, denoter)
         self.size = 1
 
     def __getitem__(self, n):
@@ -114,9 +125,8 @@ class CharacterType(OrdinalType):
 
 
 class BooleanType(OrdinalType):
-    def __init__(self):
-        super().__init__()
-        self.typename = "Boolean"
+    def __init__(self, identifier="boolean", denoter=None):
+        super().__init__(identifier, denoter)
         self.size = 1
 
     def __getitem__(self, n):
@@ -139,16 +149,16 @@ class BooleanType(OrdinalType):
 
 class EnumeratedTypeValue:
     # needed so that the values can go into the symbol table
-    def __init__(self, identifier, typename, value):
+    def __init__(self, identifier, typeidentifier, value):
         assert isinstance(identifier, str)
-        assert isinstance(typename, str)
+        assert isinstance(typeidentifier, str)
         assert isinstance(value, int)
         assert value >= 0
         self.identifier = identifier
-        self.typename = typename
+        self.typeidentifier = typeidentifier
         self.value = value
 
-    # allows us to use TypeDefinitions in Symbol tables, and yet keep the vocabluary in the TypeDefinition
+    # allows us to use EnumeratedTypeValues in Symbol tables, and yet keep the vocabulary in the TypeDefinition
     # such that matches the terminology in the ISO standard
     @property
     def name(self):
@@ -158,37 +168,35 @@ class EnumeratedTypeValue:
         return self.identifier
 
     def __repr__(self):
-        return "ID:{} for Type:{} with value:{}".format(self.identifier, self.typename, self.value)
+        return "ID:{} for Type:{} with value:{}".format(self.identifier, self.identifier, self.value)
 
 
 class EnumeratedType(OrdinalType):
-    # TODO - remove the typename - it's only used for printout.  The identifier for symbol table is on the typedef
-    def __init__(self, typename, value_list):
+    def __init__(self, identifier, value_list, denoter=None):
         i = 0
         value_identifier_list = []
         while i < len(value_list):
             assert isinstance(value_list[i], EnumeratedTypeValue)
-            assert value_list[i].typename == typename
+            assert value_list[i].typeidentifier == identifier
             assert value_list[i].value == i
             # cannot define the same constant multiple times in the same type
             assert value_list[i].identifier not in value_identifier_list
             value_identifier_list.append(value_list[i].identifier)
             i += 1
 
-        super().__init__()
+        super().__init__(identifier, denoter)
         if len(value_list) > 255:
             errstr = "Enumerated type '{}' has {} identifiers.  Maximum is 255."
-            errstr = errstr.format(typename, str(len(value_list)))
+            errstr = errstr.format(identifier, str(len(value_list)))
             raise PascalTypeException(errstr)
-        self.typename = typename
         self.size = 1
         self.value_list = value_list
 
     def __str__(self):  # pragma: no cover
-        return "Enumerated type: {}".format(self.typename)
+        return "Enumerated type: {}".format(self.identifier)
 
     def __repr__(self):  # pragma: no cover
-        ret = "Enumerated type: {} with values (".format(self.typename)
+        ret = "Enumerated type: {} with values (".format(self.identifier)
         for i in self.value_list:
             ret = ret + str(i) + ', '
         ret = ret[:-2] + ')'
@@ -210,8 +218,10 @@ class EnumeratedType(OrdinalType):
             else:
                 i += 1
         if not foundit:
+            # side note - this error is caught upstream by checking the types, so I cannot come up with a
+            # coverage scenario for this.
             errstr = "'{}' is not a valid value for enumerated type '{}'"
-            errstr = errstr.format(s, self.typename)
+            errstr = errstr.format(s, self.identifier)
             raise PascalTypeException(errstr)
         return i
 
@@ -223,21 +233,16 @@ class EnumeratedType(OrdinalType):
 
 
 class SubrangeType(OrdinalType):
-    # TODO - remove the typename - it's only used for printout.  The identifier for symbol table is on the typedef
-    def __init__(self, typename, hosttypedef, rangemin, rangemax):
-        assert isinstance(hosttypedef, TypeDef)
-        assert isinstance(hosttypedef.basetype, OrdinalType)
-        super().__init__()
-        self.typename = typename
-        self.size = hosttypedef.basetype.size
-        self.hosttypedef = hosttypedef
-        # this is needed because Pycharm shows some inaccurate "errors" if I do not.
-        assert isinstance(self.hosttypedef.basetype, OrdinalType)
+    def __init__(self, identifier, hosttype, rangemin, rangemax, denoter=None):
+        assert isinstance(hosttype, OrdinalType)
+        super().__init__(identifier, denoter)
+        self.size = hosttype.size
+        self.hosttype = hosttype
         self.rangemin = rangemin  # these are always strings
         self.rangemax = rangemax
         # need to convert the rangemin / rangemax to ints so we can compare them
-        self.rangemin_int = self.hosttypedef.basetype.position(self.rangemin)
-        self.rangemax_int = self.hosttypedef.basetype.position(self.rangemax)
+        self.rangemin_int = self.hosttype.position(self.rangemin)
+        self.rangemax_int = self.hosttype.position(self.rangemax)
         if self.rangemin_int > self.rangemax_int:
             # required in 6.4.2.4
             errstr = "Invalid subrange - value {} is not less than or equal to value {}"
@@ -245,30 +250,24 @@ class SubrangeType(OrdinalType):
             raise PascalTypeException(errstr)
 
     def __getitem__(self, n):
-        # this is needed because Pycharm shows some inaccurate "errors" if I do not.
-        assert isinstance(self.hosttypedef.basetype, OrdinalType)
         assert self.rangemin_int + n <= self.rangemax_int
-        return self.hosttypedef.basetype[n - self.rangemin_int]
+        return self.hosttype[n - self.rangemin_int]
 
     def position(self, s):
         assert self.isinrange(s)
-        # this is needed because Pycharm shows some inaccurate "errors" if I do not.
-        assert isinstance(self.hosttypedef.basetype, OrdinalType)
-        host_position = self.hosttypedef.basetype.position(s)
+        host_position = self.hosttype.position(s)
         return host_position - self.rangemin_int
 
     def isinrange(self, s):
-        # this is needed because Pycharm shows some inaccurate "errors" if I do not.
-        assert isinstance(self.hosttypedef.basetype, OrdinalType)
-        host_position = self.hosttypedef.basetype.position(s)
+        host_position = self.hosttype.position(s)
         return self.rangemin_int <= host_position <= self.rangemax_int
 
     def __str__(self):  # pragma: no cover
-        return "Subrange type: '{}'".format(self.typename)
+        return "Subrange type: '{}'".format(self.identifier)
 
     def __repr__(self):  # pragma: no cover
         retstr = "Subrange type: '{}'.  Hosttypedef: {} \n rangemin: {}  rangemax: {}"
-        retstr = retstr.format(self.typename, repr(self.hosttypedef), self.rangemin, self.rangemax)
+        retstr = retstr.format(self.identifier, repr(self.hosttype), self.rangemin, self.rangemax)
         retstr += "\nrangemin_int: {}  rangemax_int: {}".format(str(self.rangemin_int), str(self.rangemax_int))
         return retstr
 
@@ -280,75 +279,70 @@ class SubrangeType(OrdinalType):
 
 
 class RealType(SimpleType):
-    def __init__(self):
-        super().__init__()
-        self.typename = "real"
+    def __init__(self, identifier="real", denoter=None):
+        super().__init__(identifier, denoter)
         self.size = 8
 
 
 class PointerType(BaseType):
-    def __init__(self, pointstotype):
+    def __init__(self, identifier, pointstotype, denoter=None):
         assert isinstance(pointstotype, BaseType)
-        super().__init__()
-        self.typename = "pointer"
+        super().__init__(identifier, denoter)
+
         self.size = 8
-        #todo - make consistent with typedef - pointsto_typedef vs. pointstotype
         self.pointstotype = pointstotype
 
 
 class StructuredType(BaseType):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, identifier, denoter=None):
+        super().__init__(identifier, denoter)
         self.ispacked = False  # TODO handle packed structures
 
 
 class ArrayType(StructuredType):
-    def __init__(self, indextypedef, componenttypedef, ispacked):
-        assert isinstance(indextypedef, TypeDef)
-        assert isinstance(indextypedef.basetype, OrdinalType)
-        assert isinstance(componenttypedef, TypeDef)
+    def __init__(self, identifier, indextype, componenttype, ispacked, denoter=None):
+        assert isinstance(indextype, OrdinalType)
+        assert isinstance(componenttype, BaseType)
         assert isinstance(ispacked, bool)
 
-        super().__init__()
-        self.typename = "array"
-        self.indextypedef = indextypedef
-        self.componenttypedef = componenttypedef
+        super().__init__(identifier, denoter)
+        self.indextype = indextype
+        self.componenttype = componenttype
         self.ispacked = ispacked
 
-        assert isinstance(self.indextypedef.basetype, OrdinalType)  # to prevent PyCharm from flagging violations
-        self.indexmin = self.indextypedef.basetype.min_item()  # just like Subranges, these are always strings
-        self.indexmax = self.indextypedef.basetype.max_item()
+        self.indexmin = self.indextype.min_item()  # just like Subranges, these are always strings
+        self.indexmax = self.indextype.max_item()
         # need to convert the rangemin / rangemax to ints so we can compare them
-        self.indexmin_int = self.indextypedef.basetype.position(self.indexmin)
-        self.indexmax_int = self.indextypedef.basetype.position(self.indexmax)
+        self.indexmin_int = self.indextype.position(self.indexmin)
+        self.indexmax_int = self.indextype.position(self.indexmax)
         self.numitemsinarray = (self.indexmax_int - self.indexmin_int) + 1
 
-        self.size = self.numitemsinarray * self.componenttypedef.basetype.size
+        self.size = self.numitemsinarray * self.componenttype.size
 
     def is_string_type(self):
         # 6.4.3.2 of the ISO standard states that a string type must be packed, have an index type
         # that is an integer subrange that has 1 as its smallest value and a number greater than 1 as its largest
         # value, and it's component-type is a denotation of the char type.
-        if self.ispacked and isinstance(self.indextypedef.basetype, SubrangeType) and \
-                isinstance(self.indextypedef.basetype.hosttypedef.basetype, IntegerType) and \
+        if self.ispacked and isinstance(self.indextype, SubrangeType) and \
+                isinstance(self.indextype.hosttype, IntegerType) and \
                 self.indexmin == "1" and self.numitemsinarray >= 2 and \
-                isinstance(self.componenttypedef.basetype, CharacterType):
+                isinstance(self.componenttype, CharacterType):
             return True
         else:
             return False
-
 
     def __repr__(self):  # pragma: no cover
         retstr = ""
         if self.ispacked:
             retstr = "Packed "
-        retstr += "Array [{}] of {} (size {} bytes)".format(repr(self.indextypedef), repr(self.componenttypedef),
+        retstr += "Array [{}] of {} (size {} bytes)".format(repr(self.indextype), repr(self.componenttype),
                                                             self.size)
-        retstr += "\n basetype size: {}".format(self.componenttypedef.basetype.size)
+        retstr += "\n basetype size: {}".format(self.componenttype.size)
         if self.is_string_type():
             retstr += "\nString Type"
 
         return retstr
+
 
 class RecordType(StructuredType):
     pass
@@ -359,26 +353,26 @@ class SetType(StructuredType):
 
 
 class FileType(StructuredType):
-    def __init__(self, componenttypedef):
-        assert isinstance(componenttypedef, TypeDef)
+    def __init__(self, identifier, componenttype, denoter=None):
+        assert isinstance(componenttype, BaseType)
         # cannot have a File of Files.
-        assert not isinstance(componenttypedef.basetype, FileType)
-        super().__init__()
-        self.componenttypedef = componenttypedef
+        assert not isinstance(componenttype, FileType)
+        super().__init__(identifier, denoter)
+        self.componenttype = componenttype
         # FileType layout = 8 bytes for the FILE* followed by 1 byte for the mode-type
         # mode-type = 0 : file not initialized
         # mode-type = 1 : generation
         # mode-type = 2 : inspection
-        self.size = 9 + self.componenttypedef.basetype.size
-        # todo - if this works for self.typename then maybe try it for the typename of arrays?
-        self.typename = "file of {}".format(self.componenttypedef.basetype.typename)
+        self.size = 9 + self.componenttype.size
+
+    def __str__(self):
+        return "file of {}".format(self.componenttype.identifier)
 
 
 class TextFileType(FileType):
-    def __init__(self):
+    def __init__(self, identifier="text", denoter=None):
         # for now, a text file will be a typedef of chars
-        super().__init__(SIMPLETYPEDEF_CHAR)
-        self.typename = "textfile"
+        super().__init__(identifier, CharacterType(), denoter)
 
 
 class ActivationType(BaseType):
@@ -386,151 +380,23 @@ class ActivationType(BaseType):
 
 
 class ProcedureType(ActivationType):
-    def __init__(self):
-        super().__init__()
-        self.typename = "procedure activation"
+    def __init__(self, identifier="procedure activation", denoter=None):
+        super().__init__(identifier, denoter)
 
 
 class FunctionType(ActivationType):
+    def __init__(self, identifier="function activation", denoter=None):
+        super().__init__(identifier, denoter)
+
+
+class StringLiteralType(BaseType):
+    # this is a bit hacky, but allows us to pass around string literals in places that require pascal types
+    # pascal literals never have spaces, so the user can never create a type
+    # named "_string literal" to cause an issue with this type.  Needs to have the
+    # leading underscore because compatibility functions strip off the "literal" at the
+    # end to get the base type's identifier, so _string literal will become _string.
+    # _string has a leading underscore for reasons described elsewhere.
+
     def __init__(self):
-        super().__init__()
-        self.typename = "function activation"
-
-
-class TypeDef:
-    # Denoter may be a basetype but doesn't have to be.  For example:
-    # type
-    #   i=integer;
-    #   c=i;
-    #
-    # the typedefinition for i would be identifier = 'i', denoter = IntegerType()
-    # and basetype = IntegerType().
-    # the typedefinition for j would be identifier = 'j' denoter = the TypeDefinition of i,
-    # and basetype = IngeterType().
-
-    def __init__(self, identifier, denoter, basetype):
-        assert isinstance(denoter, TypeDef) or isinstance(denoter, BaseType)
-        assert isinstance(basetype, BaseType)
-        self.identifier = identifier.lower()
-        self.denoter = denoter
-        self.basetype = basetype
-
-    def get_pointer_to(self):
-        # returns a new typedef that is a pointer to the current typedef
-        bt = PointerType(self.basetype)
-        ret = PointerTypeDef("_ptrto_"+self.identifier, bt, bt, self)
-        return ret
-
-    # allows us to use TypeDefs in Symbol tables, and yet keep the vocabluary in the TypeDef
-    # such that matches the terminology in the ISO standard
-    @property
-    def name(self):
-        return self.identifier
-
-    def __str__(self):
-        return "TypeDef '{}'".format(self.name)
-
-    def __repr__(self):  # pragma: no cover
-        if isinstance(self.basetype, SubrangeType):
-            ret = "TypeDef '{}' with denoter {} and hosttype of \n\t{}\n\tminimum: {}  maximum: {}"
-            ret = ret.format(self.name, str(self.denoter), str(repr(self.basetype.hosttypedef)),
-                             self.basetype.rangemin, self.basetype.rangemax)
-            ret += "\nrangemin_int: {}  rangemax_int: {}".format(str(self.basetype.rangemin_int), str(self.basetype.rangemax_int))
-
-        else:
-            ret = "TypeDef '{}' with denoter {} and basetype {}"
-            ret = ret.format(self.name, str(self.denoter), str(repr(self.basetype)))
-        return ret
-
-
-SIMPLETYPEDEF_INTEGER = TypeDef("integer", IntegerType(), IntegerType())
-SIMPLETYPEDEF_BOOLEAN = TypeDef("boolean", BooleanType(), BooleanType())
-SIMPLETYPEDEF_REAL = TypeDef("real", RealType(), RealType())
-SIMPLETYPEDEF_CHAR = TypeDef("char", CharacterType(), CharacterType())
-# unlike the other three, "string" is not a Pascal reserved word, so a user may make a type
-# named "String."  So we put the leading underscore, since that is not a legal Pascal identifier.
-# We need this simple typedef to allow for the exceptions around string literals being passed around
-# as if they were string-types with number components equal to their length.
-SIMPLETYPEDEF_STRING = TypeDef("_string", StringLiteralType(), StringLiteralType())
-
-
-class StringLiteralTypeDef(TypeDef):
-    def __init__(self):
-        # pascal literals never have spaces, so the user can never create a type
-        # named "_string literal" to cause an issue with this type.  Needs to have the
-        # leading underscore because compatibility functions strip off the "literal" at the
-        # end to get the base type's identifier, so _string literal will become _string.
-        # _string has a leading underscore for reasons described above.
-        super().__init__('_string literal', StringLiteralType(), StringLiteralType())
-
-
-class RealLiteralTypeDef(TypeDef):
-    def __init__(self):
-        super().__init__('real literal', RealType(), RealType())
-
-
-class OrdinalLiteralTypeDef(TypeDef):
-    def __init__(self, identifier, denoter, basetype):
-        assert isinstance(basetype, OrdinalType)
-        assert isinstance(denoter, OrdinalType)
-        super().__init__(identifier, denoter, basetype)
-
-
-class IntegerLiteralTypeDef(OrdinalLiteralTypeDef):
-    def __init__(self):
-        super().__init__('integer literal', IntegerType(), IntegerType())
-
-
-class BooleanLiteralTypeDef(OrdinalLiteralTypeDef):
-    def __init__(self):
-        super().__init__('boolean literal', BooleanType(), BooleanType())
-
-
-class CharacterLiteralTypeDef(OrdinalLiteralTypeDef):
-    def __init__(self):
-        super().__init__('char literal', CharacterType(), CharacterType())
-
-
-class ActivationTypeDef(TypeDef):
-    pass
-
-
-class ProcedureTypeDef(ActivationTypeDef):
-    def __init__(self):
-        super().__init__('n/a', ProcedureType(), ProcedureType())
-
-
-class FunctionTypeDef(ActivationTypeDef):
-    def __init__(self):
-        super().__init__('n/a', FunctionType(), FunctionType())
-
-
-class PointerTypeDef(TypeDef):
-    def __init__(self, identifier, denoter, basetype, pointsto_typedef):
-        assert isinstance(basetype, PointerType)
-        assert isinstance(pointsto_typedef, TypeDef)
-        # todo - assert that the pointsto_typedef and the basetype.pointstotype are the same
-        super().__init__(identifier, denoter, basetype)
-        self.pointsto_typedef = pointsto_typedef
-
-
-class StructuredTypeDef(TypeDef):
-    pass
-
-
-class ArrayTypeDef(StructuredTypeDef):
-    def __init__(self, identifier, denoter, basetype):
-        assert isinstance(basetype, ArrayType)
-        super().__init__(identifier, denoter, basetype)
-
-
-class FileTypeDef(StructuredTypeDef):
-    def __init__(self, identifier, denoter, basetype):
-        assert isinstance(basetype, FileType)
-        super().__init__(identifier, denoter, basetype)
-
-
-class TextFileTypeDef(FileTypeDef):
-    def __init__(self, identifier, denoter, basetype):
-        assert isinstance(basetype, TextFileType)
-        super().__init__(identifier, denoter, basetype)
+        super().__init__("_string literal")
+        self.size = 8

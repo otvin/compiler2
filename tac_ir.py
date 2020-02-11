@@ -204,7 +204,7 @@ def requiredfunction_acceptsordinal(tokentype):
         return False
 
 
-def requiredfunction_returntype(tokentype, paramtypedef):
+def requiredfunction_returntype(tokentype, paramtype):
     # abs() and sqr() in 6.6.6.2 as well as succ() and pred() in 6.6.6.4 return same type as parameter
     # Remaining functions in 6.6.6.2 return reals
     # Transfer functions in 6.6.6.3 return ints
@@ -213,16 +213,16 @@ def requiredfunction_returntype(tokentype, paramtypedef):
     # functions in 6.6.6.5 return Boolean
     if tokentype in (TokenType.ABS, TokenType.SQR, TokenType.SUCC, TokenType.PRED):
         # this is a bit of hackery but it works
-        ret = deepcopy(paramtypedef)
+        ret = deepcopy(paramtype)
     elif tokentype in (TokenType.SIN, TokenType.COS, TokenType.EXP, TokenType.LN, TokenType.SQRT, TokenType.ARCTAN):
-        ret = pascaltypes.SIMPLETYPEDEF_REAL
+        ret = pascaltypes.RealType()
     elif tokentype in (TokenType.TRUNC, TokenType.ROUND, TokenType.ORD):
-        ret = pascaltypes.SIMPLETYPEDEF_INTEGER
+        ret = pascaltypes.IntegerType()
     elif tokentype == TokenType.CHR:
-        ret = pascaltypes.SIMPLETYPEDEF_CHAR
+        ret = pascaltypes.CharacterType()
     else:
         assert tokentype in (TokenType.ODD, TokenType.EOF, TokenType.EOLN)
-        ret = pascaltypes.SIMPLETYPEDEF_BOOLEAN
+        ret = pascaltypes.BooleanType()
     return ret
 
 
@@ -243,7 +243,7 @@ class TACCommentNode(TACNode):
         super().__init__(TACOperator.COMMENT)
         self.comment = comment
 
-    def __str__(self):
+    def __str__(self):  # pragma: no cover
         return "\t\t;{}".format(self.comment)
 
 
@@ -255,20 +255,21 @@ class TACLabelNode(TACNode):
         self.label = label
         self.comment = comment
 
-    def __str__(self):
+    def __str__(self):  # pragma: no cover
         return "{}:".format(self.label)
 
 
 class TACDeclareFunctionNode(TACLabelNode):
-    def __init__(self, label, paramlist, returntypedef=None):
+    # TODO - rename returntype as resulttype to be consistent with ISO Standard
+    def __init__(self, label, paramlist, returntype=None):
         super().__init__(label)
         assert isinstance(paramlist, ParameterList)
         self.paramlist = paramlist
-        assert returntypedef is None or (isinstance(returntypedef, pascaltypes.TypeDef) and
-                                         isinstance(returntypedef.basetype, pascaltypes.OrdinalType))
-        self.returntypedef = returntypedef
+        assert returntype is None or isinstance(returntype, pascaltypes.SimpleType) or \
+            isinstance(returntype, pascaltypes.PointerType)
+        self.returntype = returntype
 
-    def __str__(self):
+    def __str__(self):  # pragma: no cover
         return ""
 
 
@@ -278,7 +279,7 @@ class TACFunctionReturnNode(TACNode):
         super().__init__(TACOperator.RETURN)
         self.returnval = returnval
 
-    def __str__(self):
+    def __str__(self):  # pragma: no cover
         retstr = "return"
         if self.returnval is not None:
             retstr += " " + str(self.returnval)
@@ -287,11 +288,12 @@ class TACFunctionReturnNode(TACNode):
 
 class TACParamNode(TACNode):
     def __init__(self, paramval):
+        # TODO - what about other literal types?
         assert isinstance(paramval, Symbol) or isinstance(paramval, IntegerLiteral)
         super().__init__(TACOperator.PARAM)
         self.paramval = paramval
 
-    def __str__(self):
+    def __str__(self):  # pragma: no cover
         return "{} {}".format(str(self.operator), str(self.paramval))
 
 
@@ -308,7 +310,7 @@ class TACCallFunctionNode(TACNode):
         self.numparams = numparams
         self.lval = lval
 
-    def __str__(self):
+    def __str__(self):  # pragma: no cover
         if self.lval is None:
             return "{} {} [{}] {}".format(str(self.operator), self.label, self.funcname, str(self.numparams))
         else:
@@ -330,7 +332,7 @@ class TACUnaryNode(TACNode):
         self.lval = lval
         self.arg1 = arg1
 
-    def __str__(self):
+    def __str__(self):  # pragma: no cover
         return "{} {} {}".format(str(self.lval), str(self.operator), str(self.arg1))
 
 
@@ -342,7 +344,7 @@ class TACUnaryLiteralNode(TACNode):
         self.lval = lval
         self.literal1 = literal1
 
-    def __str__(self):
+    def __str__(self):  # pragma: no cover
         if isinstance(self.literal1, StringLiteral) or isinstance(self.literal1, CharacterLiteral):
             litval = '"{}"'.format(str(self.literal1).replace('"', '\"'))
         else:
@@ -353,6 +355,7 @@ class TACUnaryLiteralNode(TACNode):
 class TACBinaryNode(TACNode):
     def __init__(self, result, operator, arg1, arg2):
         assert isinstance(result, Symbol)
+        # todo - what about other literal types?
         assert isinstance(arg1, Symbol) or isinstance(arg1, IntegerLiteral)
         assert isinstance(arg2, Symbol) or isinstance(arg2, IntegerLiteral)
         super().__init__(operator)
@@ -360,7 +363,7 @@ class TACBinaryNode(TACNode):
         self.arg1 = arg1
         self.arg2 = arg2
 
-    def __str__(self):
+    def __str__(self):  # pragma: no cover
         return "{} := {} {} {}".format(str(self.result), str(self.arg1), str(self.operator), str(self.arg2))
 
 
@@ -371,14 +374,14 @@ class TACBinaryNodeWithBoundsCheck(TACBinaryNode):
         # max and throw the runtime error from within the TAC.  It would be the first runtime error enforced in the
         # TAC, so I don't want to extend the TAC to do that right now.
         assert isinstance(arg1, Symbol)
-        assert isinstance(arg1.typedef, pascaltypes.PointerTypeDef)
+        assert isinstance(arg1.pascaltype, pascaltypes.PointerType)
         assert isinstance(lowerbound, int)
         assert isinstance(upperbound, int)
         super().__init__(result, operator, arg1, arg2)
         self.lowerbound = lowerbound
         self.upperbound = upperbound
 
-    def __str__(self):
+    def __str__(self):  # pragma: no cover
         ret = super().__str__()
         ret += " ; {} must have lowerbound {} and upperbound {}"
         ret = ret.format(self.arg2.name, self.lowerbound, self.upperbound)
@@ -391,7 +394,7 @@ class TACGotoNode(TACNode):
         super().__init__(TACOperator.GOTO)
         self.label = label
 
-    def __str__(self):
+    def __str__(self):  # pragma: no cover
         return "{} {}".format(str(self.operator), str(self.label))
 
 
@@ -403,7 +406,7 @@ class TACIFZNode(TACNode):
         self.val = val
         self.label = label
 
-    def __str__(self):
+    def __str__(self):  # pragma: no cover
         return "{} {} GOTO {}".format(str(self.operator), str(self.val), str(self.label))
 
 
@@ -433,14 +436,11 @@ class TACBlock:
     def gettemporary(self):
         return self.generator.gettemporary()
 
-    def gettypetemporary(self):
-        return self.generator.gettypetemporary()
-
     def addnode(self, node):
         assert isinstance(node, TACNode)
         self.tacnodes.append(node)
 
-    def printnodes(self):
+    def printnodes(self):  # pragma: no cover
         for node in self.tacnodes:
             print(str(node))
 
@@ -453,14 +453,14 @@ class TACBlock:
         assert isinstance(sym, Symbol) or isinstance(sym, Literal)
         if isinstance(sym, Literal):
             return sym
-        elif isinstance(sym.typedef, pascaltypes.PointerTypeDef):
+        elif isinstance(sym.pascaltype, pascaltypes.PointerType):
             # TODO - this works fine now when the only pointers we use are arrays.  But once we have actual pointers,
             # we won't necessarily want to deref them.  So we will need a way to test whether the sym is a real pointer
-            # or a pointer to an array value.  Maybe a subclass off of pascaltypes.PointerTypeDef?
+            # or a pointer to an array value.  Maybe a subclass off of pascaltypes.PointerType?
 
             # make a new symbol that has as its base type, the base type of the pointer
             # assign deref of the pointer to the new symbol.
-            basetypesym = Symbol(self.gettemporary(), sym.location, sym.typedef.pointsto_typedef)
+            basetypesym = Symbol(self.gettemporary(), sym.location, sym.pascaltype.pointstotype)
             self.symboltable.add(basetypesym)
             self.addnode(TACUnaryNode(basetypesym, TACOperator.ASSIGNDEREFTO, sym))
             return basetypesym
@@ -549,10 +549,10 @@ class TACBlock:
         tok = ast.token
         tmp = self.deref_ifneeded(self.processast(ast.children[0]))
         lval = Symbol(self.gettemporary(), tok.location,
-                      requiredfunction_returntype(tok.tokentype, tmp.typedef))
+                      requiredfunction_returntype(tok.tokentype, tmp.pascaltype))
         self.symboltable.add(lval)
         if requiredfunction_acceptsordinal(tok.tokentype):
-            if isinstance(tmp.typedef.basetype, pascaltypes.OrdinalType):
+            if isinstance(tmp.pascaltype, pascaltypes.OrdinalType):
                 self.addnode(TACParamNode(tmp))
                 self.addnode(TACCallSystemFunctionNode(Label(maptoken_to_systemfunction_name(tok, "O")), 1, lval))
             else:
@@ -561,10 +561,10 @@ class TACBlock:
                 raise TACException(errstr)
 
         elif requiredfunction_acceptsinteger_or_real(tok.tokentype):
-            if isinstance(tmp.typedef.basetype, pascaltypes.IntegerType):
+            if isinstance(tmp.pascaltype, pascaltypes.IntegerType):
                 self.addnode(TACParamNode(tmp))
                 self.addnode(TACCallSystemFunctionNode(Label(maptoken_to_systemfunction_name(tok, "I")), 1, lval))
-            elif isinstance(tmp.typedef.basetype, pascaltypes.RealType):
+            elif isinstance(tmp.pascaltype, pascaltypes.RealType):
                 self.addnode(TACParamNode(tmp))
                 self.addnode(TACCallSystemFunctionNode(Label(maptoken_to_systemfunction_name(tok, "R")), 1, lval))
             else:
@@ -572,7 +572,7 @@ class TACBlock:
                                                                                                  tok.location)
                 raise TACException(errstr)
         elif requiredfunction_acceptsinteger(tok.tokentype):
-            if isinstance(tmp.typedef.basetype, pascaltypes.IntegerType):
+            if isinstance(tmp.pascaltype, pascaltypes.IntegerType):
                 self.addnode(TACParamNode(tmp))
                 self.addnode(TACCallSystemFunctionNode(Label(maptoken_to_systemfunction_name(tok, "I")), 1, lval))
             else:
@@ -581,19 +581,15 @@ class TACBlock:
                 raise TACException(errstr)
         else:
             assert requiredfunction_acceptsreal(tok.tokentype)
-            if isinstance(tmp.typedef.basetype, pascaltypes.IntegerType):
+            if isinstance(tmp.pascaltype, pascaltypes.IntegerType):
                 tmp2 = self.process_sym_inttoreal(tmp)
                 self.addnode(TACParamNode(tmp2))
                 self.addnode(TACCallSystemFunctionNode(Label(maptoken_to_systemfunction_name(tok, "R")), 1, lval))
-            elif isinstance(tmp.typedef.basetype, pascaltypes.RealType):
+            elif isinstance(tmp.pascaltype, pascaltypes.RealType):
                 self.addnode(TACParamNode(tmp))
                 self.addnode(TACCallSystemFunctionNode(Label(maptoken_to_systemfunction_name(tok, "R")), 1, lval))
             else:
-                # sqr() and abs() accept integer and real, others only accept reals
-                if tok.tokentype in (TokenType.SQR, TokenType.ABS):
-                    errstr = "Function {}() requires parameter of integer or real type in {}"
-                else:
-                    errstr = "Function {}() requires parameter of real type in {}"
+                errstr = "Function {}() requires parameter of real type in {}"
                 errstr = errstr.format(tok.tokentype, tok.location)
                 raise TACException(errstr)
         return lval
@@ -604,7 +600,7 @@ class TACBlock:
         tok = ast.token
         for child in ast.children:
             tmp = self.deref_ifneeded(self.processast(child))
-            bt = tmp.typedef.basetype
+            bt = tmp.pascaltype
 
             # p.98 of Cooper states that the constants of enumerated ordinal types (pascaltypes.EnumeratedType)
             # "don't have external character representations, and can't be read or written to or from
@@ -612,13 +608,15 @@ class TACBlock:
             # display the string representation of the constant when trying to print it out, but we will
             # stick to Cooper for now.  The ISO standard is silent on the topic, per my reading.
             if isinstance(bt, pascaltypes.SubrangeType):
-                bt = bt.hosttypedef.basetype
+                bt = bt.hosttype
 
             if not (isinstance(bt, pascaltypes.StringLiteralType) or isinstance(bt, pascaltypes.RealType) or
                     isinstance(bt, pascaltypes.BooleanType) or isinstance(bt, pascaltypes.IntegerType) or
                     isinstance(bt, pascaltypes.CharacterType) or
                     bt.is_string_type()):
-                errstr = tac_errstr("Invalid type {} passed to {}".format(tmp.typedef.name, tok.value), tok)
+                # TODO - this error string is ugly, but when we have files and can write arbitrary types, this
+                # logic will need to change anyway.
+                errstr = tac_errstr("'{}' is of type that cannot be displayed by {}()".format(tmp.name, tok.value), tok)
                 raise TACException(errstr)
 
             self.addnode(TACParamNode(tmp))
@@ -645,7 +643,7 @@ class TACBlock:
         tok = ast.token
         labeldone = self.getlabel()
         condition = self.processast(ast.children[0])
-        if not isinstance(condition.typedef.basetype, pascaltypes.BooleanType):
+        if not isinstance(condition.pascaltype, pascaltypes.BooleanType):
             raise TACException("If statements must be followed by Boolean Expressions: ", tok)
 
         if len(ast.children) == 2:
@@ -757,7 +755,7 @@ class TACBlock:
             # need to assign the initial and final value to temp1 and temp2 so that any changes to variables
             # in the initial and final value have no impact on the for statement.  See Cooper p.28 and p.29
             initialvalue = self.processast(assignmentast.children[1])
-            temp1 = Symbol(self.gettemporary(), initialvalue.location, initialvalue.typedef)
+            temp1 = Symbol(self.gettemporary(), initialvalue.location, initialvalue.pascaltype)
             self.symboltable.add(temp1)
 
             if isinstance(initialvalue, IntegerLiteral):
@@ -766,7 +764,7 @@ class TACBlock:
                 self.addnode(TACUnaryNode(temp1, TACOperator.ASSIGN, initialvalue))
 
             finalvalue = self.processast(todowntoast.children[0])
-            temp2 = Symbol(self.gettemporary(), finalvalue.location, finalvalue.typedef)
+            temp2 = Symbol(self.gettemporary(), finalvalue.location, finalvalue.pascaltype)
             self.symboltable.add(temp2)
             if isinstance(finalvalue, IntegerLiteral):
                 self.addnode(TACUnaryLiteralNode(temp2, TACOperator.ASSIGN, finalvalue))
@@ -786,20 +784,22 @@ class TACBlock:
             assert isinstance(controlvarsym, Symbol)
 
             # Enforce rule 2 from above
-            if not isinstance(controlvarsym.typedef.basetype, pascaltypes.OrdinalType):
+            if not isinstance(controlvarsym.pascaltype, pascaltypes.OrdinalType):
                 errstr = "'For' statements require control variables to be of ordinal type. "
                 errstr += "Variable '{}' is of type '{}'".format(controlvartoken.value,
-                                                                 controlvarsym.typedef.identifier)
+                                                                 controlvarsym.pascaltype.identifier)
                 raise TACException(tac_errstr(errstr, controlvartoken))
 
-            if not ast.nearest_symboltable().are_compatible(controlvarsym.typedef.identifier, temp1.typedef.identifier):
+            if not ast.nearest_symboltable().are_compatible(controlvarsym.pascaltype.identifier,
+                                                            temp1.pascaltype.identifier):
                 errstr = "Type {} not compatible with type {} in 'for' statement"
-                errstr = errstr.format(controlvarsym.typedef.identifier, temp1.typedef.identifier)
+                errstr = errstr.format(controlvarsym.pascaltype.identifier, temp1.pascaltype.identifier)
                 raise TACException(tac_errstr(errstr, assignmentast.children[1].token))
 
-            if not ast.nearest_symboltable().are_compatible(controlvarsym.typedef.identifier, temp2.typedef.identifier):
+            if not ast.nearest_symboltable().are_compatible(controlvarsym.pascaltype.identifier,
+                                                            temp2.pascaltype.identifier):
                 errstr = "Type {} not compatible with type {} in 'for' statement"
-                errstr = errstr.format(controlvarsym.typedef.identifier, temp2.typedef.identifier)
+                errstr = errstr.format(controlvarsym.pascaltype.identifier, temp2.pascaltype.identifier)
                 raise TACException(tac_errstr(errstr, todowntoast.children[0].token))
 
             # rule 3 will be a runtime check
@@ -820,8 +820,7 @@ class TACBlock:
 
             labeldoneif = self.getlabel()
             self.addnode(TACCommentNode("If condition is true, we execute the body once."))
-            ifsym = Symbol(self.gettemporary(), assignmentast.children[1].token.location,
-                           pascaltypes.SIMPLETYPEDEF_BOOLEAN)
+            ifsym = Symbol(self.gettemporary(), assignmentast.children[1].token.location, pascaltypes.BooleanType())
             self.symboltable.add(ifsym)
             self.addnode(TACBinaryNode(ifsym, compareop, temp1, temp2))
             self.addnode(TACIFZNode(ifsym, labeldoneif))
@@ -830,8 +829,7 @@ class TACBlock:
             labelstartwhile = self.getlabel()
             self.addnode(TACCommentNode("The for statement now becomes a while statement"))
             self.addnode(TACLabelNode(labelstartwhile))
-            whilesym = Symbol(self.gettemporary(), todowntoast.children[0].token.location,
-                              pascaltypes.SIMPLETYPEDEF_BOOLEAN)
+            whilesym = Symbol(self.gettemporary(), todowntoast.children[0].token.location, pascaltypes.BooleanType())
             self.symboltable.add(whilesym)
             self.addnode(TACBinaryNode(whilesym, TACOperator.NOTEQUAL, controlvarsym, temp2))
             self.addnode(TACIFZNode(whilesym, labeldoneif))
@@ -848,7 +846,7 @@ class TACBlock:
 
             self.addnode(TACLabelNode(labelstart))
             condition = self.processast(ast.children[0])
-            if not isinstance(condition.typedef.basetype, pascaltypes.BooleanType):
+            if not isinstance(condition.pascaltype, pascaltypes.BooleanType):
                 raise TACException("While statements must be followed by Boolean Expressions: ", tok)
             self.addnode(TACIFZNode(condition, labeldone))
             self.processast(ast.children[1])
@@ -883,12 +881,12 @@ class TACBlock:
         if isinstance(sym, ConstantSymbol):
             # optimization for integers - we can just return the literal itself instead of an assignment to
             # a local symbol.
-            if isinstance(sym.typedef.basetype, pascaltypes.IntegerType):
+            if isinstance(sym.pascaltype, pascaltypes.IntegerType):
                 return IntegerLiteral(sym.value, tok.location)
             else:
-                ret = ConstantSymbol(self.gettemporary(), tok.location, sym.typedef, sym.value)
+                ret = ConstantSymbol(self.gettemporary(), tok.location, sym.pascaltype, sym.value)
                 self.symboltable.add(ret)
-                if isinstance(sym.typedef.basetype, pascaltypes.BooleanType):
+                if isinstance(sym.pascaltype, pascaltypes.BooleanType):
                     # the value of the symbol will always be a string
                     assert sym.value.lower() in ("true", "false")
                     if sym.value.lower() == 'true':
@@ -896,15 +894,15 @@ class TACBlock:
                     else:
                         tokval = "0"
                     lit = BooleanLiteral(tokval, tok.location)
-                elif isinstance(sym.typedef.basetype, pascaltypes.StringLiteralType):
+                elif isinstance(sym.pascaltype, pascaltypes.StringLiteralType):
                     lit = StringLiteral(sym.value, tok.location)
-                elif isinstance(sym.typedef.basetype, pascaltypes.CharacterType):
+                elif isinstance(sym.pascaltype, pascaltypes.CharacterType):
                     lit = CharacterLiteral(sym.value, tok.location)
-                elif isinstance(sym.typedef.basetype, pascaltypes.RealType):
+                elif isinstance(sym.pascaltype, pascaltypes.RealType):
                     lit = RealLiteral(sym.value, tok.location)
                 else:
-                    assert isinstance(sym.typedef.basetype, pascaltypes.EnumeratedType)
-                    lit = IntegerLiteral(str(sym.typedef.basetype.position(sym.value)), tok.location)
+                    assert isinstance(sym.pascaltype, pascaltypes.EnumeratedType)
+                    lit = IntegerLiteral(str(sym.pascaltype.position(sym.value)), tok.location)
 
                 self.addnode(TACUnaryLiteralNode(ret, TACOperator.ASSIGN, lit))
         elif isinstance(sym, pascaltypes.EnumeratedTypeValue):
@@ -912,8 +910,8 @@ class TACBlock:
             # TODO - return the enumerated type value so that we can make it a literal here instead of a symbol
             # assign.  Cannot return an IntegerLiteral here because then it will not assign properly to values
             # of the enumerated type.  Likely need an EnumeratedTypeLiteral
-            tmptypedef = self.symboltable.fetch(sym.typename)
-            tmpsym = Symbol(self.gettemporary(), tok.location, tmptypedef)
+            tmptype = self.symboltable.fetch(sym.typeidentifier)
+            tmpsym = Symbol(self.gettemporary(), tok.location, tmptype)
             self.symboltable.add(tmpsym)
             comment = "Convert literal '{}' to integer value {}".format(sym.identifier, sym.value)
             self.addnode(TACCommentNode(comment))
@@ -948,11 +946,11 @@ class TACBlock:
                         raise TACException(errstr)
 
                     # For variable parameters, the actual parameter must have same type as the formal parameter
-                    if not ast.nearest_symboltable().are_same_type(tmp.typedef.identifier,
-                                                                   sym.paramlist[i].symbol.typedef.identifier):
+                    if not ast.nearest_symboltable().are_same_type(tmp.pascaltype.identifier,
+                                                                   sym.paramlist[i].symbol.pascaltype.identifier):
                         errstr = "Type Mismatch - parameter {} of {}() must be type {} in {}"
                         errstr = errstr.format(sym.paramlist[i].symbol.name, sym.name,
-                                               str(sym.paramlist[i].symbol.typedef.denoter), child.token.location)
+                                               str(sym.paramlist[i].symbol.pascaltype.identifier), child.token.location)
                         raise TACException(errstr)
                 else:
                     # For value parameters, the actual parameter must be assignment compatible with the formal
@@ -963,23 +961,23 @@ class TACBlock:
                         optval = None
 
                     if not ast.nearest_symboltable().are_assignment_compatible(
-                            sym.paramlist[i].symbol.typedef.identifier, tmp.typedef.identifier, optval):
-                        errstr = "Error D.7: Type Mismatch - {} is not assignment compatible with parameter"
+                            sym.paramlist[i].symbol.pascaltype.identifier, tmp.pascaltype.identifier, optval):
+                        errstr = "Error D.7: Type Mismatch - {} is not assignment compatible with parameter "
                         errstr += "{} of {}() in {}"
-                        errstr = errstr.format(tmp.typedef.denoter,
+                        errstr = errstr.format(str(tmp.pascaltype.identifier),
                                                sym.paramlist[i].symbol.name, sym.name, child.token.location)
                         raise TACException(errstr)
 
-                if isinstance(tmp.typedef.basetype, pascaltypes.IntegerType) and \
-                        isinstance(sym.paramlist[i].symbol.typedef.basetype, pascaltypes.RealType):
+                if isinstance(tmp.pascaltype, pascaltypes.IntegerType) and \
+                        isinstance(sym.paramlist[i].symbol.pascaltype, pascaltypes.RealType):
                     tmp2 = self.process_sym_inttoreal(tmp)
                     self.addnode(TACParamNode(tmp2))
                 else:
                     self.addnode(TACParamNode(tmp))
 
-            if sym.returntypedef is not None:
+            if sym.returntype is not None:
                 # means it is a function
-                ret = Symbol(self.gettemporary(), tok.location, sym.returntypedef)
+                ret = Symbol(self.gettemporary(), tok.location, sym.returntype)
                 self.symboltable.add(ret)
             else:
                 # procedures return nothing
@@ -1006,9 +1004,9 @@ class TACBlock:
 
         tok = ast.token
         lit = RealLiteral(tok.value, tok.location)
-        littypedef = pascaltypes.RealLiteralTypeDef()
+        littype = pascaltypes.RealType()
 
-        ret = ConstantSymbol(self.gettemporary(), tok.location, littypedef, tok.value)
+        ret = ConstantSymbol(self.gettemporary(), tok.location, littype, tok.value)
         self.symboltable.add(ret)
         self.addnode(TACUnaryLiteralNode(ret, TACOperator.ASSIGN, lit))
 
@@ -1019,7 +1017,7 @@ class TACBlock:
         assert ast.token.tokentype in (TokenType.TRUE, TokenType.FALSE)
 
         tok = ast.token
-        ret = ConstantSymbol(self.gettemporary(), tok.location, pascaltypes.SIMPLETYPEDEF_BOOLEAN, tok.value)
+        ret = ConstantSymbol(self.gettemporary(), tok.location, pascaltypes.BooleanType(), tok.value)
         self.symboltable.add(ret)
         if tok.tokentype == TokenType.TRUE:
             tokval = "1"  # 6.4.2.2 of ISO standard - Booleans are stored as 0 or 1 in memory
@@ -1037,13 +1035,14 @@ class TACBlock:
         litval = tok.value
         # string of length 1 is a character.  String of any other length is a string literal
         if len(litval) != 1:
-            littypedef = pascaltypes.StringLiteralTypeDef()
+            littype = pascaltypes.StringLiteralType()
             lit = StringLiteral(litval, tok.location)
         else:
-            littypedef = pascaltypes.SIMPLETYPEDEF_CHAR
+            # TODO - should this be CharacterLiteralType() ?
+            littype = pascaltypes.CharacterType()
             lit = CharacterLiteral(litval, tok.location)
 
-        ret = ConstantSymbol(self.gettemporary(), tok.location, littypedef, litval)
+        ret = ConstantSymbol(self.gettemporary(), tok.location, littype, litval)
         self.symboltable.add(ret)
         self.addnode(TACUnaryLiteralNode(ret, TACOperator.ASSIGN, lit))
         return ret
@@ -1055,8 +1054,8 @@ class TACBlock:
 
         '''
         Core Logic:
-            Step 1 - resolve the lval.  It will either be a symbol with a typedef of an array, or a 
-            pointer, that points to the typedef of an array.
+            Step 1 - resolve the lval.  It will either be a symbol with a pascaltype of an array, or a 
+            pointer, that points to the type of an array.
             
             Step 2 - create a symbol that is a pointer that points to the lval array's component type.
             If the lval is an array symbol, set lval to the address of the array.  If the lval is 
@@ -1070,28 +1069,27 @@ class TACBlock:
             If the result of step 3 is a symbol, then we need to do the math at runtime.
             
             Step 5 - add the number of bytes result from step 4, add that to the address of the pointer
-            in step 2, and store that result in a symbol.  The typedef for the symbol should equal
-            a pointer to the componenttypedef for the array.  Return this symbol.
+            in step 2, and store that result in a symbol.  The pascaltype for the symbol should equal
+            a pointer to the componenttype for the array.  Return this symbol.
         '''
 
         step1 = self.processast(ast.children[0])
-        assert isinstance(step1.typedef, pascaltypes.ArrayTypeDef) or \
-            (isinstance(step1.typedef, pascaltypes.PointerTypeDef) and
-             isinstance(step1.typedef.pointsto_typedef, pascaltypes.ArrayTypeDef))
+        assert isinstance(step1.pascaltype, pascaltypes.ArrayType) or \
+            (isinstance(step1.pascaltype, pascaltypes.PointerType) and
+             isinstance(step1.pascaltype.pointstotype, pascaltypes.ArrayType))
         
-        if isinstance(step1.typedef, pascaltypes.ArrayTypeDef):
-            arraytypedef = step1.typedef
-            componenttypedef = arraytypedef.basetype.componenttypedef
-            indextypedef = arraytypedef.basetype.indextypedef
+        if isinstance(step1.pascaltype, pascaltypes.ArrayType):
+            arraytype = step1.pascaltype
             assignop = TACOperator.ASSIGNADDRESSOF
         else:
-            arraytypedef = step1.typedef.pointsto_typedef
-            assert isinstance(arraytypedef, pascaltypes.ArrayTypeDef)
-            componenttypedef = arraytypedef.basetype.componenttypedef
-            indextypedef = arraytypedef.basetype.indextypedef
+            arraytype = step1.pascaltype.pointstotype
+            assert isinstance(arraytype, pascaltypes.ArrayType)
             assignop = TACOperator.ASSIGN
 
-        step2 = Symbol(self.gettemporary(), step1.location, componenttypedef.get_pointer_to())
+        componenttype = arraytype.componenttype
+        indextype = arraytype.indextype
+
+        step2 = Symbol(self.gettemporary(), step1.location, componenttype.get_pointer_to())
         self.symboltable.add(step2)
         self.addnode(TACUnaryNode(step2, assignop, step1))
 
@@ -1099,7 +1097,7 @@ class TACBlock:
 
         # the type of the index expression must be assignment compatible with the index type
         # (Cooper p.115)
-        if not self.symboltable.are_assignment_compatible(indextypedef.identifier, step3.typedef.identifier):
+        if not self.symboltable.are_assignment_compatible(indextype.identifier, step3.pascaltype.identifier):
             # Error D.1 comes from 6.5.3.2 of the ISO standard
             raise TACException("Error D.1: Incorrect type for array index in {}".format(ast.children[1].token.location))
 
@@ -1108,15 +1106,15 @@ class TACBlock:
 
         # TODO - if the array is an enumerated type (and possibly an ordinal type like char) it will not have
         # a subrange.
-        if isinstance(indextypedef.basetype, pascaltypes.SubrangeType):
-            minrange = indextypedef.basetype.rangemin_int
-            maxrange = indextypedef.basetype.rangemax_int
+        if isinstance(indextype, pascaltypes.SubrangeType):
+            minrange = indextype.rangemin_int
+            maxrange = indextype.rangemax_int
         else:
-            assert isinstance(indextypedef.basetype, pascaltypes.OrdinalType)
-            if isinstance(indextypedef.basetype, pascaltypes.IntegerType):
+            assert isinstance(indextype, pascaltypes.OrdinalType)
+            if isinstance(indextype, pascaltypes.IntegerType):
                 raise TACException("Cannot have an array with index range 'integer' in {}".format(ast.token.location))
-            minrange = indextypedef.basetype.position(indextypedef.basetype.min_item())
-            maxrange = indextypedef.basetype.position(indextypedef.basetype.max_item())
+            minrange = indextype.position(indextype.min_item())
+            maxrange = indextype.position(indextype.max_item())
 
         if isinstance(step3, IntegerLiteral):
             # we can do the math in the compiler
@@ -1125,23 +1123,22 @@ class TACBlock:
                 raise TACException(errstr)
 
             indexpos = (int(step3.value) - minrange)
-            numbytes = indexpos * componenttypedef.basetype.size
+            numbytes = indexpos * componenttype.size
             step4 = IntegerLiteral(str(numbytes), step1.location)
         else:
-            step4a = Symbol(self.gettemporary(), step1.location, pascaltypes.SIMPLETYPEDEF_INTEGER)
+            step4a = Symbol(self.gettemporary(), step1.location, pascaltypes.IntegerType())
             indexmin_literal = IntegerLiteral(str(minrange), step1.location)
-            size_literal = IntegerLiteral(str(componenttypedef.basetype.size), step1.location)
+            size_literal = IntegerLiteral(str(componenttype.size), step1.location)
             self.symboltable.add(step4a)
             self.addnode(TACBinaryNode(step4a, TACOperator.SUBTRACT, step3, indexmin_literal))
-            step4 = Symbol(self.gettemporary(), step1.location, pascaltypes.SIMPLETYPEDEF_INTEGER)
+            step4 = Symbol(self.gettemporary(), step1.location, pascaltypes.IntegerType())
             self.symboltable.add(step4)
             self.addnode(TACBinaryNode(step4, TACOperator.MULTIPLY, step4a, size_literal))
 
-        step5 = Symbol(self.gettemporary(), step1.location, step2.typedef)
+        step5 = Symbol(self.gettemporary(), step1.location, step2.pascaltype)
         self.symboltable.add(step5)
 
-        self.addnode(TACBinaryNodeWithBoundsCheck(step5, TACOperator.ADD, step2, step4, 0,
-                                                  arraytypedef.basetype.size-1))
+        self.addnode(TACBinaryNodeWithBoundsCheck(step5, TACOperator.ADD, step2, step4, 0, arraytype.size-1))
         return step5
 
     def processast_assignment(self, ast):
@@ -1150,11 +1147,11 @@ class TACBlock:
         assert len(ast.children) == 2, "TACBlock.processast_assignment - Assignment ASTs must have 2 children."
 
         lval = self.processast(ast.children[0])
-        if isinstance(lval.typedef, pascaltypes.PointerTypeDef):
-            lval_reftypedef = lval.typedef.pointsto_typedef
+        if isinstance(lval.pascaltype, pascaltypes.PointerType):
+            lval_reftype = lval.pascaltype.pointstotype
             assignop = TACOperator.ASSIGNTODEREF
         else:
-            lval_reftypedef = lval.typedef
+            lval_reftype = lval.pascaltype
             assignop = TACOperator.ASSIGN
 
         if isinstance(lval, ConstantSymbol):
@@ -1173,19 +1170,19 @@ class TACBlock:
             else:
                 t2value = None
 
-            if not ast.nearest_symboltable().are_assignment_compatible(lval_reftypedef.identifier,
-                                                                       rval.typedef.identifier, t2value):
+            if not ast.nearest_symboltable().are_assignment_compatible(lval_reftype.identifier,
+                                                                       rval.pascaltype.identifier, t2value):
                 if t2value is not None:
                     errstr = "Cannot assign value '{}' of type {} to type {}"
-                    if isinstance(rval.typedef.basetype, pascaltypes.OrdinalType):
+                    if isinstance(rval.pascaltype, pascaltypes.OrdinalType):
                         # the error in 6.8.2.2 is specific to ordinal types.
                         errstr = "Error D.49: " + errstr
-                    errstr = errstr.format(t2value, rval.typedef.identifier, lval_reftypedef.identifier)
+                    errstr = errstr.format(t2value, rval.pascaltype.identifier, lval_reftype.identifier)
                 else:
-                    errstr = "Cannot assign {} type to {}".format(rval.typedef.identifier, lval_reftypedef.identifier)
+                    errstr = "Cannot assign {} type to {}".format(rval.pascaltype.identifier, lval_reftype.identifier)
                 raise TACException(tac_errstr(errstr, ast.children[1].token))
-            if isinstance(lval_reftypedef.basetype, pascaltypes.RealType) and \
-                    isinstance(rval.typedef.basetype, pascaltypes.IntegerType):
+            if isinstance(lval_reftype, pascaltypes.RealType) and \
+                    isinstance(rval.pascaltype, pascaltypes.IntegerType):
                 newrval = self.process_sym_inttoreal(rval)
             else:
                 newrval = rval
@@ -1200,8 +1197,8 @@ class TACBlock:
         # sym is a symbol of integer type.  Returns a symbol that converts tok to a real type
         assert isinstance(sym, Symbol) or isinstance(sym, IntegerLiteral)
         if isinstance(sym, Symbol):
-            assert isinstance(sym.typedef.basetype, pascaltypes.IntegerType)
-        ret = Symbol(self.gettemporary(), sym.location, pascaltypes.SIMPLETYPEDEF_REAL)
+            assert isinstance(sym.pascaltype, pascaltypes.IntegerType)
+        ret = Symbol(self.gettemporary(), sym.location, pascaltypes.RealType())
         self.symboltable.add(ret)
         if isinstance(sym, Symbol):
             self.addnode(TACUnaryNode(ret, TACOperator.INTTOREAL, sym))
@@ -1220,20 +1217,20 @@ class TACBlock:
         child1 = self.deref_ifneeded(self.processast(ast.children[0]))
         child2 = self.deref_ifneeded(self.processast(ast.children[1]))
 
-        if isinstance(child1.typedef.basetype, pascaltypes.BooleanType) or \
-                isinstance(child2.typedef.basetype, pascaltypes.BooleanType):
+        if isinstance(child1.pascaltype, pascaltypes.BooleanType) or \
+                isinstance(child2.pascaltype, pascaltypes.BooleanType):
             raise TACException(tac_errstr("Cannot use boolean type with math operators", tok))
 
         if tok.tokentype in (TokenType.IDIV, TokenType.MOD) and \
-                (isinstance(child1.typedef.basetype, pascaltypes.RealType) or
-                 isinstance(child2.typedef.basetype, pascaltypes.RealType)):
+                (isinstance(child1.pascaltype, pascaltypes.RealType) or
+                 isinstance(child2.pascaltype, pascaltypes.RealType)):
             raise TACException(tac_errstr("Cannot use integer division with Real values.", tok))
 
         # The addition, subtraction, multiplication operators can take integers or reals, and return
         # integer if both operands are integers, or a real if one or both operands are reals.  The
         # division operator returns a real even if both operands are integers
-        if isinstance(child1.typedef.basetype, pascaltypes.RealType) or \
-                isinstance(child2.typedef.basetype, pascaltypes.RealType) or \
+        if isinstance(child1.pascaltype, pascaltypes.RealType) or \
+                isinstance(child2.pascaltype, pascaltypes.RealType) or \
                 op == TACOperator.DIVIDE:
 
             # 6.7.2.1 of the ISO Standard states that if either operand of addition, subtraction, or multiplication
@@ -1241,21 +1238,21 @@ class TACBlock:
             # even if both operands are integer-type, the result is real-type.  Cooper states on p.31 that
             # "[t]his means that integer operands are sometimes coerced into being reals; i.e. they are temporarily
             # treated as values of type real."
-            if isinstance(child1.typedef.basetype, pascaltypes.IntegerType):
+            if isinstance(child1.pascaltype, pascaltypes.IntegerType):
                 newchild1 = self.process_sym_inttoreal(child1)
             else:
                 newchild1 = child1
 
-            if isinstance(child2.typedef.basetype, pascaltypes.IntegerType):
+            if isinstance(child2.pascaltype, pascaltypes.IntegerType):
                 newchild2 = self.process_sym_inttoreal(child2)
             else:
                 newchild2 = child2
 
-            ret = Symbol(self.gettemporary(), tok.location, pascaltypes.SIMPLETYPEDEF_REAL)
+            ret = Symbol(self.gettemporary(), tok.location, pascaltypes.RealType())
             self.symboltable.add(ret)
             self.addnode(TACBinaryNode(ret, op, newchild1, newchild2))
         else:
-            ret = Symbol(self.gettemporary(), tok.location, pascaltypes.SIMPLETYPEDEF_INTEGER)
+            ret = Symbol(self.gettemporary(), tok.location, pascaltypes.IntegerType())
             self.symboltable.add(ret)
             self.addnode(TACBinaryNode(ret, op, child1, child2))
 
@@ -1270,8 +1267,8 @@ class TACBlock:
         child1 = self.deref_ifneeded(self.processast(ast.children[0]))
         child2 = self.deref_ifneeded(self.processast(ast.children[1]))
 
-        c1type = child1.typedef.basetype
-        c2type = child2.typedef.basetype
+        c1type = child1.pascaltype
+        c2type = child2.pascaltype
 
         # 6.7.2.5 of the ISO standard says that the operands of relational operators shall be of compatible
         # types, or one operand shall be of real-type and the other of integer-type.  Table 6, has
@@ -1281,7 +1278,7 @@ class TACBlock:
         # which works fine for every time other than string literals doing relational comparisons.  For
         # string literals we need to look at the length to know if they are compatible.
 
-        if not self.symboltable.are_compatible(child1.typedef.identifier, child2.typedef.identifier, child1, child2):
+        if not self.symboltable.are_compatible(c1type.identifier, c2type.identifier, child1, child2):
             if isinstance(c1type, pascaltypes.IntegerType) and isinstance(c2type, pascaltypes.RealType):
                 pass
             elif isinstance(c2type, pascaltypes.IntegerType) and isinstance(c1type, pascaltypes.RealType):
@@ -1290,7 +1287,7 @@ class TACBlock:
                 raise TACException(tac_errstr("Cannot compare Boolean to non-Boolean", tok))
             else:
                 errstr = "Cannot compare types '{}' and '{}' with relational operator"
-                errstr = errstr.format(child1.typedef.identifier, child2.typedef.identifier)
+                errstr = errstr.format(c1type.identifier, c2type.identifier)
                 raise TACException(tac_errstr(errstr, tok))
 
         if isinstance(c1type, pascaltypes.IntegerType) and isinstance(c2type, pascaltypes.RealType):
@@ -1302,7 +1299,7 @@ class TACBlock:
         else:
             newchild2 = child2
 
-        ret = Symbol(self.gettemporary(), tok.location, pascaltypes.SIMPLETYPEDEF_BOOLEAN)
+        ret = Symbol(self.gettemporary(), tok.location, pascaltypes.BooleanType())
         self.symboltable.add(ret)
         self.addnode(TACBinaryNode(ret, op, newchild1, newchild2))
         return ret
@@ -1317,18 +1314,18 @@ class TACBlock:
         if tok.tokentype in (TokenType.AND, TokenType.OR):
             child1 = self.deref_ifneeded(self.processast(ast.children[0]))
             child2 = self.deref_ifneeded(self.processast(ast.children[1]))
-            if not isinstance(child1.typedef.basetype, pascaltypes.BooleanType) or \
-                    not isinstance(child2.typedef.basetype, pascaltypes.BooleanType):
+            if not isinstance(child1.pascaltype, pascaltypes.BooleanType) or \
+                    not isinstance(child2.pascaltype, pascaltypes.BooleanType):
                 errstr = "Both arguments to operator '{}' must be Boolean type".format(tok.value)
                 raise TACException(tac_errstr(errstr, tok))
-            ret = Symbol(self.gettemporary(), tok.location, pascaltypes.SIMPLETYPEDEF_BOOLEAN)
+            ret = Symbol(self.gettemporary(), tok.location, pascaltypes.BooleanType())
             self.symboltable.add(ret)
             self.addnode(TACBinaryNode(ret, op, child1, child2))
         else:  # tok.tokentype == TokenType.NOT
             child = self.deref_ifneeded(self.processast(ast.children[0]))
-            if not isinstance(child.typedef.basetype, pascaltypes.BooleanType):
+            if not isinstance(child.pascaltype, pascaltypes.BooleanType):
                 raise TACException(tac_errstr("Operator 'not' can only be applied to Boolean factors", tok))
-            ret = Symbol(self.gettemporary(), tok.location, pascaltypes.SIMPLETYPEDEF_BOOLEAN)
+            ret = Symbol(self.gettemporary(), tok.location, pascaltypes.BooleanType())
             self.symboltable.add(ret)
             self.addnode(TACUnaryNode(ret, op, child))
         return ret
@@ -1395,7 +1392,6 @@ class TACGenerator:
         self.tacblocks = []
         self.nextlabel = 0
         self.nexttemporary = 0
-        self.nextanonymoustype = 0
         self.globalsymboltable = SymbolTable()
         self.globalliteraltable = deepcopy(literaltable)
 
@@ -1441,12 +1437,7 @@ class TACGenerator:
         self.nexttemporary += 1
         return temporary
 
-    def gettypetemporary(self):
-        temporary = "_TYPE_" + str(self.nextanonymoustype)
-        self.nextanonymoustype += 1
-        return temporary
-
-    def printblocks(self):
+    def printblocks(self):  # pragma: no cover
         for block in self.tacblocks:
             if block.ismain:
                 print("_MAIN:")

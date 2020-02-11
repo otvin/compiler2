@@ -172,12 +172,12 @@ def main(onlytest=""):
     run_test_list("string", 1, 1)
     run_test_list("string", 3, 3)
     run_test_list("string", 5, 11)
-    run_test_list("typedef", 1, 12)
+    run_test_list("typedef", 1, 13)
     run_test_list("while", 1, 3)
     run_test_list("write", 1, 1)
     run_test_list("writeln", 1, 3)
 
-    run_compilefail_test_list(1, 62)
+    run_compilefail_test_list(1, 75)
 
     # tests from old compiler not yet running in compiler2
     # dotest("tests/testconcat01.pas", "tests/testconcat01.out")

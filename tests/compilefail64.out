@@ -1,0 +1,1 @@
+Both elements of subrange type  must be same type.'4' is type integer and 'q' is type char in file:tests/compilefail64.pas line:4     column:9  .

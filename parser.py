@@ -3,6 +3,7 @@ from lexer import TokenType, Token, TokenStream, LexerException
 from symboltable import StringLiteral, LiteralTable, SymbolTable, VariableSymbol, ParameterList, \
     ActivationSymbol, FunctionResultVariableSymbol, Parameter, SymbolException, ConstantSymbol, RealLiteral, \
     CharacterLiteral, ProgramParameterSymbol
+from copy import deepcopy
 import pascaltypes
 
 '''
@@ -210,7 +211,7 @@ class Parser:
         return None
 
     def parse_constant(self, parent_ast, optionalconstid=""):
-        # returns a tuple (typedef of the constant, value of the constant)
+        # returns a tuple (type of the constant, value of the constant)
         # value of the constant will be a string
         # optionalconstid is if you are using this to parse a constant definition, it enables us to catch
         # a self-referencing constant definition.
@@ -244,26 +245,26 @@ class Parser:
             else:
                 tokval = realtok.value
             self.literaltable.add(RealLiteral(tokval, realtok.location))
-            ret = pascaltypes.SIMPLETYPEDEF_REAL, tokval
+            ret = pascaltypes.RealType(), tokval
         elif self.tokenstream.peektokentype() == TokenType.UNSIGNED_INT:
             inttok = self.getexpectedtoken(TokenType.UNSIGNED_INT)
             if isneg:
                 tokval = "-" + inttok.value
             else:
                 tokval = inttok.value
-            ret = pascaltypes.SIMPLETYPEDEF_INTEGER, tokval
+            ret = pascaltypes.IntegerType(), tokval
         elif self.tokenstream.peektokentype() == TokenType.MAXINT:
             self.getexpectedtoken(TokenType.MAXINT)
             if isneg:
-                ret = pascaltypes.SIMPLETYPEDEF_INTEGER, pascaltypes.STRNEGMAXINT
+                ret = pascaltypes.IntegerType(), pascaltypes.STRNEGMAXINT
             else:
-                ret = pascaltypes.SIMPLETYPEDEF_INTEGER, pascaltypes.STRMAXINT
+                ret = pascaltypes.IntegerType(), pascaltypes.STRMAXINT
         elif self.tokenstream.peektokentype() in (TokenType.TRUE, TokenType.FALSE):
             booltok = self.tokenstream.eattoken()
             if sawsign:
                 errstr = "Cannot have a sign before a Boolean constant in {}".format(booltok.location)
                 raise ParseException(errstr)
-            ret = pascaltypes.SIMPLETYPEDEF_BOOLEAN, booltok.value
+            ret = pascaltypes.BooleanType(), booltok.value
         elif self.tokenstream.peektokentype() == TokenType.CHARSTRING:
             charstrtok = self.getexpectedtoken(TokenType.CHARSTRING)
             if sawsign:
@@ -271,10 +272,10 @@ class Parser:
                 raise ParseException(errstr)
             if len(charstrtok.value) == 1:
                 self.literaltable.add(CharacterLiteral(charstrtok.value, charstrtok.location))
-                ret = pascaltypes.SIMPLETYPEDEF_CHAR, charstrtok.value
+                ret = pascaltypes.CharacterType(), charstrtok.value
             else:
                 self.literaltable.add(StringLiteral(charstrtok.value, charstrtok.location))
-                ret = pascaltypes.StringLiteralTypeDef(), charstrtok.value
+                ret = pascaltypes.StringLiteralType(), charstrtok.value
         elif self.tokenstream.peektokentype() == TokenType.IDENTIFIER:
             ident_token = self.getexpectedtoken(TokenType.IDENTIFIER)
             if not parent_ast.symboltable.existsanywhere(ident_token.value):
@@ -290,6 +291,7 @@ class Parser:
                     errstr = "Constant '{}' must be defined as a literal or another constant, cannot use '{}' in {}"
                     errstr = errstr.format(optionalconstid, ident_token.value, ident_token.location)
                 else:
+                    assert False
                     errstr = "Constant expected, must be literal or another constant, cannot use '{}' in {}"
                     errstr = errstr.format(ident_token.value, ident_token.location)
                 raise ParseException(errstr)
@@ -300,8 +302,8 @@ class Parser:
                 else:
                     assert isinstance(sym, ConstantSymbol)
 
-                    if isinstance(sym.typedef.basetype, pascaltypes.RealType) or \
-                            isinstance(sym.typedef.basetype, pascaltypes.IntegerType):
+                    if isinstance(sym.pascaltype, pascaltypes.RealType) or \
+                            isinstance(sym.pascaltype, pascaltypes.IntegerType):
                         if isneg:
                             if sym.value[0] == "-":
                                 tokval = sym.value[1:]  # remove the negative
@@ -310,14 +312,14 @@ class Parser:
                             # If we define a constant as negative another constant, we need to ensure the
                             # literal value is in the literals table if it's a real constant.
                             # LiteralTable.add() allows adding duplicates and filters them out.
-                            if isinstance(sym.typedef.basetype, pascaltypes.RealType):
+                            if isinstance(sym.pascaltype, pascaltypes.RealType):
                                 self.literaltable.add(RealLiteral(tokval, ident_token.location))
-                                ret = sym.typedef, tokval
+                                ret = sym.pascaltype, tokval
                             else:
-                                ret = sym.typedef, tokval
+                                ret = sym.pascaltype, tokval
                         else:
                             tokval = sym.value
-                            ret = sym.typedef, tokval
+                            ret = sym.pascaltype, tokval
                     else:
                         invalidsign = True
 
@@ -332,12 +334,12 @@ class Parser:
                     errstr = errstr.format(ident_token.value, ident_token.location)
                     raise ParseException(errstr)
             elif isinstance(sym, pascaltypes.EnumeratedTypeValue):
-                enumerated_typedef = parent_ast.symboltable.fetch_originalsymtable_andtypedef(sym.typename)[1]
-                ret = enumerated_typedef, ident_token.value
+                enumerated_type = parent_ast.symboltable.fetch_originalsymtable_andtype(sym.typeidentifier)[1]
+                ret = enumerated_type, ident_token.value
             else:
                 assert isinstance(sym, ConstantSymbol)
                 tokval = sym.value
-                ret = sym.typedef, tokval
+                ret = sym.pascaltype, tokval
         else:
             nexttok = self.tokenstream.eattoken()
             errstr = "Unexpected token {} in {}.".format(str(nexttok.value), nexttok.location)
@@ -358,21 +360,20 @@ class Parser:
             while not done:
                 const_id = self.getexpectedtoken(TokenType.IDENTIFIER)
                 self.getexpectedtoken(TokenType.EQUALS)
-                consttypedef, constval = self.parse_constant(parent_ast, const_id.value)
-                bt = consttypedef.basetype
-                if isinstance(bt, pascaltypes.RealType):
-                    newsymtypedef = pascaltypes.RealLiteralTypeDef()
-                elif isinstance(bt, pascaltypes.IntegerType):
-                    newsymtypedef = pascaltypes.IntegerLiteralTypeDef()
-                elif isinstance(bt, pascaltypes.BooleanType):
-                    newsymtypedef = pascaltypes.BooleanLiteralTypeDef()
-                elif isinstance(bt, pascaltypes.CharacterType):
-                    newsymtypedef = pascaltypes.CharacterLiteralTypeDef()
-                elif isinstance(bt, pascaltypes.StringLiteralType):
-                    newsymtypedef = pascaltypes.StringLiteralTypeDef()
+                consttype, constval = self.parse_constant(parent_ast, const_id.value)
+                if isinstance(consttype, pascaltypes.RealType):
+                    newsymtype = pascaltypes.RealType()
+                elif isinstance(consttype, pascaltypes.IntegerType):
+                    newsymtype = pascaltypes.IntegerType()
+                elif isinstance(consttype, pascaltypes.BooleanType):
+                    newsymtype = pascaltypes.BooleanType()
+                elif isinstance(consttype, pascaltypes.CharacterType):
+                    newsymtype = pascaltypes.CharacterType()
+                elif isinstance(consttype, pascaltypes.StringLiteralType):
+                    newsymtype = pascaltypes.StringLiteralType()
                 else:
-                    newsymtypedef = consttypedef
-                parent_ast.symboltable.add(ConstantSymbol(const_id.value, const_id.location, newsymtypedef, constval))
+                    newsymtype = consttype
+                parent_ast.symboltable.add(ConstantSymbol(const_id.value, const_id.location, newsymtype, constval))
                 self.getexpectedtoken(TokenType.SEMICOLON)
                 if self.tokenstream.peektokentype() != TokenType.IDENTIFIER:
                     done = True
@@ -412,7 +413,7 @@ class Parser:
         #   The valid type-identifiers are the simple types (integer, char, boolean, real) and identifiers
         #   that have already been defined for other types.
         #
-        # Returns a typedef
+        # Returns a type
 
         type_token = self.tokenstream.eattoken()
         if type_token.tokentype not in (TokenType.INTEGER, TokenType.REAL, TokenType.BOOLEAN,
@@ -421,24 +422,28 @@ class Parser:
             raise ParseException(token_errstr(errstr, type_token))
 
         if type_token.tokentype == TokenType.IDENTIFIER:
-            symboltypedef = parent_ast.symboltable.fetch(type_token.value)
+            symboltype = parent_ast.symboltable.fetch(type_token.value)
         else:
-            symboltypedef = parent_ast.symboltable.fetch(str(type_token.tokentype))
-        assert isinstance(symboltypedef, pascaltypes.TypeDef)
-        return symboltypedef
+            symboltype = parent_ast.symboltable.fetch(str(type_token.tokentype))
+        if not isinstance(symboltype, pascaltypes.BaseType):
+            raise ParseException(token_errstr("Invalid type identifier", type_token))
+        return symboltype
 
-    def generate_anonymous_typename(self):
+    def generate_anonymous_typeidentifier(self):
         # begins with an underscore so can never clash with a valid pascal identifier.
         ret = "_anonymous_{}".format(str(self.anonymous_type_counter))
         self.anonymous_type_counter += 1
         return ret
 
-    def parse_subrangetype(self, parent_ast, optionaltypename=""):
+    def parse_subrangetype(self, parent_ast, optionaltypeidentifier=""):
         # 6.4.2.4 <subrange-type> ::= <constant> ".." <constant>
         # 6.3 <constant> ::= [sign](<unsigned-number> | <constant-identifier>) | <character-string>
         #   (character-string is not valid for subrange types, however)
         #
-        # This function returns the typedef.  If a <new-type> is created, then the <new-type> will be
+        # Note that the text of 6.4.2.4 states that "Both constants shall be of the same ordinal type,"
+        # even though <unsigned-number> allows for integers or reals.
+        #
+        # This function returns the type.  If a <new-type> is created, then the <new-type> will be
         # added to the symbol table.  The name of the new type will be in the optionaltypename field.
         # If a <new-type> is created and the typename is blank, then the type name will be created
         # anonymously.  See page 69 of Cooper for discussion of anonymous types.
@@ -446,31 +451,34 @@ class Parser:
         assert self.next_three_tokens_contain_subrange()
 
         nexttok = self.tokenstream.peektoken()  # used for error messages
-        const1typedef, const1value = self.parse_constant(parent_ast)
+        const1type, const1value = self.parse_constant(parent_ast)
         self.getexpectedtoken(TokenType.SUBRANGE)
-        const2typedef, const2value = self.parse_constant(parent_ast)
-        if not parent_ast.symboltable.are_same_type(const1typedef.identifier, const2typedef.identifier):
+        const2type, const2value = self.parse_constant(parent_ast)
+        if not parent_ast.symboltable.are_same_type(const1type.identifier, const2type.identifier):
             errstr = "Both elements of subrange type {} must be same type."
             errstr += "'{}' is type {} and '{}' is type {} in {}."
             # optionaltypename may be blank here, and that's ok for the error message, rather than
             # plugging in an anonymous type
-            errstr = errstr.format(optionaltypename, const1value, const1typedef.identifier,
-                                   const2value, const2typedef.identifier, nexttok.location)
+            errstr = errstr.format(optionaltypeidentifier, const1value, const1type.identifier,
+                                   const2value, const2type.identifier, nexttok.location)
             raise ParseException(errstr)
 
-        if optionaltypename == "":
-            typename = self.generate_anonymous_typename()
+        if not isinstance(const1type, pascaltypes.OrdinalType) or not isinstance(const2type, pascaltypes.OrdinalType):
+            errstr = "Both elements of subrange type {} must be ordinal type."
+            errstr += " Types {} and {} are used in {}"
+            errstr = errstr.format(optionaltypeidentifier, const1type.identifier, const2type.identifier, nexttok.location)
+            raise ParseException(errstr)
+
+        if optionaltypeidentifier == "":
+            typeidentifier = self.generate_anonymous_typeidentifier()
         else:
-            typename = optionaltypename
+            typeidentifier = optionaltypeidentifier
 
         try:
-            newbasetype = pascaltypes.SubrangeType(typename, const1typedef, const1value,
-                                                   const2value)
+            ret = pascaltypes.SubrangeType(typeidentifier, const1type, const1value, const2value)
         except pascaltypes.PascalTypeException as e:
             errstr = str(e) + " in {}".format(nexttok.location)
             raise ParseException(errstr)
-
-        ret = pascaltypes.TypeDef(typename, newbasetype, newbasetype)
 
         parent_ast.symboltable.add(ret)
         return ret
@@ -479,16 +487,15 @@ class Parser:
         # 6.4.2.3 <enumerated-type> ::= "(" <identifier-list> ")"
         # 6.4.2.3 <identifier-list> ::= <identifier> {"," <identifier>}
         #
-        # This function returns the typedef.  If a <new-type> is created, then the <new-type> will be
+        # This function returns the type.  If a <new-type> is created, then the <new-type> will be
         # added to the symbol table.  The name of the new type will be in the optionaltypename field.
         # If a <new-type> is created and the typename is blank, then the type name will be created
         # anonymously.  See page 69 of Cooper for discussion of anonymous types.
-        # new enumerated type
 
         self.getexpectedtoken(TokenType.LPAREN)
 
         if optionaltypename == "":
-            typename = self.generate_anonymous_typename()
+            typename = self.generate_anonymous_typeidentifier()
         else:
             typename = optionaltypename
 
@@ -503,9 +510,8 @@ class Parser:
                 errstr = token_errstr("Identifier redefined: '{}'".format(idtoken.value), idtoken)
                 raise ParseException(errstr)
 
-        newbasetype = pascaltypes.EnumeratedType(typename, etvlist)
+        ret = pascaltypes.EnumeratedType(typename, etvlist)
         self.getexpectedtoken(TokenType.RPAREN)
-        ret = pascaltypes.TypeDef(typename, newbasetype, newbasetype)
 
         parent_ast.symboltable.add(ret)
         return ret
@@ -516,23 +522,23 @@ class Parser:
         # 6.4.2.1 <ordinal-type> ::= <new-ordinal-type> | <ordinal-type-identifier>
         # 6.4.2.1 <new-ordinal-type> ::= <enumerated-type> | <subrange-type>
         #
-        # returns a list of typedefs
+        # returns a list of types
         ret = []
         done = False
 
         while not done:
             tmptok = self.tokenstream.peektoken()  # used for error messages
-            newtypedef = self.parse_typedenoter(parent_ast)
-            if not isinstance(newtypedef.basetype, pascaltypes.OrdinalType):
-                raise ParseException(token_errstr("Invalid type for array index"), tmptok)
-            ret.append(newtypedef)
+            newtype = self.parse_typedenoter(parent_ast)
+            if not isinstance(newtype, pascaltypes.OrdinalType):
+                raise ParseException(token_errstr("Invalid type for array index", tmptok))
+            ret.append(newtype)
             if self.tokenstream.peektokentype() == TokenType.COMMA:
                 self.getexpectedtoken(TokenType.COMMA)
             else:
                 done = True
         return ret
 
-    def parse_structuredtype(self, parent_ast, optionaltypename=""):
+    def parse_structuredtype(self, parent_ast, optionaltypeidentifier=""):
         # 6.4.3.1 <new-structured-type> ::= ["packed"] <unpacked-structured-type>
         # 6.4.3.1 <unpacked-structured-type> ::= <array-type> | <record-type> | <set-type> | <file-type>
         # 6.4.3.2 <array-type> ::= "array" "[" <index-type> {"," <index-type>} "]" "of" <component-type>
@@ -541,7 +547,7 @@ class Parser:
         # 6.4.2.1 <new-ordinal-type> ::= <enumerated-type> | <subrange-type>
         # 6.4.3.2 <component-type> ::= <type-denoter>
         #
-        # This function returns the typedef.  If a <new-type> is created, then the <new-type> will be
+        # This function returns the type.  If a <new-type> is created, then the <new-type> will be
         # added to the symbol table.  The name of the new type will be in the optionaltypename field.
         # If a <new-type> is created and the typename is blank, then the type name will be created
         # anonymously.  See page 69 of Cooper for discussion of anonymous types.
@@ -573,33 +579,34 @@ class Parser:
             indextypelist = self.parse_indextype_list(parent_ast)
             self.getexpectedtoken(TokenType.RBRACKET)
             self.getexpectedtoken(TokenType.OF)
-            component_typedef = self.parse_typedenoter(parent_ast)
+            component_type = self.parse_typedenoter(parent_ast)
 
             # iterate through the indextype list backwards.
 
-            nexttypedef = component_typedef
+            nexttype = component_type
             for i in range(-1, (-1 * len(indextypelist)) - 1, -1):
-                indextypedef = indextypelist[i]
+                indextype = indextypelist[i]
                 # the typename passed into this function goes to the outermost array definition.
                 # If it is shorthand for multiple arrays, then the inner array definitions are all
                 # anonymously named.
-                if i == (-1 * len(indextypelist)) and optionaltypename != "":
-                    typename = optionaltypename
+                if i == (-1 * len(indextypelist)) and optionaltypeidentifier != "":
+                    typeidentifier = optionaltypeidentifier
                 else:
-                    typename = self.generate_anonymous_typename()
+                    typeidentifier = self.generate_anonymous_typeidentifier()
 
-                # the nexttypedef variable will be overwritten every type through the loop, so only
+                # the nexttype variable will be overwritten every type through the loop, so only
                 # the final one processed will be returned
-                newarraytype = pascaltypes.ArrayType(indextypedef, nexttypedef, ispacked)
-                nexttypedef = pascaltypes.ArrayTypeDef(typename, newarraytype, newarraytype)
-                parent_ast.symboltable.add(nexttypedef)
-            return nexttypedef
+                # TODO - could likely just have nexttype = pascaltypes.ArrayType(...) and remove a line
+                newarraytype = pascaltypes.ArrayType(typeidentifier, indextype, nexttype, ispacked)
+                nexttype = newarraytype
+                parent_ast.symboltable.add(nexttype)
+            return nexttype
 
         else:
             tok = self.tokenstream.eattoken()
-            raise ParseException(token_errstr("Invalid Structured Type {}".format(tok.value)), tok)
+            raise ParseException(token_errstr("Invalid Structured Type {}".format(tok.value), tok))
 
-    def parse_typedenoter(self, parent_ast, optionaltypename=""):
+    def parse_typedenoter(self, parent_ast, optionaltypeidentifier=""):
         # 6.4.1 <type-denoter> ::= <type-identifier> | <new-type>
         # 6.4.1 <type-identifier> ::= <identifier>
         #   The valid type-identifiers are the simple types (integer, char, boolean, real) and identifiers
@@ -609,29 +616,33 @@ class Parser:
         # 6.4.3.1 <new-structured-type> ::= ["packed"] <unpacked-structured-type>
         # 6.4.3.1 <unpacked-structured-type> ::= <array-type> | <record-type> | <set-type> | <file-type>
         #
-        # This function returns the typedef.  If a <new-type> is created, then the <new-type> will be
+        # This function returns the type.  If a <new-type> is created, then the <new-type> will be
         # added to the symbol table.  The name of the new type will be in the optionaltypename field.
         # If a <new-type> is created and the typename is blank, then the type name will be created
         # anonymously.  See page 69 of Cooper for discussion of anonymous types.
 
         if self.next_three_tokens_contain_subrange():
-            return self.parse_subrangetype(parent_ast, optionaltypename)
+            return self.parse_subrangetype(parent_ast, optionaltypeidentifier)
         elif self.tokenstream.peektokentype() == TokenType.LPAREN:
-            return self.parse_enumeratedtype(parent_ast, optionaltypename)
+            return self.parse_enumeratedtype(parent_ast, optionaltypeidentifier)
         elif self.tokenstream.peektokentype() in (TokenType.PACKED, TokenType.ARRAY, TokenType.RECORD, TokenType.SET,
                                                   TokenType.FILE):
-            return self.parse_structuredtype(parent_ast, optionaltypename)
+            return self.parse_structuredtype(parent_ast, optionaltypeidentifier)
         else:
-            existingtypedef = self.parse_typeidentifier(parent_ast)
-            if optionaltypename != "":
+            existingtype = self.parse_typeidentifier(parent_ast)
+            if optionaltypeidentifier != "":
                 # if we have an existing type, we don't need to create a symbol for an anonymous type.  But if we
                 # were given a new type name, then we do need to create a symbol for it, as the statement
-                # we are parsing is a typedef with an alias.
-                newtypedef = pascaltypes.TypeDef(optionaltypename, existingtypedef, existingtypedef.basetype)
-                parent_ast.symboltable.add(newtypedef)
-                return newtypedef
+                # we are parsing is a type with an alias.
+
+                newtype = deepcopy(existingtype)
+                newtype.identifier = optionaltypeidentifier
+                newtype.denoter = existingtype
+
+                parent_ast.symboltable.add(newtype)
+                return newtype
             else:
-                return existingtypedef
+                return existingtype
 
     def parse_identifierlist(self):
         # 6.4.2.3 <identifier-list> ::= <identifier> { "," <identifier> }
@@ -658,11 +669,11 @@ class Parser:
             while not done:
                 identifier_list = self.parse_identifierlist()
                 self.getexpectedtoken(TokenType.COLON)
-                symboltypedef = self.parse_typedenoter(parent_ast)
+                symboltype = self.parse_typedenoter(parent_ast)
                 self.getexpectedtoken(TokenType.SEMICOLON)
                 for identifier_token in identifier_list:
                     parent_ast.symboltable.add(VariableSymbol(identifier_token.value,
-                                                              identifier_token.location, symboltypedef))
+                                                              identifier_token.location, symboltype))
                 if self.tokenstream.peektokentype() != TokenType.IDENTIFIER:
                     done = True
 
@@ -742,7 +753,7 @@ class Parser:
                     try:
                         tmp_symboltype = self.parse_typeidentifier(ast_procfunc)
                     except ParseException:
-                        pass  # errors' are ok here.
+                        pass  # errors are ok here.
 
                     if tmp_symboltype is None:
                         errstr = "Function {} missing return type at {}".format(tok_procfuncname.value,
@@ -751,26 +762,26 @@ class Parser:
                         errstr = "Expected ':' but saw '{}' in {}".format(tmp_token.value, tmp_token.location)
                     raise ParseException(errstr)
                 self.getexpectedtoken(TokenType.COLON)
-                resulttypedef = self.parse_typeidentifier(ast_procfunc)
+                resulttype = self.parse_typeidentifier(ast_procfunc)
                 # 6.6.2 - functions can only return simple types or pointers
-                if not (isinstance(resulttypedef.basetype, pascaltypes.SimpleType) or
-                        isinstance(resulttypedef.basetype, pascaltypes.PointerType)):
+                if not (isinstance(resulttype, pascaltypes.SimpleType) or
+                        isinstance(resulttype, pascaltypes.PointerType)):
                     errstr = "Function {} has invalid return type: {} at {}".format(tok_procfuncname.value,
-                                                                                    str(resulttypedef),
+                                                                                    str(resulttype),
                                                                                     str(tok_procfunc.location))
                     raise ParseException(errstr)
                 ast_procfunc.symboltable.add(FunctionResultVariableSymbol(tok_procfuncname.value,
                                                                           tok_procfuncname.location,
-                                                                          resulttypedef))
-                activationtypedef = pascaltypes.FunctionTypeDef()
+                                                                          resulttype))
+                activationtype = pascaltypes.FunctionType()
             else:
-                resulttypedef = None
-                activationtypedef = pascaltypes.ProcedureTypeDef()
+                resulttype = None
+                activationtype = pascaltypes.ProcedureType()
 
             # Procedures and Functions can only be declared in Program scope, or in the scope of other procedures
             # or functions.  So the parent of the procfunc here has to have a symbol table.
             parent_ast.symboltable.add(ActivationSymbol(tok_procfuncname.value, tok_procfuncname.location,
-                                                        activationtypedef, ast_procfunc.paramlist, resulttypedef))
+                                                        activationtype, ast_procfunc.paramlist, resulttype))
 
             self.getexpectedtoken(TokenType.SEMICOLON)
             ast_procfunc.children.extend(self.parse_block(ast_procfunc))
@@ -836,7 +847,7 @@ class Parser:
         # should call parse_variableaccess() recursively.  As such, we are not going to use a recursive
         # definition.  Remember also, depending on the types, this is valid syntax:
         #
-        # myarr[2,3}.foobar.x[7][(x+2*9+i)].fizbuz[-apple]^
+        # myarr[2,3].foobar.x[7][(x+2*9+i)].fizbuz[-apple]^
         #
         # so we are going to just parse a token at a time until we lookahead and see something that would
         # cause the variable access to end, and we will iterate and create the ASTs as if we had called it
@@ -932,7 +943,7 @@ class Parser:
                         # the FunctionResultVariableSymbol not the ActivationSymbol, and that's by design.  Hence
                         # testing for isinstance(ActivationSymbol) in the next line before testing to see if it is
                         # a procedure call.
-                        if isinstance(sym, ActivationSymbol) and sym.returntypedef is None:
+                        if isinstance(sym, ActivationSymbol) and sym.returntype is None:
                             if parent_ast.token.tokentype == TokenType.ASSIGNMENT:
                                 errstr = "Procedure {} cannot be used as right value to assignment in {}"
                                 errstr = errstr.format(nexttok.value, ret.token.location)
@@ -1058,6 +1069,16 @@ class Parser:
 
     def parse_assignmentstatement(self, parent_ast):
         # 6.8.2.2 - <assignment-statement> ::= (<variable-access>|<function-identifier>) ":=" <expression>
+
+        # TODO - this may fall apart with procedures declared inside procedures:
+        #
+        # Procedure outer(...);
+        #   var a:integer;
+        #   Procedure inner(var a:char);
+        #       a := 'x';
+        #
+        # The logic below will find the var a in outer, not the a that is a parameter to inner.
+
         assert self.tokenstream.peektokentype() == TokenType.IDENTIFIER
         assert parent_ast is not None
 
@@ -1199,7 +1220,7 @@ class Parser:
             if tmpsym is None:
                 raise ParseException(token_errstr("Identifier undefined", self.tokenstream.peektoken()))
             elif isinstance(tmpsym, ActivationSymbol):
-                if tmpsym.returntypedef is not None:
+                if tmpsym.returntype is not None:
                     errstr = "Cannot invoke function without assigning its return value: "
                     raise ParseException(token_errstr(errstr, self.tokenstream.eattoken()))
                 return self.parse_procedurestatement(parent_ast)
@@ -1297,19 +1318,20 @@ class Parser:
         ret = AST(self.getexpectedtoken(TokenType.FOR), parent_ast)
         nexttwo = self.tokenstream.peekmultitokentype(2)
         if nexttwo[0] != TokenType.IDENTIFIER:
-            errstr = token_errstr("Identifier expected following 'for' statement", self.tokenstream.eattoken())
+            errstr = token_errstr("Identifier expected following 'for' statement, instead saw:",
+                                  self.tokenstream.eattoken())
             raise ParseException(errstr)
         if nexttwo[1] != TokenType.ASSIGNMENT:
             self.tokenstream.eattoken()  # eat the identifier
             self.getexpectedtoken(TokenType.ASSIGNMENT)  # will generate the exception and exit
-            raise ParseException('Unexpected Exception')  # pragma: no cover (only here so reader can see we exit))
+            assert False  # pragma: no cover (only here so reader can see we exited at the line immediately above))
 
         assignast = self.parse_assignmentstatement(ret)
         ret.children.append(assignast)
 
         if self.tokenstream.peektokentype() not in (TokenType.TO, TokenType.DOWNTO):
             tmptok = self.tokenstream.eattoken()
-            errstr = token_errstr("'to' or 'downto' expected, instead saw {}".format(tmptok.value), tmptok)
+            errstr = token_errstr("'to' or 'downto' expected, instead saw:".format(tmptok.value), tmptok)
             raise ParseException(errstr)
 
         self.tokenstream.setstartpos()
@@ -1360,7 +1382,6 @@ class Parser:
         assert parent_ast is not None
 
         next_tokentype = self.tokenstream.peektokentype()
-        # TODO make a helper function to see if next token type makes for a structured statement
         if startsstructuredstatement(next_tokentype):
             return self.parse_structuredstatement(parent_ast)
         else:
@@ -1470,14 +1491,17 @@ class Parser:
             while self.tokenstream.peektokentype() != TokenType.RPAREN:
                 tok = self.tokenstream.eattoken()
                 if tok.tokentype == TokenType.INPUT:
-                    tftd = pascaltypes.TextFileTypeDef("input", pascaltypes.TextFileType(), pascaltypes.TextFileType())
+                    # TODO - this adding the ProgramParameterSymbol separate from the type identifier into symboltable
+                    # is not consistent with how we add other types like integer, real, etc.  Probably need to add
+                    # "text" when we add the simple types, and then have tftd.denoter = the text base type?  Not sure.
+                    tftd = pascaltypes.TextFileType("input")
                     ret.symboltable.add(ProgramParameterSymbol("input", tok.location, tftd, position))
                 elif tok.tokentype == TokenType.OUTPUT:
-                    tftd = pascaltypes.TextFileTypeDef("output", pascaltypes.TextFileType(), pascaltypes.TextFileType())
+                    tftd = pascaltypes.TextFileType("output")
                     ret.symboltable.add(ProgramParameterSymbol("output", tok.location, tftd, position))
                 elif tok.tokentype == TokenType.IDENTIFIER:
-                    # when we run into the definition of this, we will change the componenttypedef if it is not text
-                    ftd = pascaltypes.FileTypeDef(tok.value, pascaltypes.TextFileType(), pascaltypes.TextFileType())
+                    # when we run into the definition of this, we will change the componenttype if it is not text
+                    ftd = pascaltypes.FileType(tok.value, pascaltypes.CharacterType())
                     ret.symboltable.add(ProgramParameterSymbol(tok.value, tok.location, ftd, position))
                 position += 1
             self.getexpectedtoken(TokenType.RPAREN)

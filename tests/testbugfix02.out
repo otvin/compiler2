@@ -1,1 +1,1 @@
-Error D.49: Cannot assign value '-11' of type integer literal to type myrange in file:tests/testbugfix02.pas line:7     column:11 
+Error D.49: Cannot assign value '-11' of type integer to type myrange in file:tests/testbugfix02.pas line:7     column:11 
