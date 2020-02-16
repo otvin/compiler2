@@ -594,46 +594,64 @@ class TACBlock:
                 raise TACException(errstr)
         return lval
 
+    def process_write_parameter(self, outputfile, paramsym, writetoken):
+        assert isinstance(paramsym, Symbol) or isinstance(paramsym, Literal)
+
+        bt = paramsym.pascaltype
+
+        # p.98 of Cooper states that the constants of enumerated ordinal types (pascaltypes.EnumeratedType)
+        # "don't have external character representations, and can't be read or written to or from
+        # textfiles - in particular, from the standard input and output."  It would be very easy to
+        # display the string representation of the constant when trying to print it out, but we will
+        # stick to Cooper for now.  The ISO standard is silent on the topic, per my reading.
+        if isinstance(bt, pascaltypes.SubrangeType):
+            bt = bt.hosttype
+
+        if not (isinstance(bt, pascaltypes.StringLiteralType) or isinstance(bt, pascaltypes.RealType) or
+                isinstance(bt, pascaltypes.BooleanType) or isinstance(bt, pascaltypes.IntegerType) or
+                isinstance(bt, pascaltypes.CharacterType) or
+                bt.is_string_type()):
+            # TODO - this error string is ugly, but when we have files and can write arbitrary types, this
+            # logic will need to change anyway.
+            errstr = "'{}' is of type that cannot be displayed by {}()".format(paramsym.name, writetoken.value)
+            errstr = tac_errstr(errstr, writetoken)
+            raise TACException(errstr)
+
+        self.addnode(TACParamNode(outputfile))
+        self.addnode(TACParamNode(paramsym))
+        if isinstance(bt, pascaltypes.StringLiteralType):
+            self.addnode(TACCallSystemFunctionNode(Label("_WRITESL"), 2))
+        elif isinstance(bt, pascaltypes.RealType):
+            self.addnode(TACCallSystemFunctionNode(Label("_WRITER"), 2))
+        elif isinstance(bt, pascaltypes.BooleanType):
+            self.addnode(TACCallSystemFunctionNode(Label("_WRITEB"), 2))
+        elif isinstance(bt, pascaltypes.IntegerType):
+            self.addnode(TACCallSystemFunctionNode(Label("_WRITEI"), 2))
+        elif bt.is_string_type():
+            self.addnode(TACCallSystemFunctionNode(Label("_WRITEST"), 2))
+        else:
+            self.addnode(TACCallSystemFunctionNode(Label("_WRITEC"), 2))
+
     def processast_write(self, ast):
         assert isinstance(ast, AST)
         assert ast.token.tokentype in (TokenType.WRITE, TokenType.WRITELN)
         tok = ast.token
-        for child in ast.children:
-            tmp = self.deref_ifneeded(self.processast(child))
-            bt = tmp.pascaltype
 
-            # p.98 of Cooper states that the constants of enumerated ordinal types (pascaltypes.EnumeratedType)
-            # "don't have external character representations, and can't be read or written to or from
-            # textfiles - in particular, from the standard input and output."  It would be very easy to
-            # display the string representation of the constant when trying to print it out, but we will
-            # stick to Cooper for now.  The ISO standard is silent on the topic, per my reading.
-            if isinstance(bt, pascaltypes.SubrangeType):
-                bt = bt.hosttype
-
-            if not (isinstance(bt, pascaltypes.StringLiteralType) or isinstance(bt, pascaltypes.RealType) or
-                    isinstance(bt, pascaltypes.BooleanType) or isinstance(bt, pascaltypes.IntegerType) or
-                    isinstance(bt, pascaltypes.CharacterType) or
-                    bt.is_string_type()):
-                # TODO - this error string is ugly, but when we have files and can write arbitrary types, this
-                # logic will need to change anyway.
-                errstr = tac_errstr("'{}' is of type that cannot be displayed by {}()".format(tmp.name, tok.value), tok)
-                raise TACException(errstr)
-
-            self.addnode(TACParamNode(tmp))
-            if isinstance(bt, pascaltypes.StringLiteralType):
-                self.addnode(TACCallSystemFunctionNode(Label("_WRITESL"), 1))
-            elif isinstance(bt, pascaltypes.RealType):
-                self.addnode(TACCallSystemFunctionNode(Label("_WRITER"), 1))
-            elif isinstance(bt, pascaltypes.BooleanType):
-                self.addnode(TACCallSystemFunctionNode(Label("_WRITEB"), 1))
-            elif isinstance(bt, pascaltypes.IntegerType):
-                self.addnode(TACCallSystemFunctionNode(Label("_WRITEI"), 1))
-            elif bt.is_string_type():
-                self.addnode(TACCallSystemFunctionNode(Label("_WRITEST"), 1))
+        outputfile = self.symboltable.fetch("output")
+        if len(ast.children) > 0:
+            childsym = self.deref_ifneeded(self.processast(ast.children[0]))
+            if isinstance(childsym.pascaltype, pascaltypes.FileType):
+                outputfile = childsym
             else:
-                self.addnode(TACCallSystemFunctionNode(Label("_WRITEC"), 1))
+                self.process_write_parameter(outputfile, childsym, tok)
+
+        for child in ast.children[1:]:
+            childsym = self.deref_ifneeded(self.processast(child))
+            self.process_write_parameter(outputfile, childsym, tok)
+
         if tok.tokentype == TokenType.WRITELN:
-            self.addnode(TACCallSystemFunctionNode(Label("_WRITECRLF"), 0))
+            self.addnode(TACParamNode(outputfile))
+            self.addnode(TACCallSystemFunctionNode(Label("_WRITECRLF"), 1))
 
     def processast_conditionalstatement(self, ast):
         assert isinstance(ast, AST)
@@ -861,6 +879,11 @@ class TACBlock:
             condition = self.processast(ast.children[maxchild])
             self.addnode(TACIFZNode(condition, labelstart))
 
+    def processast_inputoutput(self, ast):
+        assert isinstance(ast, AST)
+        assert ast.token.tokentype in (TokenType.INPUT, TokenType.OUTPUT)
+        return self.symboltable.fetch(ast.token.value)
+
     def processast_identifier(self, ast):
         assert isinstance(ast, AST)
         assert ast.token.tokentype == TokenType.IDENTIFIER
@@ -987,6 +1010,8 @@ class TACBlock:
         return ret
 
     def processast_integerliteral(self, ast):
+        # This function is static (no references to self) but because of what it does, I have it included in the
+        # object instead of a standalone helper function.
         assert isinstance(ast, AST)
         assert ast.token.tokentype in (TokenType.UNSIGNED_INT, TokenType.SIGNED_INT, TokenType.MAXINT)
 
@@ -1364,6 +1389,8 @@ class TACBlock:
             ret = self.processast_assignment(ast)
         elif toktype == TokenType.IDENTIFIER:
             ret = self.processast_identifier(ast)
+        elif tok.tokentype in (TokenType.INPUT, TokenType.OUTPUT):
+            ret = self.processast_inputoutput(ast)
         elif tok.tokentype in (TokenType.UNSIGNED_INT, TokenType.SIGNED_INT, TokenType.MAXINT):
             ret = self.processast_integerliteral(ast)
         elif tok.tokentype in (TokenType.UNSIGNED_REAL, TokenType.SIGNED_REAL):

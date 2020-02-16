@@ -1,6 +1,6 @@
 # Compiler2
 
-Goal is to build an compiler that implements a large subset of ISO-7185 Pascal.  Compiler is written in python3 in Ubuntu.  The assembly files are written in NASM format.  You must install NASM via e.g. ```sudo apt-get install nasm``` in order for the program to compile the assembly.
+Goal is to build an compiler that implements a large subset of ISO-7185 Pascal.  Compiler is written in python3 running on Ubuntu.  The assembly files are written in NASM format.  You must install NASM via e.g. ```sudo apt-get install nasm``` in order for Compiler2 to compile the assembly.
 
 ### Current Status
 
@@ -56,7 +56,7 @@ Compiler2 supports the following Pascal Language features:
  
 ### Commentary
 
-At this point, Compiler2 has all features from Compiler1 except for the non-standard "Concat()" function from Compiler1.  However, the String type in the original compiler is not ISO standard, it was modeled after Turbo Pascal, and Concat() would not work as a built-in.  
+At this point, Compiler2 has all features from Compiler1 except for the non-standard "Concat()" function from Compiler1.  However, the String type in the original compiler is not ISO standard, it was modeled after Turbo Pascal, and Concat() would not work as a built-in in Compiler2.  
 
 Compiler2 also has the following functionality that compiler1 did not:
 * Boolean and Character types
@@ -88,7 +88,7 @@ One of the cool things that I have done is used the compiler to generate assembl
 
 ### Unit tests
 
-Compiler2 currently passes 234 unit tests, including the 48 (of 60) unit tests created for Compiler which did not use Concat() and an additional test which represented the one known bug from Compiler.  You can execute the unit test suite by running:
+Compiler2 currently passes 235 unit tests, including the 48 (of 60) unit tests created for Compiler which did not use Concat() and an additional test which represented the one known bug from Compiler.  You can execute the unit test suite by running:
 
 ```python3 compiler_test.py```
 
@@ -134,12 +134,16 @@ None
 ### ISO Standard Errors
 Section 3.1 of the ISO Standard defines an Error as "A violation by a program of the requirements of this International Standard that a processor is permitted to leave undetected."  Section 5.1(f) of the standard says that, for each error, the processor has to report whether the error is detected at compile-time, detected at run-time, or not detected at all.  While compiler2 is nowhere near an ISO-compatible processor, it does detect many of the errors from the standard.  These are documented in the table below.
 
-There are 60 total errors in the ISO standard.  Compiler2 handles 13 of them, and partially handles 1 more.  The remaining errors apply to not-yet-implemented language features or are not detected.
+There are 60 total errors in the ISO standard.  Compiler2 handles 15 of them, has code to handle 2 others (but that code is not invoked yet), and partially handles 1 more.  The remaining errors apply to not-yet-implemented language features or are not detected.
 
 | Error | Ref. Section|Description| How Handled|
 |------|---------|---------|-------------|
 |D.1|6.5.3.2|For an indexed-variable closest-containing a single index-expression, it is an error if the value of the index-expression is not assignment-compatible with the index-type of the array-type.|Detected at compile-time|
 |D.7|6.6.3.2|It is an error if the value of each corresponding actual value parameter is not assignment-compatible with the type possessed by the formal-parameter.|Detected at compile-time|
+|D.9|6.6.5.2|It is an error if the file mode is not Generation immediately prior to any use of *put*, *write*, *writeln*, or *page*.|Detected at runtime|
+|D.10|6.6.5.2|It is an error if the file is undefined immediately prior to any use of  *put*, *write*, *writeln*, or *page*.|Detected at runtime|
+|D.14|6.6.5.2|It is an error if the file mode is not Inspection immediately prior to any use of *get* or *read*.|Code to detect at runtime is built, but we do not support *get* or read* yet.|
+|D.15|6.6.5.2|It is an error if the file is undefined immediately prior to any use of *get* or *read*.|Code to detect at runtime is built, but we do not support *get* or read* yet.|
 |D.33|6.6.6.2|For ln(x), it is an error if x is not greater than zero.|Detected at runtime|
 |D.34|6.6.6.2|For sqrt(x), it is an error if x is negative.|Detected at runtime|
 |D.37|6.6.6.3|For chr(x), the function returns a result of char-type that is the value whose ordinal number is equal to the value of the expression x if such a character value exists.  It is an error if such a character value does not exist.|Detected at runtime|

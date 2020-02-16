@@ -19,6 +19,11 @@ VALID_REGISTER_LIST = ["RAX", "RBX", "RCX", "RDX", "RSI", "RDI", "RBP", "RSP", "
 VALID_DWORD_REGISTER_LIST = ["EAX", "EBX", "ECX", "EDX", "ESI", "EDI", "EBP", "ESP", "R8D", "R9D", "R10D", "R11D",
                              "R12D", "R13D", "R14D", "R15D", "R16D"]
 
+FILESTATE_NOTINITIALIZED = 0
+FILESTATE_GENERATION = 1
+FILESTATE_INSPECTION = 2
+
+
 class PascalError:
     def __init__(self, errorstr, label):
         assert isinstance(errorstr, str)
@@ -43,6 +48,11 @@ PASCALERRORS[10] = PascalError("Error: unable to de-allocate dynamic memory.", "
 PASCALERRORS[11] = PascalError("Error D.14: file not in inspection mode prior to get() or read().",
                                "_PASCAL_WRONGMODE_GET_ERROR")
 PASCALERRORS[12] = PascalError("Error D.16: EOF encountered during get() or read().", "_PASCAL_EOF_GET_ERROR")
+PASCALERRORS[13] = PascalError("Error D.9: File not in generation mode prior to put(), write(), writeln(), or page().",
+                               "_PASCAL_FILENOTGENERATION_ERROR")
+PASCALERRORS[14] = PascalError("Error D.14: File not in inspection mode prior to get() or read().",
+                               "_PASCAL_FILENOTINSPECTION_ERROR")
+PASCALERRORS[15] = PascalError("Error D.10 or D.15: File undefined prior to access.", "_PASCAL_UNDEFINEDFILE_ERROR")
 
 
 def get_register_slice_bybytes(register, numbytes):
@@ -520,6 +530,26 @@ class AssemblyGenerator:
                 self.emitcode("POP RDI", "free memory from array value parameter")
                 self.emitcode("CALL _PASCAL_DISPOSE_MEMORY")
 
+    def generate_filevariable_statevalidationcode(self, filesym, state):
+        global FILESTATE_GENERATION
+        global FILESTATE_INSPECTION
+        global FILESTATE_NOTINITIALIZED
+        assert isinstance(filesym, Symbol)
+        assert isinstance(filesym.pascaltype, pascaltypes.FileType)
+        assert state in (FILESTATE_GENERATION, FILESTATE_INSPECTION)
+
+        # current state of the file is in the 9th byte after the location of the file
+        self.emitcode("lea rax, [{}]".format(filesym.memoryaddress), "validate file state")
+        self.emitcode("add rax, 8")
+        self.emitcode("movzx r11, byte [rax]")
+        self.emitcode("test r11b, r11b")
+        self.emitcode("jz _PASCAL_UNDEFINEDFILE_ERROR")
+        self.emitcode("cmp r11b, {}".format(str(state)))
+        if state == FILESTATE_GENERATION:
+            self.emitcode("jne _PASCAL_FILENOTGENERATION_ERROR")
+        else:
+            self.emitcode("jne _PASCAL_FILENOTINSPECTION_ERROR")
+
     def generate_globalfile_initializationcode(self):
         for symname in self.tacgenerator.globalsymboltable.symbols.keys():
             sym = self.tacgenerator.globalsymboltable.fetch(symname)
@@ -528,7 +558,7 @@ class AssemblyGenerator:
                     self.emitcode("mov r11, stdout", "initialize global textfile variable 'output'")
                     self.emitcode("mov rax, [r11]")
                     self.emitcode("mov [rel _globalvar_output], rax")
-                    self.emitcode("mov rax, [rel _globalvar_output]")
+                    self.emitcode("lea rax, [rel _globalvar_output]")
                     self.emitcode("add rax, 8")
                     self.emitcode("mov [rax], byte 1")
                     self.emitcode("inc rax")
@@ -537,7 +567,7 @@ class AssemblyGenerator:
                     self.emitcode("mov r11, stdin", "initialize global textfile variable 'input'")
                     self.emitcode("mov rax, [r11]")
                     self.emitcode("mov [rel _globalvar_output], rax")
-                    self.emitcode("mov rax, [rel _globalvar_input]")
+                    self.emitcode("lea rax, [rel _globalvar_input]")
                     self.emitcode("add rax, 8")
                     self.emitcode("mov [rax], byte 2")
                     self.emitcode("inc rax")
@@ -754,73 +784,72 @@ class AssemblyGenerator:
                     self.generate_procfunc_call_code(block, node, params)
 
                 elif isinstance(node, TACCallSystemFunctionNode):
-                    if node.label.name == "_WRITEI":
-                        if node.numparams != 1:  # pragma: no cover
-                            raise ASMGeneratorError("Invalid numparams to _WRITEI")
-                        self.emitcode("mov rdi, [rel _globalvar_output]")
-                        self.emitcode("mov rsi, _printf_intfmt")
-                        param = params[-1]
-                        destregister = get_register_slice_bybytes("RDX", param.paramval.pascaltype.size)
-                        self.emit_movtoregister_fromstackorliteral(destregister, param.paramval)
-                        # must pass 0 (in rax) as number of floating point args since fprintf is variadic
-                        self.emitcode("mov rax, 0")
-                        self.emitcode("call fprintf wrt ..plt")
-                        del params[-1]
-                    elif node.label.name == "_WRITER":
-                        if node.numparams != 1:  # pragma: no cover
-                            raise ASMGeneratorError("Invalid numparams to _WRITER")
-                        self.emitcode("mov rdi, [rel _globalvar_output]")
-                        self.emitcode("mov rsi, _printf_realfmt")
-                        self.emit_movtoxmmregister_fromstack("xmm0", params[-1].paramval)
-                        self.emitcode("mov rax, 1", "1 floating point param")
-                        self.emitcode("call fprintf wrt ..plt")
-                        del params[-1]
-                    elif node.label.name == "_WRITESL":
-                        p = params[-1].paramval
-                        assert isinstance(p, ConstantSymbol)
-                        self.emitcode("mov rdi, [rel _globalvar_output]")
-                        self.emitcode("mov rsi, [{}]".format(p.memoryaddress))
-                        self.emitcode("mov edx, {}".format(len(p.value)))
-                        self.emitcode("call _PASCAL_PRINTSTRINGTYPE", "in compiler2_system_io.asm")
-                        del params[-1]
-                    elif node.label.name == "_WRITEST":
-                        p = params[-1].paramval
-                        assert isinstance(p, Symbol)
-                        assert p.pascaltype.is_string_type()
-                        self.emitcode("mov rdi, [rel _globalvar_output]")
-                        self.emitcode("mov rsi, [{}]".format(p.memoryaddress))
-                        self.emitcode("mov edx, {}".format(p.pascaltype.numitemsinarray))
-                        self.emitcode("call _PASCAL_PRINTSTRINGTYPE", "in compiler2_system_io.asm")
-                        del params[-1]
-                    elif node.label.name == "_WRITEC":
-                        self.emit_movtoregister_fromstack("RDI", params[-1].paramval)
-                        self.emitcode("mov rsi, [rel _globalvar_output]")
-                        self.emitcode("call fputc wrt ..plt")
-                        del params[-1]
-                    elif node.label.name == "_WRITEB":
-                        self.emit_movtoregister_fromstack("al", params[-1].paramval)
-                        self.emitcode("test al, al")
-                        labelfalse = self.getnextlabel()
-                        labelprint = self.getnextlabel()
-                        self.emitcode("je {}".format(labelfalse))
-                        self.emitcode("mov rsi, _printf_true")
-                        self.emitcode("mov edx, 4")
-                        self.emitcode("jmp {}".format(labelprint))
-                        self.emitlabel(labelfalse)
-                        self.emitcode("mov rsi, _printf_false")
-                        self.emitcode("mov edx, 5")
-                        self.emitlabel(labelprint)
-                        self.emitcode("mov rdi, [rel _globalvar_output]")
-                        self.emitcode("call _PASCAL_PRINTSTRINGTYPE", "in compiler2_system_io.asm")
-                        del params[-1]
-                    elif node.label.name == "_WRITECRLF":
-                        self.emitcode("mov rdi, [rel _globalvar_output]")
-                        self.emitcode("mov rsi, _printf_newln")
-                        self.emitcode("mov rax, 0")
-                        self.emitcode("call fprintf wrt ..plt")
-                        self.emitcode("XOR RDI, RDI", "Flush standard output when we do a writeln")
-                        self.emitcode("CALL fflush wrt ..plt")
-                        self.emitcode("")
+                    if node.label.name[:6] == "_WRITE":
+                        if node.label.name == "_WRITECRLF":
+                            outfilesym = params[-1].paramval
+                            self.generate_filevariable_statevalidationcode(outfilesym, FILESTATE_GENERATION)
+                            assert node.numparams == 1
+                            self.emitcode("mov rdi, [{}]".format(outfilesym.memoryaddress))
+                            self.emitcode("mov rsi, _printf_newln")
+                            self.emitcode("mov rax, 0")
+                            self.emitcode("call fprintf wrt ..plt")
+                            self.emitcode("XOR RDI, RDI", "Flush standard output when we do a writeln")
+                            self.emitcode("CALL fflush wrt ..plt")
+                            self.emitcode("")
+                            del params[-1]
+                        else:
+                            assert node.numparams == 2
+                            outfilesym = params[-2].paramval
+                            self.generate_filevariable_statevalidationcode(outfilesym, FILESTATE_GENERATION)
+                            outparamsym = params[-1].paramval
+                            if node.label.name == "_WRITEI":
+                                self.emitcode("mov rdi, [{}]".format(outfilesym.memoryaddress))
+                                self.emitcode("mov rsi, _printf_intfmt")
+                                destregister = get_register_slice_bybytes("RDX", outparamsym.pascaltype.size)
+                                self.emit_movtoregister_fromstackorliteral(destregister, outparamsym)
+                                # must pass 0 (in rax) as number of floating point args since fprintf is variadic
+                                self.emitcode("mov rax, 0")
+                                self.emitcode("call fprintf wrt ..plt")
+                            elif node.label.name == "_WRITER":
+                                self.emitcode("mov rdi, [{}]".format(outfilesym.memoryaddress))
+                                self.emitcode("mov rsi, _printf_realfmt")
+                                self.emit_movtoxmmregister_fromstack("xmm0", outparamsym)
+                                self.emitcode("mov rax, 1", "1 floating point param")
+                                self.emitcode("call fprintf wrt ..plt")
+                            elif node.label.name == "_WRITESL":
+                                assert isinstance(outparamsym, ConstantSymbol), type(outparamsym)
+                                self.emitcode("mov rdi, [{}]".format(outfilesym.memoryaddress))
+                                self.emitcode("mov rsi, [{}]".format(outparamsym.memoryaddress))
+                                self.emitcode("mov edx, {}".format(len(outparamsym.value)))
+                                self.emitcode("call _PASCAL_PRINTSTRINGTYPE", "in compiler2_system_io.asm")
+                            elif node.label.name == "_WRITEST":
+                                assert isinstance(outparamsym, Symbol)
+                                assert outparamsym.pascaltype.is_string_type()
+                                self.emitcode("mov rdi, [{}]".format(outfilesym.memoryaddress))
+                                self.emitcode("mov rsi, [{}]".format(outparamsym.memoryaddress))
+                                self.emitcode("mov edx, {}".format(outparamsym.pascaltype.numitemsinarray))
+                                self.emitcode("call _PASCAL_PRINTSTRINGTYPE", "in compiler2_system_io.asm")
+                            elif node.label.name == "_WRITEC":
+                                self.emit_movtoregister_fromstack("RDI", outparamsym)
+                                self.emitcode("mov rsi, [{}]".format(outfilesym.memoryaddress))
+                                self.emitcode("call fputc wrt ..plt")
+                            elif node.label.name == "_WRITEB":
+                                self.emit_movtoregister_fromstack("al", outparamsym)
+                                self.emitcode("test al, al")
+                                labelfalse = self.getnextlabel()
+                                labelprint = self.getnextlabel()
+                                self.emitcode("je {}".format(labelfalse))
+                                self.emitcode("mov rsi, _printf_true")
+                                self.emitcode("mov edx, 4")
+                                self.emitcode("jmp {}".format(labelprint))
+                                self.emitlabel(labelfalse)
+                                self.emitcode("mov rsi, _printf_false")
+                                self.emitcode("mov edx, 5")
+                                self.emitlabel(labelprint)
+                                self.emitcode("mov rdi, [{}]".format(outfilesym.memoryaddress))
+                                self.emitcode("call _PASCAL_PRINTSTRINGTYPE", "in compiler2_system_io.asm")
+                            del params[-2:]
+
                     elif node.label.name == "_SQRTR":
                         comment = "parameter {} for sqrt()".format(str(params[-1].paramval))
                         self.emit_movtoxmmregister_fromstack("xmm0", params[-1].paramval, comment)

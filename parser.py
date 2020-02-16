@@ -1042,11 +1042,7 @@ class Parser:
         ret = AST(self.tokenstream.eattoken(), parent_ast)
         if self.tokenstream.peektokentype() == TokenType.LPAREN:
             self.getexpectedtoken(TokenType.LPAREN)
-            # TODO: When we support other Output types, we need to actually parse the first parameter
-            # to see if it is a file-variable.
-            # TODO: The file-variable, or implied file-variable OUTPUT should be a symbol.
             if self.tokenstream.peektokentype() == TokenType.OUTPUT:
-                # note - the below code will fail because TAC-IR won't know how to parse the OUTPUT token
                 ret.children.append(AST(self.getexpectedtoken(TokenType.OUTPUT), parent_ast))
                 self.getexpectedtoken(TokenType.COMMA)
 
