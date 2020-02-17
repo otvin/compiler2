@@ -1531,6 +1531,10 @@ class Parser:
                     ftd = pascaltypes.FileType(tok.value, pascaltypes.CharacterType())
                     ret.symboltable.add(ProgramParameterSymbol(tok.value, tok.location, ftd, position))
                     position += 1
+                else:
+                    raise ParseException(token_errstr("Invalid program parameter", tok))
+                if self.tokenstream.peektokentype() != TokenType.RPAREN:
+                    self.getexpectedtoken(TokenType.COMMA)
             self.getexpectedtoken(TokenType.RPAREN)
         self.getexpectedtoken(TokenType.SEMICOLON)
         ret.children = self.parse_block(ret)

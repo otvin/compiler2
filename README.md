@@ -49,8 +49,11 @@ Compiler2 supports the following Pascal Language features:
 * Global and local constants
     * Signed Real, Signed Integer, Character, or String
     * the required constants ```true```, ```false```, and ```maxint```
-* Write() and Writeln() to stdout
+* Output Files (limited)
+    * Can write to stdout.  Can also write to a text file, by naming a variable in the program parameter list, declaring a variable in global scope with same name and type *text*, and then passing the name of the file in via a command-line argument.  (ISO 7185 Pascal has very limited support for files written permanently to disk)
+    * Write() and Writeln() supported.
     * each take a comma-separated list of one or more parameters, with each parameter a variable, a math expression, a numeric literal, a character literal, a string literal, an array that is a string-type, or a constant.
+    * Rewrite() supported for output text files.
 * Comments
 
  
@@ -66,6 +69,7 @@ Compiler2 also has the following functionality that compiler1 did not:
 * Ability to do relational operations comparing Integer and Real types, and relational operations involving enumerated types.
 * abs(), sqr(), sin(), cos(), exp(), ln(), sqrt(), trunc(), round(), chr(), ord(), succ(), pred(), and odd()
 * Boolean operators not, or, and
+* Writing to Text Files in addition to stdout
 * Type Definitions, including Subrange Types, Enumerated Types, and arrays.
 
 Compiler2 also uses the official BNF from the ISO standard, whereas Compiler1 used a BNF that I updated based on a variation I had downloaded from a random website.
@@ -88,7 +92,7 @@ One of the cool things that I have done is used the compiler to generate assembl
 
 ### Unit tests
 
-Compiler2 currently passes 235 unit tests, including the 48 (of 60) unit tests created for Compiler which did not use Concat() and an additional test which represented the one known bug from Compiler.  You can execute the unit test suite by running:
+Compiler2 currently passes 238 unit tests, including the 48 (of 60) unit tests created for Compiler which did not use Concat() and an additional test which represented the one known bug from Compiler.  You can execute the unit test suite by running:
 
 ```python3 compiler_test.py```
 

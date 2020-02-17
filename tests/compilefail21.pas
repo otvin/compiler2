@@ -1,4 +1,4 @@
-program compilefail21(output, fizzazle);
+program compilefail21(output, real);
 {test invalid program parameters}
 
 begin

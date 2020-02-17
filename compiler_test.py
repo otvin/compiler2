@@ -7,55 +7,105 @@ NUM_SUCCESSES = 0
 TEST_FPC_INSTEAD = False  # switch to true to validate the .out files using fpc
 
 
-def dotest(infilename, resultfilename):
+def compare_two_files(actualfile, expectedfile, printdiffs=False):
+    testfile1 = open(actualfile, "r")
+    testvalue1 = testfile1.read()
+    testfile1.close()
+
+    testfile2 = open(expectedfile, "r")
+    testvalue2 = testfile2.read()
+    testfile2.close()
+
+    if (testvalue1 != testvalue2) and printdiffs:
+        print("ACTUAL " + actualfile)
+        print(testvalue1)
+        print("EXPECTED " + expectedfile)
+        print(testvalue2)
+
+    return testvalue1 == testvalue2
+
+
+def dotest2(pascal_filename, numparamfiles=0, pipefile=False, paramfile_comparelist=None):
+    assert pascal_filename[-4:] == ".pas"
+    assert numparamfiles >= 0
+    assert isinstance(pipefile, bool)
+    assert paramfile_comparelist is None or isinstance(paramfile_comparelist, list)
+
     global NUM_ATTEMPTS
     global NUM_SUCCESSES
 
     NUM_ATTEMPTS += 1
 
     try:
-        asmfilename = infilename[:-4] + ".asm"
-        objfilename = infilename[:-4] + ".o"
-        exefilename = infilename[:-4]
-        testoutputfilename = exefilename + ".testoutput"
+        fileroot = pascal_filename[:-4]
+
+        asmfilename = fileroot + ".asm"
+        objfilename = fileroot + ".o"
+        exefilename = fileroot
+        stdoutfilename = fileroot + ".testoutput"
+        resultfilename = fileroot + ".out"
+
+        paramfilestr = ""
+        for i in range(numparamfiles):
+            paramfilestr = " " + fileroot + "_paramfile" + str(i) + ".file"
+
+        pipefilestr = ""
+        if pipefile:
+            pipefilestr = " < " + fileroot + "_pipein" + ".file"
 
         if not TEST_FPC_INSTEAD:
-            compiler.compile(infilename, asmfilename=asmfilename, objfilename=objfilename, exefilename=exefilename)
+            compiler.compile(pascal_filename, asmfilename=asmfilename, objfilename=objfilename, exefilename=exefilename)
         else:
-            os.system("fpc -Miso -v0 {}".format(infilename))
+            os.system("fpc -Miso -v0 {}".format(pascal_filename))
 
-        os.system("./{0} > {1}".format(exefilename, testoutputfilename))
+        exestr = "./{} {} {} > {}".format(exefilename, paramfilestr, pipefilestr, stdoutfilename)
+        os.system(exestr)
 
-        testfile = open(testoutputfilename, "r")
-        testvalue = testfile.read()
-        testfile.close()
+        # compare the files
+        passed = True  # assume success
 
-        resultfile = open(resultfilename, "r")
-        resultvalue = resultfile.read()
-        resultfile.close()
+        if not compare_two_files(stdoutfilename, resultfilename):
+            passed = False
+            print("FAIL: {}".format(pascal_filename))
+            compare_two_files(stdoutfilename, resultfilename, True)
 
-        if resultvalue == testvalue:
+        if paramfile_comparelist is not None:
+            for i in paramfile_comparelist:
+                assert isinstance(i, int)
+                actualfilename = fileroot + "_paramfile" + str(i) + ".file"
+                expectedfilename = fileroot + "_comparefile" + str(i) + ".file"
+                if not compare_two_files(actualfilename, expectedfilename):
+                    if passed:
+                        passed = False
+                        print("FAIL: {}".format(pascal_filename))
+                    compare_two_files(actualfilename, expectedfilename, True)
+
+        if passed:
             if not TEST_FPC_INSTEAD:
-                print("PASS: {}".format(infilename))
+                print("PASS: {}".format(pascal_filename))
             else:
-                print("FPC PASS: {}".format(infilename))
-            NUM_SUCCESSES += 1
+                print("FPC PASS: {}".format(pascal_filename))
 
             # remove the files from passed tests; we will leave the files from failed tests so we can debug
             if not TEST_FPC_INSTEAD:
                 os.system("rm {}".format(asmfilename))
                 os.system("rm {}".format(objfilename))
             os.system("rm {}".format(exefilename))
-            os.system("rm {}".format(testoutputfilename))
-        else:  # pragma: no cover
-            print("FAIL: {}".format(infilename))
-            print("ACTUAL")
-            print(testvalue)
-            print("EXPECTED:")
-            print(resultvalue)
+            os.system("rm {}".format(stdoutfilename))
+            if paramfile_comparelist is not None:
+                for i in paramfile_comparelist:
+                    actualfilename = fileroot + "_paramfile" + str(i) + ".file"
+                    os.system("rm {}".format(actualfilename))
+
+            NUM_SUCCESSES += 1
+
     except Exception as e:  # pragma: no cover
-        print("FAIL: {}".format(infilename))
+        print("FAIL: {}".format(pascal_filename))
         print(e)
+
+
+def dotest(infilename, resultfilename):
+    dotest2(infilename)
 
 
 def do_compilefailtest(infilename, resultfilename):
@@ -149,6 +199,12 @@ def main(onlytest=""):
     run_test_list("comments", 1, 1)
     run_test_list("const", 1, 6)
     run_test_list("divide", 1, 1)
+
+    if ONLYTEST == "" or ONLYTEST == "files":
+        dotest2("tests/testfiles01.pas", 1, False, [0])
+        dotest2("tests/testfiles02.pas", 1, False, [0])
+        dotest2("tests/testfiles03.pas", 1, False, [0])
+
     run_test_list("for", 1, 5)
     run_test_list("fpmath", 1, 7)
     run_test_list("functions", 1, 11)
