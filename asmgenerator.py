@@ -53,6 +53,9 @@ PASCALERRORS[13] = PascalError("Error D.9: File not in generation mode prior to 
 PASCALERRORS[14] = PascalError("Error D.14: File not in inspection mode prior to get() or read().",
                                "_PASCAL_FILENOTINSPECTION_ERROR")
 PASCALERRORS[15] = PascalError("Error D.10 or D.15: File undefined prior to access.", "_PASCAL_UNDEFINEDFILE_ERROR")
+PASCALERRORS[16] = PascalError("Error: insufficient number of command-line arguments.",
+                               "_PASCAL_INSUFFICIENT_ARGC_ERROR")
+PASCALERRORS[17] = PascalError("Error opening file.", "_PASCAL_FOPEN_ERROR")
 
 
 def get_register_slice_bybytes(register, numbytes):
@@ -283,6 +286,8 @@ class AssemblyGenerator:
 
     def generate_externs(self):
         self.emitcode("extern fprintf")
+        self.emitcode("extern fopen")
+        self.emitcode("extern freopen")
         self.emitcode("extern fputc")
         self.emitcode("extern calloc")
         self.emitcode("extern free")
@@ -312,6 +317,12 @@ class AssemblyGenerator:
         self.emitcode('_printf_newln db 10,0')
         self.emitcode('_printf_true db "TRUE",0')
         self.emitcode('_printf_false db "FALSE",0')
+
+        self.emitcode('_filemode_write db "w",0')
+        self.emitcode('_filemode_writebinary db "wb",0')
+        self.emitcode('_filemode_read db "r",0')
+        self.emitcode('_filemode_readbinary db "rb",0')
+
         if len(self.tacgenerator.globalliteraltable) > 0:
             nextid = 0
             for lit in self.tacgenerator.globalliteraltable:
@@ -541,7 +552,7 @@ class AssemblyGenerator:
         # current state of the file is in the 9th byte after the location of the file
         self.emitcode("lea rax, [{}]".format(filesym.memoryaddress), "validate file state")
         self.emitcode("add rax, 8")
-        self.emitcode("movzx r11, byte [rax]")
+        self.emitcode("mov r11b, byte [rax]")
         self.emitcode("test r11b, r11b")
         self.emitcode("jz _PASCAL_UNDEFINEDFILE_ERROR")
         self.emitcode("cmp r11b, {}".format(str(state)))
@@ -550,31 +561,56 @@ class AssemblyGenerator:
         else:
             self.emitcode("jne _PASCAL_FILENOTINSPECTION_ERROR")
 
+    def generate_programparameter_initializationcode(self):
+        # assumption:
+        # RDI - contains int argc (integer with number parameters)
+        # RSI - contains char **argv
+
+        symlist = []
+
+        for symname in self.tacgenerator.globalsymboltable.symbols.keys():
+            sym = self.tacgenerator.globalsymboltable.fetch(symname)
+            if isinstance(sym, ProgramParameterSymbol) and sym.name not in ("input", "output"):
+                symlist.append((sym.position, sym.filenamememoryaddress))
+
+        if len(symlist) > 0:
+            self.emitcode("cmp RDI, {}".format(len(symlist)), "Test number of command-line arguments")
+            self.emitcode("jl _PASCAL_INSUFFICIENT_ARGC_ERROR")
+            for syminfo in symlist:
+                rsi_offset = 8 * syminfo[0]
+                comment = "retrieve file name for variable {}".format(sym.name)
+                self.emitcode("mov RAX, [RSI+{}]".format(rsi_offset), comment)
+                self.emitcode("mov [{}], rax".format(syminfo[1]))
+
     def generate_globalfile_initializationcode(self):
+        # set up stdin and stdout if needed
         for symname in self.tacgenerator.globalsymboltable.symbols.keys():
             sym = self.tacgenerator.globalsymboltable.fetch(symname)
             if isinstance(sym, ProgramParameterSymbol):
                 if sym.name == "output":
                     self.emitcode("mov r11, stdout", "initialize global textfile variable 'output'")
                     self.emitcode("mov rax, [r11]")
-                    self.emitcode("mov [rel _globalvar_output], rax")
-                    self.emitcode("lea rax, [rel _globalvar_output]")
+                    self.emitcode("mov [{}], rax".format(sym.memoryaddress))
+                    self.emitcode("lea rax, [{}]".format(sym.memoryaddress))
                     self.emitcode("add rax, 8")
-                    self.emitcode("mov [rax], byte 1")
+                    self.emitcode("mov [rax], byte {}".format(FILESTATE_GENERATION))
                     self.emitcode("inc rax")
                     self.emitcode("mov [rax], byte 0")
                 elif sym.name == "input":
                     self.emitcode("mov r11, stdin", "initialize global textfile variable 'input'")
                     self.emitcode("mov rax, [r11]")
-                    self.emitcode("mov [rel _globalvar_output], rax")
-                    self.emitcode("lea rax, [rel _globalvar_input]")
+                    self.emitcode("mov [{}], rax".format(sym.memoryaddress))
+                    self.emitcode("lea rax, [{}]".format(sym.memoryaddress))
                     self.emitcode("add rax, 8")
-                    self.emitcode("mov [rax], byte 2")
+                    self.emitcode("mov [rax], byte {}".format(FILESTATE_INSPECTION))
                     self.emitcode("inc rax")
                     self.emitcode("mov [rax], byte 0")
                 else:
-                    errstr = "Invalid program parameter '{}' in {}".format(sym.name, sym.location)
-                    raise ASMGeneratorError(errstr)
+                    self.emitcode("lea rax, [{}]".format(sym.memoryaddress))
+                    self.emitcode("add rax, 8")
+                    self.emitcode("mov [rax], byte {}".format(FILESTATE_NOTINITIALIZED))
+                    self.emitcode("add rax, 1")
+                    self.emitcode("mov [rax], byte 0")
 
     def generate_code(self):
         params = []  # this is a stack of parameters
@@ -584,8 +620,6 @@ class AssemblyGenerator:
 
             if block.ismain:
                 self.emitlabel("main")
-                self.generate_globalfile_initializationcode()
-                self.emitcode("finit")  # TODO - this should only be written if we use x87 anywhere.
                 tacnodelist = block.tacnodes
             else:
                 self.emitlabel(block.tacnodes[0].label.name, block.tacnodes[0].comment)
@@ -601,6 +635,8 @@ class AssemblyGenerator:
                         # a 1, 2, or 4 byte value.
                         totalstorageneeded += 8
                         sym.memoryaddress = "RBP-{}".format(str(totalstorageneeded))
+                    if isinstance(sym, ProgramParameterSymbol) and sym.name not in ("input", "output"):
+                        totalstorageneeded += 8
 
             if totalstorageneeded > 0 or block.ismain:
                 self.emitcode("PUSH RBP")  # ABI requires callee to preserve RBP
@@ -629,6 +665,10 @@ class AssemblyGenerator:
 
                 else:
                     self.generate_localvar_comments(block)
+                    # This needs to be first because it takes advantage of RDI and RSI state when execution starts
+                    self.generate_programparameter_initializationcode()
+                    self.generate_globalfile_initializationcode()
+                    self.emitcode("finit")  # TODO - this should only be written if we use x87 anywhere.
                     # need to init any global variables that are arrays
                     for symname in self.tacgenerator.globalsymboltable.symbols.keys():
                         sym = self.tacgenerator.globalsymboltable.fetch(symname)
@@ -849,7 +889,43 @@ class AssemblyGenerator:
                                 self.emitcode("mov rdi, [{}]".format(outfilesym.memoryaddress))
                                 self.emitcode("call _PASCAL_PRINTSTRINGTYPE", "in compiler2_system_io.asm")
                             del params[-2:]
+                    elif node.label.name == "_REWRITE":
+                        assert node.numparams == 1
+                        outfilesym = params[-1].paramval
+                        assert outfilesym.name not in ("input", "output")  # these errors are raised in tac-ir.py
 
+                        # TODO goes away when we add temporary files
+                        assert isinstance(outfilesym, ProgramParameterSymbol)
+
+                        # TODO much of these long strings of assembly in this function can be pulled out and this
+                        # made easier to manage
+
+                        labelreopen = self.getnextlabel()
+                        labeldone = self.getnextlabel()
+                        self.emitcode("lea rax, [{}]".format(outfilesym.memoryaddress))
+                        self.emitcode("add rax, 8")
+                        self.emitcode("mov r11b, byte [rax]", "file state is in r11b")
+
+                        # For FOPEN - RDI gets pointer to filename, RSI gets "w"
+                        # For FREOPEN - RDI gets pointer to filename, RSI gets "w", RDX gets the FILE*
+                        self.emitcode("mov rdi, [{}]".format(outfilesym.filenamememoryaddress))
+                        # TODO gets more complicaed when we can write binary
+                        self.emitcode("mov rsi, _filemode_write")
+                        self.emitcode("test r11b, r11b", "determine if we need to open or reopen this file")
+                        self.emitcode("jg {}".format(labelreopen))
+                        self.emitcode("call fopen wrt ..plt", "FILE* is in RAX")
+                        self.emitcode("jmp {}".format(labeldone))
+                        self.emitlabel(labelreopen)
+                        self.emitcode("mov rdx, [{}]".format(outfilesym.memoryaddress))
+                        self.emitcode("call freopen wrt ..plt", "FILE* is in RAX")
+                        self.emitlabel(labeldone)
+                        self.emitcode("test rax, rax")
+                        self.emitcode("jz _PASCAL_FOPEN_ERROR")
+                        self.emitcode("lea r11, [{}]".format(outfilesym.memoryaddress))
+                        self.emitcode("mov [r11], rax")
+                        self.emitcode("add r11, 8")
+                        self.emitcode("mov [r11], byte {}".format(FILESTATE_GENERATION))
+                        del params[-1]
                     elif node.label.name == "_SQRTR":
                         comment = "parameter {} for sqrt()".format(str(params[-1].paramval))
                         self.emit_movtoxmmregister_fromstack("xmm0", params[-1].paramval, comment)
@@ -1391,6 +1467,10 @@ class AssemblyGenerator:
                 sym = self.tacgenerator.globalsymboltable.fetch(symname)
                 if isinstance(sym, Symbol) and not isinstance(sym, ActivationSymbol):
                     if isinstance(sym, ProgramParameterSymbol):
+                        if sym.name not in ("input", "output"):
+                            label2 = "_globalvar_{}_filenameptr".format(sym.name)
+                            sym.filenamememoryaddress = "rel {}".format(label2)
+                            self.emitcode("{} resb {}".format(label2, 8), "holds pointer to command-line arg")
                         label = "_globalvar_{}".format(sym.name)
                     else:
                         label = "_globalvar_{}".format(str(varseq))

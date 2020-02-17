@@ -291,7 +291,6 @@ class Parser:
                     errstr = "Constant '{}' must be defined as a literal or another constant, cannot use '{}' in {}"
                     errstr = errstr.format(optionalconstid, ident_token.value, ident_token.location)
                 else:
-                    assert False
                     errstr = "Constant expected, must be literal or another constant, cannot use '{}' in {}"
                     errstr = errstr.format(ident_token.value, ident_token.location)
                 raise ParseException(errstr)
@@ -410,14 +409,14 @@ class Parser:
 
     def parse_typeidentifier(self, parent_ast):
         # 6.4.1 <type-identifier> ::= <identifier>
-        #   The valid type-identifiers are the simple types (integer, char, boolean, real) and identifiers
+        #   The valid type-identifiers are the simple types (integer, char, boolean, real), file types and identifiers
         #   that have already been defined for other types.
         #
         # Returns a type
 
         type_token = self.tokenstream.eattoken()
         if type_token.tokentype not in (TokenType.INTEGER, TokenType.REAL, TokenType.BOOLEAN,
-                                        TokenType.CHAR, TokenType.IDENTIFIER):
+                                        TokenType.CHAR, TokenType.TEXT, TokenType.IDENTIFIER):
             errstr = "Invalid type identifier '{}'".format(type_token.value)
             raise ParseException(token_errstr(errstr, type_token))
 
@@ -672,8 +671,25 @@ class Parser:
                 symboltype = self.parse_typedenoter(parent_ast)
                 self.getexpectedtoken(TokenType.SEMICOLON)
                 for identifier_token in identifier_list:
-                    parent_ast.symboltable.add(VariableSymbol(identifier_token.value,
-                                                              identifier_token.location, symboltype))
+                    do_not_add = False
+
+                    # A bit hacky, but if we are declaring a variable and we are in the outermost scope
+                    # (which is only location where ProgramParameterSymbols can live) then instead of
+                    # creating a new symbol, we update the existing with the correct type.  Note that
+                    # error messages on duplicate symbols are handled in SymbolTable.add() so we do not
+                    # need to raise any errors here if the symbol exists and is not a ProgramParameterSymbol.
+                    if parent_ast.symboltable.exists(identifier_token.value):
+                        tmpsym = parent_ast.symboltable.fetch(identifier_token.value)
+                        if isinstance(tmpsym, ProgramParameterSymbol):
+                            if not isinstance(symboltype, pascaltypes.FileType):
+                                assert False  # TODO - some pretty error
+                            else:
+                                do_not_add = True
+                                tmpsym.pascaltype = symboltype
+
+                    if not do_not_add:
+                        parent_ast.symboltable.add(VariableSymbol(identifier_token.value,
+                                                                  identifier_token.location, symboltype))
                 if self.tokenstream.peektokentype() != TokenType.IDENTIFIER:
                     done = True
 
@@ -834,6 +850,9 @@ class Parser:
 
         ident_token = self.tokenstream.eattoken()
         sym = parent_ast.nearest_symboldefinition(ident_token.value)
+        if isinstance(sym, ProgramParameterSymbol):
+            # special case for files that are declared as Program Parameters.
+            return AST(ident_token, parent_ast)
         assert isinstance(sym, VariableSymbol), "non-variable access: {}".format(sym.name)
 
         # if the identifier is an array, we could see one of a few valid things. Assume the array variable
@@ -1025,6 +1044,16 @@ class Parser:
             ret = simpleexp1
         return ret
 
+    def parse_file_procedure(self, parent_ast):
+        assert self.tokenstream.peektokentype() in (TokenType.REWRITE, TokenType.RESET, TokenType.PUT, TokenType.GET), \
+            "Parser.parse_file_procedure called and rewrite, reset, put, get not next token."
+        self.tokenstream.setstartpos()
+        ret = AST(self.tokenstream.eattoken(), parent_ast)
+        self.parse_actualparameterlist(ret)
+        self.tokenstream.setendpos()
+        ret.comment = "Call procedure: {}".format(self.tokenstream.printstarttoend())
+        return ret
+
     def parse_writeandwriteln(self, parent_ast):
         # 6.8.2.3 - <procedure-statement> ::= procedure-identifier ([<actual-parameter-list>] | <read-parameter_list>
         #                                            | <readln-parameter-list> | <write-parameter-list>
@@ -1043,7 +1072,7 @@ class Parser:
         if self.tokenstream.peektokentype() == TokenType.LPAREN:
             self.getexpectedtoken(TokenType.LPAREN)
             if self.tokenstream.peektokentype() == TokenType.OUTPUT:
-                ret.children.append(AST(self.getexpectedtoken(TokenType.OUTPUT), parent_ast))
+                ret.children.append(AST(self.getexpectedtoken(TokenType.OUTPUT), ret))
                 self.getexpectedtoken(TokenType.COMMA)
 
             # TODO - this is a temporary error check
@@ -1208,6 +1237,8 @@ class Parser:
 
         if next_tokentype in (TokenType.WRITE, TokenType.WRITELN):
             return self.parse_writeandwriteln(parent_ast)
+        elif next_tokentype in (TokenType.REWRITE, TokenType.RESET, TokenType.PUT, TokenType.GET):
+            return self.parse_file_procedure(parent_ast)
         elif next_tokentype == TokenType.GOTO:
             return self.parse_gotostatement(parent_ast)
         elif next_tokentype == TokenType.IDENTIFIER:
@@ -1491,15 +1522,15 @@ class Parser:
                     # is not consistent with how we add other types like integer, real, etc.  Probably need to add
                     # "text" when we add the simple types, and then have tftd.denoter = the text base type?  Not sure.
                     tftd = pascaltypes.TextFileType("input")
-                    ret.symboltable.add(ProgramParameterSymbol("input", tok.location, tftd, position))
+                    ret.symboltable.add(ProgramParameterSymbol("input", tok.location, tftd, None))
                 elif tok.tokentype == TokenType.OUTPUT:
                     tftd = pascaltypes.TextFileType("output")
-                    ret.symboltable.add(ProgramParameterSymbol("output", tok.location, tftd, position))
+                    ret.symboltable.add(ProgramParameterSymbol("output", tok.location, tftd, None))
                 elif tok.tokentype == TokenType.IDENTIFIER:
                     # when we run into the definition of this, we will change the componenttype if it is not text
                     ftd = pascaltypes.FileType(tok.value, pascaltypes.CharacterType())
                     ret.symboltable.add(ProgramParameterSymbol(tok.value, tok.location, ftd, position))
-                position += 1
+                    position += 1
             self.getexpectedtoken(TokenType.RPAREN)
         self.getexpectedtoken(TokenType.SEMICOLON)
         ret.children = self.parse_block(ret)

@@ -632,6 +632,31 @@ class TACBlock:
         else:
             self.addnode(TACCallSystemFunctionNode(Label("_WRITEC"), 2))
 
+    def processast_fileprocedure(self, ast):
+        assert isinstance(ast, AST)
+        assert ast.token.tokentype in (TokenType.RESET, TokenType.REWRITE)
+        assert len(ast.children) == 1
+
+        tok = ast.token
+        paramsym = self.processast(ast.children[0])
+        if not isinstance(paramsym.pascaltype, pascaltypes.FileType):
+            errstr = "Function {}() requires parameter of file type".format(tok.tokentype)
+            raise TACException(tac_errstr(errstr, tok))
+
+        if  paramsym.name in ("output", "input"):
+            errstr = "Cannot call {}() on built-in textfile {}".format(tok.tokentype, paramsym.value)
+            raise TACException(tac_errstr(errstr, tok))
+
+        self.addnode(TACParamNode(paramsym))
+
+        if not isinstance(paramsym.pascaltype, pascaltypes.TextFileType):
+            suffix = "B"
+        else:
+            suffix = ""
+
+        sysfuncname = "_" + tok.value.upper() + suffix
+        self.addnode(TACCallSystemFunctionNode(Label(sysfuncname), 1))
+
     def processast_write(self, ast):
         assert isinstance(ast, AST)
         assert ast.token.tokentype in (TokenType.WRITE, TokenType.WRITELN)
@@ -1375,6 +1400,8 @@ class TACBlock:
             self.processast_begin(ast)
         elif toktype in (TokenType.PROCEDURE, TokenType.FUNCTION):
             self.processast_procedurefunction(ast)
+        elif toktype in (TokenType.RESET, TokenType.REWRITE):
+            self.processast_fileprocedure(ast)
         elif toktype in (TokenType.WRITE, TokenType.WRITELN):
             self.processast_write(ast)
         elif toktype == TokenType.IF:

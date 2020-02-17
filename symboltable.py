@@ -212,10 +212,12 @@ class ActivationSymbol(Symbol):
 class ProgramParameterSymbol(Symbol):
     def __init__(self, name, location, pascaltype, position):
         assert isinstance(pascaltype, pascaltypes.FileType)
-        assert isinstance(position, int)
-        assert position >= 1  # position = where in the program parameter list this identifier falls
+        # position is where in the parameter list this parameter falls.  Used for assigning the program parameters
+        # that are neither input nor output.  Input and Output get None for position.
+        assert position is None or (isinstance(position, int) and position >= 1)
         super().__init__(name, location, pascaltype)
         self.position = position
+        self.filenamememoryaddress = None
 
 
 class Label:
@@ -396,6 +398,7 @@ class SymbolTable:
         self.add(pascaltypes.BooleanType())
         self.add(pascaltypes.RealType())
         self.add(pascaltypes.CharacterType())
+        self.add(pascaltypes.TextFileType())
         # TODO - this is a hack due to the combination of TypeDef and BaseType into BaseType
         slt = pascaltypes.StringLiteralType()
         slt.identifier = "_string"
