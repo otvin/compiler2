@@ -86,13 +86,6 @@ class ParseException(Exception):
     pass
 
 
-@unique
-class ASTAttributes(Enum):
-    PROGRAM_NAME = auto()  # the identifier that names the program.  Not used in compilation.
-    PROGRAM_INPUT = auto()  # was the program-parameter INPUT provided
-    PROGRAM_OUTPUT = auto()  # was the program-parameter OUTPUT provided
-
-
 class AST:
     def __init__(self, token, parent, comment=""):
         assert(isinstance(token, Token)), "AST.__init__: AST requires a token"
@@ -595,9 +588,7 @@ class Parser:
 
                 # the nexttype variable will be overwritten every type through the loop, so only
                 # the final one processed will be returned
-                # TODO - could likely just have nexttype = pascaltypes.ArrayType(...) and remove a line
-                newarraytype = pascaltypes.ArrayType(typeidentifier, indextype, nexttype, ispacked)
-                nexttype = newarraytype
+                nexttype = pascaltypes.ArrayType(typeidentifier, indextype, nexttype, ispacked)
                 parent_ast.symboltable.add(nexttype)
             return nexttype
 
@@ -682,7 +673,10 @@ class Parser:
                         tmpsym = parent_ast.symboltable.fetch(identifier_token.value)
                         if isinstance(tmpsym, ProgramParameterSymbol):
                             if not isinstance(symboltype, pascaltypes.FileType):
-                                assert False  # TODO - some pretty error
+                                errstr = "Variable '{}' is declared as a program parameter, must be File or Text type"
+                                errstr += " in: {}"
+                                errstr = errstr.format(identifier_token.value, identifier_token.location)
+                                raise ParseException(errstr)
                             else:
                                 do_not_add = True
                                 tmpsym.pascaltype = symboltype

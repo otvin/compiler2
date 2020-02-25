@@ -1,0 +1,1 @@
+Variable 'fizzbuz' is declared as a program parameter, must be File or Text type in: file:tests/compilefail76.pas line:4     column:5  

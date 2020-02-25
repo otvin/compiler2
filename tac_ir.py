@@ -260,14 +260,13 @@ class TACLabelNode(TACNode):
 
 
 class TACDeclareFunctionNode(TACLabelNode):
-    # TODO - rename returntype as resulttype to be consistent with ISO Standard
-    def __init__(self, label, paramlist, returntype=None):
+    def __init__(self, label, paramlist, resulttype=None):
         super().__init__(label)
         assert isinstance(paramlist, ParameterList)
         self.paramlist = paramlist
-        assert returntype is None or isinstance(returntype, pascaltypes.SimpleType) or \
-            isinstance(returntype, pascaltypes.PointerType)
-        self.returntype = returntype
+        assert resulttype is None or isinstance(resulttype, pascaltypes.SimpleType) or \
+            isinstance(resulttype, pascaltypes.PointerType)
+        self.returntype = resulttype
 
     def __str__(self):  # pragma: no cover
         return ""
@@ -481,10 +480,7 @@ class TACBlock:
         assert isinstance(ast, AST)
 
         if ast.token.tokentype == TokenType.ASSIGNMENT:
-            if ast.children[0].token.value.lower() == functionidentifier.lower():
-                return True
-            else:
-                return self.validate_function_returnsvalue(functionidentifier, ast.children[1])
+            return ast.children[0].token.value.lower() == functionidentifier.lower()
         else:
             for child in ast.children:
                 tmp = self.validate_function_returnsvalue(functionidentifier, child)
@@ -1088,7 +1084,6 @@ class TACBlock:
             littype = pascaltypes.StringLiteralType()
             lit = StringLiteral(litval, tok.location)
         else:
-            # TODO - should this be CharacterLiteralType() ?
             littype = pascaltypes.CharacterType()
             lit = CharacterLiteral(litval, tok.location)
 
