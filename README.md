@@ -118,7 +118,7 @@ _Code for exceptions that should never occur are excluded, as is code that only 
 
 The following works are cited in various comments in the Compiler2 code:
 
-International Organization for Standardization. (1990) Pascal (ISO standard no. 7185:1990) Retrieved from [http://www.pascal-central.com/docs/iso7185.pdf]
+International Organization for Standardization. (1990) Pascal ([ISO standard no. 7185:1990](docs/iso7185.pdf))
 
 Cooper, Doug. Standard Pascal User Reference Manual. W.W. Norton, 1983.
 
