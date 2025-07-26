@@ -10,7 +10,9 @@
 extern fputc
 extern _PASCAL_OVERFLOW_ERROR
 
-global _PASCAL_PRINTSTRINGTYPE
+section .note.GNU-stack noalloc noexec nowrite progbits
+section .text
+    global _PASCAL_PRINTSTRINGTYPE
 
 
 

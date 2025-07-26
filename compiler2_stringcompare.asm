@@ -9,7 +9,10 @@
 
 extern _PASCAL_OVERFLOW_ERROR
 
-global _PASCAL_STRINGCOMPARE
+section .note.GNU-stack noalloc noexec nowrite progbits
+section .text
+    global _PASCAL_STRINGCOMPARE
+
 
 
 _PASCAL_STRINGCOMPARE:							;Function stringcompare(s:array, t:array, k:integer)

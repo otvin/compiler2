@@ -1497,6 +1497,10 @@ class AssemblyGenerator:
         self.generate_errorhandlingcode()
         self.generate_programterminationcode()
 
+    def generate_gnu_stack_section(self):
+        # notify the linker that we do not need an executable stack
+        self.emitsection("note.GNU-stack noalloc noexec nowrite progbits")
+
     def generate_bsssection(self):
         if len(self.tacgenerator.globalsymboltable.symbols.keys()) > 0:
             self.emitsection("bss")
@@ -1523,6 +1527,7 @@ class AssemblyGenerator:
 
     def generate(self, objfilename, exefilename):
         self.generate_externs()
+        self.generate_gnu_stack_section()
         self.generate_bsssection()
         self.generate_datasection()
         self.generate_textsection()
