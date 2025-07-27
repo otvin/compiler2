@@ -635,7 +635,7 @@ class AssemblyGenerator:
 
                 if sym.name in ("input", "output"):
                     comment = "initialize global textfile variable '{}'".format(sym.name)
-                    self.emitcode("mov r11, {}".format(stdinout), comment)
+                    self.emitcode("lea r11, [rel {}]".format(stdinout), comment)
                     self.emitcode("mov rax, [r11]")
                     self.emitcode("mov [{}], rax".format(sym.memoryaddress))
 
@@ -863,7 +863,7 @@ class AssemblyGenerator:
                             self.generate_filevariable_statevalidationcode(outfilesym, FILESTATE_GENERATION)
                             assert node.numparams == 1
                             self.emitcode("mov rdi, [{}]".format(outfilesym.memoryaddress))
-                            self.emitcode("mov rsi, _printf_newln")
+                            self.emitcode("lea rsi, [rel _printf_newln]")
                             self.emitcode("mov rax, 0")
                             self.emitcode("call fprintf wrt ..plt")
                             self.emitcode("XOR RDI, RDI", "Flush standard output when we do a writeln")
@@ -877,7 +877,7 @@ class AssemblyGenerator:
                             outparamsym = params[-1].paramval
                             if node.label.name == "_WRITEI":
                                 self.emitcode("mov rdi, [{}]".format(outfilesym.memoryaddress))
-                                self.emitcode("mov rsi, _printf_intfmt")
+                                self.emitcode("lea rsi, [rel _printf_intfmt]")
                                 destregister = get_register_slice_bybytes("RDX", outparamsym.pascaltype.size)
                                 self.emit_movtoregister_fromstackorliteral(destregister, outparamsym)
                                 # must pass 0 (in rax) as number of floating point args since fprintf is variadic
@@ -885,7 +885,7 @@ class AssemblyGenerator:
                                 self.emitcode("call fprintf wrt ..plt")
                             elif node.label.name == "_WRITER":
                                 self.emitcode("mov rdi, [{}]".format(outfilesym.memoryaddress))
-                                self.emitcode("mov rsi, _printf_realfmt")
+                                self.emitcode("lea rsi, [rel _printf_realfmt]")
                                 self.emit_movtoxmmregister_fromstack("xmm0", outparamsym)
                                 self.emitcode("mov rax, 1", "1 floating point param")
                                 self.emitcode("call fprintf wrt ..plt")
@@ -894,14 +894,14 @@ class AssemblyGenerator:
                                 self.emitcode("mov rdi, [{}]".format(outfilesym.memoryaddress))
                                 self.emitcode("mov rsi, [{}]".format(outparamsym.memoryaddress))
                                 self.emitcode("mov edx, {}".format(len(outparamsym.value)))
-                                self.emitcode("call _PASCAL_PRINTSTRINGTYPE", "in compiler2_system_io.asm")
+                                self.emitcode("call _PASCAL_PRINTSTRINGTYPE wrt ..plt", "in compiler2_system_io.asm")
                             elif node.label.name == "_WRITEST":
                                 assert isinstance(outparamsym, Symbol)
                                 assert outparamsym.pascaltype.is_string_type()
                                 self.emitcode("mov rdi, [{}]".format(outfilesym.memoryaddress))
                                 self.emitcode("mov rsi, [{}]".format(outparamsym.memoryaddress))
                                 self.emitcode("mov edx, {}".format(outparamsym.pascaltype.numitemsinarray))
-                                self.emitcode("call _PASCAL_PRINTSTRINGTYPE", "in compiler2_system_io.asm")
+                                self.emitcode("call _PASCAL_PRINTSTRINGTYPE wrt ..plt", "in compiler2_system_io.asm")
                             elif node.label.name == "_WRITEC":
                                 self.emit_movtoregister_fromstack("RDI", outparamsym)
                                 self.emitcode("mov rsi, [{}]".format(outfilesym.memoryaddress))
@@ -912,15 +912,15 @@ class AssemblyGenerator:
                                 labelfalse = self.getnextlabel()
                                 labelprint = self.getnextlabel()
                                 self.emitcode("je {}".format(labelfalse))
-                                self.emitcode("mov rsi, _printf_true")
+                                self.emitcode("lea rsi, [rel _printf_true]")
                                 self.emitcode("mov edx, 4")
                                 self.emitcode("jmp {}".format(labelprint))
                                 self.emitlabel(labelfalse)
-                                self.emitcode("mov rsi, _printf_false")
+                                self.emitcode("lea rsi, [rel _printf_false]")
                                 self.emitcode("mov edx, 5")
                                 self.emitlabel(labelprint)
                                 self.emitcode("mov rdi, [{}]".format(outfilesym.memoryaddress))
-                                self.emitcode("call _PASCAL_PRINTSTRINGTYPE", "in compiler2_system_io.asm")
+                                self.emitcode("call _PASCAL_PRINTSTRINGTYPE wrt ..plt", "in compiler2_system_io.asm")
                             del params[-2:]
                     elif node.label.name == "_REWRITE":
                         assert node.numparams == 1
@@ -943,7 +943,7 @@ class AssemblyGenerator:
                         # For FREOPEN - RDI gets pointer to filename, RSI gets "w", RDX gets the FILE*
                         self.emitcode("mov rdi, [{}]".format(outfilesym.filenamememoryaddress))
                         # TODO gets more complicaed when we can write binary
-                        self.emitcode("mov rsi, _filemode_write")
+                        self.emitcode("lea rsi, [rel _filemode_write]")
                         self.emitcode("test r11b, r11b", "determine if we need to open or reopen this file")
                         self.emitcode("jg {}".format(labelreopen))
                         self.emitcode("call fopen wrt ..plt", "FILE* is in RAX")
@@ -1461,7 +1461,7 @@ class AssemblyGenerator:
         for i in self.pascalerrors.keys():
             if self.pascalerrors[i].isused:
                 self.emitlabel(self.pascalerrors[i].label)
-                self.emitcode("mov rsi, _pascalerr_{}".format(str(i)))
+                self.emitcode("lea rsi, [rel _pascalerr_{}]".format(str(i)))
                 self.emitcode("mov rdx, {}".format(len(self.pascalerrors[i].errorstr)))
                 self.emitcode("jmp _PASCAL_PRINT_ERROR")
 
