@@ -91,18 +91,18 @@ def compile(infilename, asmfilename=None, objfilename=None, exefilename=None,
 if __name__ == '__main__':
     if len(sys.argv) < 2:
         print("Usage: python3 compiler.py [filename]")
-        print("Or: python3 -s compiler.py [filename]   {for silent mode}")
+        print("Or: python3 -V compiler.py [filename]   {for verbose mode}")
         sys.exit()
 
-    if sys.argv[1] == '-s':
+    if sys.argv[1] == '-V':
         if len(sys.argv) < 3:
             print("Usage: python3 compiler.py [filename]")
-            print("Or: python3 -s compiler.py [filename]   {for silent mode}")
+            print("Or: python3 -V compiler.py [filename]   {for verbose mode}")
             sys.exit()
-        verboseparm = False
+        verboseparm = True
         infileparm = sys.argv[2]
     else:
-        verboseparm = True
+        verboseparm = False
         infileparm = sys.argv[1]
 
     infilename = sys.argv[1]
