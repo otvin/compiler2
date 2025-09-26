@@ -112,6 +112,13 @@ Current code coverage:
 _Code for exceptions that should never occur are excluded, as is code that only prints text for debugging purposes.  Regular compiler errors e.g. syntax errors in Pascal code are covered via "compilefail" tests.  Code written for future features, e.g. the code that handles 64-bit integers in spots, does count against code coverage, so I do not forget to add them back to the code to be tested._
  
 
+### BSI Validation Suite
+
+Cloned from: https://github.com/pascal-validation/validation-suite. More details may be found [here](tests/BSI-validation-suite/README.md).
+
+Compiler2 currently passes 71 of 221 "conform" tests from the BSI suite.  You can execute the suite by running:
+
+```python3 validation_test.py```
 
 
 ### Bibliography
