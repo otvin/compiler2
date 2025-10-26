@@ -1282,7 +1282,7 @@ class AssemblyGenerator:
                                 posmodlabel = self.getnextlabel()
                                 self.emitcode("CMP EAX, 0")
                                 self.emitcode("JGE {}".format(posmodlabel))
-                                self.emitcode("IMUL EAX, -1")
+                                self.emitcode("ADD EAX, R11D")
                                 self.emitlabel(posmodlabel)
                             self.emit_movtostack_fromregister(node.result, "eax")
                         else:  # pragma: no cover
