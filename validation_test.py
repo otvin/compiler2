@@ -25,7 +25,7 @@ def do_conform():
         stdoutfilename = "tests/BSI-validation-suite/CONFORM/" + test + ".testoutput"
 
         try:
-            compiler.compile(pascal_filename, asmfilename=asmfilename, objfilename=objfilename, exefilename=exefilename)
+            t = compiler.compile(pascal_filename, asmfilename=asmfilename, objfilename=objfilename, exefilename=exefilename)
             if os.path.exists(exefilename):
                 exestr = "./{} > {}".format(exefilename, stdoutfilename)
                 os.system(exestr)
@@ -45,7 +45,7 @@ def do_conform():
                 else:
                     print(testresult ({}).format(test))
             else:
-                print("No compilation: ({})\n".format(test))
+                print("Compile error: {} ({})\n".format(t, test))
         except Exception as e:
             print("FAIL: {}".format(pascal_filename))
             print(e)

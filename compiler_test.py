@@ -235,19 +235,6 @@ def main(onlytest=""):
 
     run_compilefail_test_list(1, 76)
 
-    # tests from old compiler not yet running in compiler2
-    # dotest("tests/testconcat01.pas", "tests/testconcat01.out")
-    # dotest("tests/testconcat02.pas", "tests/testconcat02.out")
-    # dotest("tests/testconcat03.pas", "tests/testconcat03.out")
-    # dotest("tests/testconcat04.pas", "tests/testconcat04.out")
-    # dotest("tests/testconcat05.pas", "tests/testconcat05.out")
-    # dotest("tests/testfunc12.pas", "tests/testfunc12.out")
-    # dotest("tests/testproc02.pas", "tests/testproc02.out")
-    # dotest("tests/testproc03.pas", "tests/testproc03.out")
-    # dotest("tests/testproc04.pas", "tests/testproc04.out")
-    # dotest("tests/teststring02.pas", "tests/teststring02.out")
-    # dotest("tests/teststring04.pas", "tests/teststring04.out")
-
     print("Tests Attempted: " + str(NUM_ATTEMPTS))
     print("Tests Succeeded: " + str(NUM_SUCCESSES))
 
