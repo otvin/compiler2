@@ -1,1 +1,2 @@
-Error D.7: Type Mismatch - bigarr is not assignment compatible with parameter a of printlittlearr() in file:tests/compilefail59.pas line:17    column:20 
+[1mtests/compilefail59.pas:17:20: [0m[1m[91merror:[0m Error D.7: Type Mismatch - bigarr is not assignment compatible with parameter a of printlittlearr()
+    17 | 	printlittlearr(b);

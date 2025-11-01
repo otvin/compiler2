@@ -1,1 +1,2 @@
-Both arguments to operator 'or' must be Boolean type in file:tests/compilefail37.pas line:9     column:10 
+[1mtests/compilefail37.pas:9:10: [0m[1m[91merror:[0m Both arguments to operator 'or' must be Boolean type
+     9 | 	if i or True then

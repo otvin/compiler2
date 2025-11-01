@@ -339,11 +339,11 @@ class TokenStream:
 
 class Lexer:
     def __init__(self, filename):
-        self.location = FileLocation(filename, 1, 1)
         self.tokenstream = TokenStream()
         self.text = ""
         self.length = 0
         self.curpos = 0
+        self.location = FileLocation(filename, 1, 1, self.peekrestofcurrentline())
 
     def at_eof(self):
         return self.curpos >= self.length
@@ -364,6 +364,17 @@ class Lexer:
         else:
             return self.text[pos]
 
+    def peekrestofcurrentline(self):
+        # returns the text from the current position until the end of current line or end of file, whichever
+        # comes first.
+        i = 0
+        while not self.at_eof() and self.text[self.curpos + i] != "\n":
+            i += 1
+        if i == 0:
+            return ""
+        else:
+            return self.peekmulti(i)
+
     def peekmulti(self, num):
         return self.text[self.curpos:self.curpos + num]
 
@@ -376,6 +387,7 @@ class Lexer:
             if ret == '\n':
                 self.location.line += 1
                 self.location.column = 1
+                self.location.curlinestr = self.peekrestofcurrentline()
             elif ret == '\t':
                 self.location.column += NUM_SPACES_IN_TAB
             else:
@@ -506,6 +518,7 @@ class Lexer:
             self.text = f.read()
             self.length = len(self.text)
             f.close()
+            self.location.curline = self.peekrestofcurrentline()
         except FileNotFoundError:
             print("Invalid filename: {}".format(self.location.filename))
             raise

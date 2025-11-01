@@ -1,1 +1,2 @@
-Cannot assign real type to integer in file:tests/compilefail17.pas line:13    column:8  
+[1mtests/compilefail17.pas:13:8: [0m[1m[91merror:[0m Cannot assign real type to integer
+    13 | 	j:=addone(i);

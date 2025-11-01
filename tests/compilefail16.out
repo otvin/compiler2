@@ -1,1 +1,2 @@
-Type Mismatch - parameter r of addone() must be type real in file:tests/compilefail16.pas line:13    column:12 
+[1mtests/compilefail16.pas:13:12: [0m[1m[91merror:[0m Type Mismatch - parameter r of addone() must be type real
+    13 | 	addone(i);

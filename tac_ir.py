@@ -73,6 +73,7 @@ from symboltable import Symbol, Label, Literal, IntegerLiteral, RealLiteral, Str
     SymbolTable, LiteralTable, ParameterList, ActivationSymbol, Parameter, VariableSymbol,\
     FunctionResultVariableSymbol, ConstantSymbol, CharacterLiteral
 from lexer import TokenType, Token
+from compiler_error import compiler_errstr, ErrLevel
 import pascaltypes
 
 
@@ -81,11 +82,7 @@ class TACException(Exception):
 
 
 def tac_errstr(msg, tok=None):
-    errstr = msg
-    if tok is not None:
-        assert(isinstance(tok, Token))
-        errstr += " in {0}".format(str(tok.location))
-    return errstr
+    return(compiler_errstr(msg, ErrLevel.ERROR, tok))
 
 
 @unique
@@ -552,9 +549,8 @@ class TACBlock:
                 self.addnode(TACParamNode(tmp))
                 self.addnode(TACCallSystemFunctionNode(Label(maptoken_to_systemfunction_name(tok, "O")), 1, lval))
             else:
-                errstr = "Function {}() requires parameter of ordinal type in {}".format(tok.tokentype,
-                                                                                         tok.location)
-                raise TACException(errstr)
+                raise TACException(tac_errstr('Function {}() requires parameter of ordinal type'.format(tok.tokentype)
+                                              , tok))
 
         elif requiredfunction_acceptsinteger_or_real(tok.tokentype):
             if isinstance(tmp.pascaltype, pascaltypes.IntegerType):
@@ -564,17 +560,13 @@ class TACBlock:
                 self.addnode(TACParamNode(tmp))
                 self.addnode(TACCallSystemFunctionNode(Label(maptoken_to_systemfunction_name(tok, "R")), 1, lval))
             else:
-                errstr = "Function {}() requires parameter of integer or real type in {}".format(tok.tokentype,
-                                                                                                 tok.location)
-                raise TACException(errstr)
+                raise TACException(tac_errstr('Function {}() requires parameter of integer or real type'.format(tok.tokentype), tok))
         elif requiredfunction_acceptsinteger(tok.tokentype):
             if isinstance(tmp.pascaltype, pascaltypes.IntegerType):
                 self.addnode(TACParamNode(tmp))
                 self.addnode(TACCallSystemFunctionNode(Label(maptoken_to_systemfunction_name(tok, "I")), 1, lval))
             else:
-                errstr = "Function {}() requires parameter of integer type in {}".format(tok.tokentype,
-                                                                                         tok.location)
-                raise TACException(errstr)
+                raise TACException(tac_errstr('Function {}() requires parameter of integer type'.format(tok.tokentype), tok))
         else:
             assert requiredfunction_acceptsreal(tok.tokentype)
             if isinstance(tmp.pascaltype, pascaltypes.IntegerType):
@@ -585,9 +577,7 @@ class TACBlock:
                 self.addnode(TACParamNode(tmp))
                 self.addnode(TACCallSystemFunctionNode(Label(maptoken_to_systemfunction_name(tok, "R")), 1, lval))
             else:
-                errstr = "Function {}() requires parameter of real type in {}"
-                errstr = errstr.format(tok.tokentype, tok.location)
-                raise TACException(errstr)
+                raise TACException(tac_errstr('Function {}() requires parameter of real type'.format(tok.tokentype), tok))
         return lval
 
     def process_write_parameter(self, outputfile, paramsym, writetoken):
@@ -610,8 +600,7 @@ class TACBlock:
             # TODO - this error string is ugly, but when we have files and can write arbitrary types, this
             # logic will need to change anyway.
             errstr = "'{}' is of type that cannot be displayed by {}()".format(paramsym.name, writetoken.value)
-            errstr = tac_errstr(errstr, writetoken)
-            raise TACException(errstr)
+            raise TACException(tac_errstr(errstr, writetoken))
 
         self.addnode(TACParamNode(outputfile))
         self.addnode(TACParamNode(paramsym))
@@ -886,7 +875,7 @@ class TACBlock:
             self.addnode(TACLabelNode(labelstart))
             condition = self.processast(ast.children[0])
             if not isinstance(condition.pascaltype, pascaltypes.BooleanType):
-                raise TACException("While statements must be followed by Boolean Expressions: ", tok)
+                raise TACException(tac_errstr("While statements must be followed by Boolean Expressions: ", tok))
             self.addnode(TACIFZNode(condition, labeldone))
             self.processast(ast.children[1])
             self.addnode(TACGotoNode(labelstart))
@@ -911,7 +900,7 @@ class TACBlock:
 
         tok = ast.token
         if not self.symboltable.existsanywhere(tok.value):
-            errstr = "Undefined Identifier: {} in {}".format(tok.value, tok.location)
+            errstr = tac_errstr("Undefined Identifier: {}".format(tok.value), tok)
             raise TACException(errstr)
         sym = self.symboltable.fetch(tok.value)
         if isinstance(sym, FunctionResultVariableSymbol):
@@ -985,17 +974,16 @@ class TACBlock:
                     # and the actual parameter must be a variable access, meaning it cannot be a literal
                     # or the output of a function.
                     if not isinstance(tmp, VariableSymbol):
-                        errstr = "Must pass in variable for parameter {} of {}() in {}"
-                        errstr = errstr.format(sym.paramlist[i].symbol.name, sym.name, child.token.location)
-                        raise TACException(errstr)
+                        errstr = "Must pass in variable for parameter {} of {}()".format(sym.paramlist[i].symbol.name, sym.name)
+                        raise TACException(tac_errstr(errstr, child.token))
 
                     # For variable parameters, the actual parameter must have same type as the formal parameter
                     if not ast.nearest_symboltable().are_same_type(tmp.pascaltype.identifier,
                                                                    sym.paramlist[i].symbol.pascaltype.identifier):
-                        errstr = "Type Mismatch - parameter {} of {}() must be type {} in {}"
+                        errstr = "Type Mismatch - parameter {} of {}() must be type {}"
                         errstr = errstr.format(sym.paramlist[i].symbol.name, sym.name,
-                                               str(sym.paramlist[i].symbol.pascaltype.identifier), child.token.location)
-                        raise TACException(errstr)
+                                               str(sym.paramlist[i].symbol.pascaltype.identifier))
+                        raise TACException(tac_errstr(errstr, child.token))
                 else:
                     # For value parameters, the actual parameter must be assignment compatible with the formal
                     # parameter
@@ -1007,10 +995,10 @@ class TACBlock:
                     if not ast.nearest_symboltable().are_assignment_compatible(
                             sym.paramlist[i].symbol.pascaltype.identifier, tmp.pascaltype.identifier, optval):
                         errstr = "Error D.7: Type Mismatch - {} is not assignment compatible with parameter "
-                        errstr += "{} of {}() in {}"
+                        errstr += "{} of {}()"
                         errstr = errstr.format(str(tmp.pascaltype.identifier),
-                                               sym.paramlist[i].symbol.name, sym.name, child.token.location)
-                        raise TACException(errstr)
+                                               sym.paramlist[i].symbol.name, sym.name)
+                        raise TACException(tac_errstr(errstr, child.token))
 
                 if isinstance(tmp.pascaltype, pascaltypes.IntegerType) and \
                         isinstance(sym.paramlist[i].symbol.pascaltype, pascaltypes.RealType):
@@ -1144,7 +1132,7 @@ class TACBlock:
         # (Cooper p.115)
         if not self.symboltable.are_assignment_compatible(indextype.identifier, step3.pascaltype.identifier):
             # Error D.1 comes from 6.5.3.2 of the ISO standard
-            raise TACException("Error D.1: Incorrect type for array index in {}".format(ast.children[1].token.location))
+            raise TACException(tac_errstr("Error D.1: Incorrect type for array index", ast.children[1].token))
 
         # logic here - take result of (step 3 minus the minimum index) and multiply by the component size.
         # add that to the result of step 2.
@@ -1157,14 +1145,15 @@ class TACBlock:
         else:
             assert isinstance(indextype, pascaltypes.OrdinalType)
             if isinstance(indextype, pascaltypes.IntegerType):
-                raise TACException("Cannot have an array with index range 'integer' in {}".format(ast.token.location))
+                errstr = tac_errstr("Cannot have an array with index range 'integer'", ast.token)
+                raise TACException(errstr)
             minrange = indextype.position(indextype.min_item())
             maxrange = indextype.position(indextype.max_item())
 
         if isinstance(step3, IntegerLiteral):
             # we can do the math in the compiler
             if int(step3.value) < minrange or int(step3.value) > maxrange:
-                errstr = "Array Index '{}' out of range in: {}".format(step3.value, step3.location)
+                errstr = tac_errstr("Array Index '{}' out of range".format(step3.value), ast.children[1].token)
                 raise TACException(errstr)
 
             indexpos = (int(step3.value) - minrange)
@@ -1429,7 +1418,7 @@ class TACBlock:
         elif tok.tokentype in (TokenType.AND, TokenType.OR, TokenType.NOT):
             ret = self.processast_booleanoperator(ast)
         else:  # pragma: no cover
-            raise TACException("TACBlock.processast - cannot process token:", str(tok))
+            raise TACException(tac_errstr("TACBlock.processast - cannot process token:".format(str(tok)), tok))
 
         assert ret is None or isinstance(ret, Symbol) or isinstance(ret, IntegerLiteral)
         return ret

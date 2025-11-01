@@ -1,1 +1,2 @@
-Cannot compare types 'char' and 'transport' with relational operator in file:tests/compilefail40.pas line:15    column:10 
+[1mtests/compilefail40.pas:15:10: [0m[1m[91merror:[0m Cannot compare types 'char' and 'transport' with relational operator
+    15 | 	if c > q then

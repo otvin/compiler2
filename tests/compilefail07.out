@@ -1,1 +1,2 @@
-mac expected 2 parameters, but 3 provided in file:tests/compilefail07.pas line:13    column:5  
+[1mtests/compilefail07.pas:13:5: [0m[1m[91merror:[0m mac expected 2 parameters, but 3 provided
+    13 | 	mac(4,9,6);

@@ -1,1 +1,2 @@
-Error D.48: Function addone must have a return value in file:tests/compilefail52.pas line:4     column:1  
+[1mtests/compilefail52.pas:4:1: [0m[1m[91merror:[0m Error D.48: Function addone must have a return value
+     4 | function addone(a:integer):integer;

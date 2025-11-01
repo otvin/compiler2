@@ -1,1 +1,2 @@
-Cannot pass control variable 'myalpha' of a 'for' statement as variable parameter 'pp' to 'writethenextnato' in file:tests/compilefail48.pas line:52    column:30 
+[1mtests/compilefail48.pas:52:30: [0m[1m[91merror:[0m Cannot pass control variable 'myalpha' of a 'for' statement as variable parameter 'pp' to 'writethenextnato'
+    52 | 			writethenextnato(myalpha);

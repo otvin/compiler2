@@ -1,1 +1,2 @@
-Function succ() requires parameter of ordinal type in file:tests/compilefail71.pas line:9     column:10 
+[1mtests/compilefail71.pas:9:10: [0m[1m[91merror:[0m Function succ() requires parameter of ordinal type
+     9 | 	r := succ(r);

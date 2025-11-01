@@ -1,1 +1,2 @@
-Cannot assign value '3.14' of type real to type integer in file:tests/compilefail02.pas line:5     column:8  
+[1mtests/compilefail02.pas:5:8: [0m[1m[91merror:[0m Cannot assign value '3.14' of type real to type integer
+     5 | 	a:=3.14;

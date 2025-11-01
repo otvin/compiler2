@@ -1,1 +1,2 @@
-Array Index '-5' out of range in: file:tests/compilefail56.pas line:10    column:12 
+[1mtests/compilefail56.pas:10:12: [0m[1m[91merror:[0m Array Index '-5' out of range
+    10 | 	myarr[-5] := 'z';  {should compile error}

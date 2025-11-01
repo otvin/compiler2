@@ -1,1 +1,2 @@
-Error D.1: Incorrect type for array index in file:tests/compilefail58.pas line:18    column:7  
+[1mtests/compilefail58.pas:18:7: [0m[1m[91merror:[0m Error D.1: Incorrect type for array index
+    18 | 	a[c, i] := True;

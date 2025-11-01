@@ -1,1 +1,2 @@
-Error D.49: Cannot assign value '-11' of type integer to type myrange in file:tests/testbugfix02.pas line:7     column:11 
+[1mtests/testbugfix02.pas:7:11: [0m[1m[91merror:[0m Error D.49: Cannot assign value '-11' of type integer to type myrange
+     7 |     q := -11;  {should be caught at compile-time, was then only caught at run-time}

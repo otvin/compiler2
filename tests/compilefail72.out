@@ -1,1 +1,2 @@
-Function sqr() requires parameter of integer or real type in file:tests/compilefail72.pas line:9     column:10 
+[1mtests/compilefail72.pas:9:10: [0m[1m[91merror:[0m Function sqr() requires parameter of integer or real type
+     9 | 	r := sqr(r);

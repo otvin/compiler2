@@ -1,1 +1,2 @@
-Must pass in variable for parameter a of addone() in file:tests/compilefail15.pas line:14    column:12 
+[1mtests/compilefail15.pas:14:12: [0m[1m[91merror:[0m Must pass in variable for parameter a of addone()
+    14 | 	addone(7);

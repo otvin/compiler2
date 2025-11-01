@@ -1,1 +1,2 @@
-Cannot compare Boolean to non-Boolean in file:tests/compilefail04.pas line:9     column:10 
+[1mtests/compilefail04.pas:9:10: [0m[1m[91merror:[0m Cannot compare Boolean to non-Boolean
+     9 | 	if r >= b then

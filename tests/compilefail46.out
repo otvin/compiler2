@@ -1,1 +1,2 @@
-'For' statements require control variables to be of ordinal type. Variable 'k' is of type 'real' in file:tests/compilefail46.pas line:11    column:9  
+[1mtests/compilefail46.pas:11:9: [0m[1m[91merror:[0m 'For' statements require control variables to be of ordinal type. Variable 'k' is of type 'real'
+    11 | 	for k := 0 to j do begin

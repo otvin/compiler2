@@ -1,1 +1,2 @@
-Control variable 'i' must be declared in same block as the 'for' in file:tests/compilefail43.pas line:14    column:9  
+[1mtests/compilefail43.pas:14:9: [0m[1m[91merror:[0m Control variable 'i' must be declared in same block as the 'for'
+    14 | 	for i := 15 downto j do begin

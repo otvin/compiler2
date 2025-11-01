@@ -1,1 +1,2 @@
-Error D.49: Cannot assign value '7' of type integer to type myrange in file:tests/compilefail41.pas line:12    column:10 
+[1mtests/compilefail41.pas:12:10: [0m[1m[91merror:[0m Error D.49: Cannot assign value '7' of type integer to type myrange
+    12 | 	q := 7;

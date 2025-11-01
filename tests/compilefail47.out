@@ -1,1 +1,2 @@
-Cannot assign a value to the control variable 'i' of a 'for' statement in file:tests/compilefail47.pas line:12    column:17 
+[1mtests/compilefail47.pas:12:17: [0m[1m[91merror:[0m Cannot assign a value to the control variable 'i' of a 'for' statement
+    12 | 				i := 0;

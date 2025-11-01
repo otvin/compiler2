@@ -1,1 +1,2 @@
-Function sqrt() requires parameter of real type in file:tests/compilefail74.pas line:10    column:13 
+[1mtests/compilefail74.pas:10:13: [0m[1m[91merror:[0m Function sqrt() requires parameter of real type
+    10 | 	writeln(sqrt(r));
