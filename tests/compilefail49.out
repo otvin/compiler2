@@ -1,1 +1,2 @@
-Procedure threetimes cannot be used as right value to assignment in file:tests/compilefail49.pas line:20    column:14 
+[1mtests/compilefail49.pas:20:14: [0m[1m[91merror:[0m Procedure threetimes cannot be used as right value to assignment
+    20 | 	for a := threetimes(b) to sixtimes(b) do

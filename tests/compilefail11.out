@@ -1,1 +1,2 @@
-Procedure two cannot be used as parameter to one() in file:tests/compilefail11.pas line:16    column:12 
+[1mtests/compilefail11.pas:16:12: [0m[1m[91merror:[0m Procedure two cannot be used as parameter to one()
+    16 | 	i:=one(two(7));

@@ -3,6 +3,7 @@ from lexer import TokenType, Token, TokenStream, LexerException
 from symboltable import StringLiteral, LiteralTable, SymbolTable, VariableSymbol, ParameterList, \
     ActivationSymbol, FunctionResultVariableSymbol, Parameter, SymbolException, ConstantSymbol, RealLiteral, \
     CharacterLiteral, ProgramParameterSymbol
+from compiler_error import compiler_errstr
 from copy import deepcopy
 import pascaltypes
 
@@ -18,12 +19,6 @@ resemble more common BNF terminology.
 "xyz"       - the terminal symbol xyz
 <xyz>       - the non-terminal symbol xyz, which shall be defined elsewhere in the BNF
 '''
-
-
-# Helper Functions
-def token_errstr(msg, tok):
-    assert isinstance(tok, Token), "Non-token generating token error {}".format(msg)
-    return msg + " '{0}' in {1}".format(tok.value, str(tok.location))
 
 
 def isrelationaloperator(tokentype):
@@ -193,9 +188,10 @@ class Parser:
         if ret.tokentype != tokentype:
             if tokentype == tokentype.SEMICOLON:
                 # TODO - insert a semicolon into the stream and allow parsing to continue
-                errstr = "Semicolon expected in {}".format(str(ret.location))
+                errstr = compiler_errstr("Semicolon expected",ret)
             else:
-                errstr = "Expected '{0}' but saw '{1}' in {2}".format(str(tokentype), str(ret.value), str(ret.location))
+                errstr = compiler_errstr("Expected '{0}' but saw '{1}'".format(str(tokentype), str(ret.value)),
+                                         ret)
             raise ParseException(errstr)
         assert isinstance(ret, Token)
         return ret
@@ -255,13 +251,13 @@ class Parser:
         elif self.tokenstream.peektokentype() in (TokenType.TRUE, TokenType.FALSE):
             booltok = self.tokenstream.eattoken()
             if sawsign:
-                errstr = "Cannot have a sign before a Boolean constant in {}".format(booltok.location)
+                errstr = compiler_errstr("Cannot have a sign before a Boolean constant", booltok)
                 raise ParseException(errstr)
             ret = pascaltypes.BooleanType(), booltok.value
         elif self.tokenstream.peektokentype() == TokenType.CHARSTRING:
             charstrtok = self.getexpectedtoken(TokenType.CHARSTRING)
             if sawsign:
-                errstr = "Cannot have a sign before a string constant in {}".format(charstrtok.location)
+                errstr = compiler_errstr("Cannot have a sign before a string constant",charstrtok)
                 raise ParseException(errstr)
             if len(charstrtok.value) == 1:
                 self.literaltable.add(CharacterLiteral(charstrtok.value, charstrtok.location))
@@ -273,19 +269,19 @@ class Parser:
             ident_token = self.getexpectedtoken(TokenType.IDENTIFIER)
             if not parent_ast.symboltable.existsanywhere(ident_token.value):
                 if ident_token.value == optionalconstid:
-                    errstr = "Self-referencing constant definition '{}' in {}"
-                    errstr = errstr.format(ident_token.value, ident_token.location)
+                    errstr = compiler_errstr("Self-referencing constant definition '{}'".format(ident_token.value), ident_token)
                 else:
-                    errstr = "Undefined Identifier: '{}' in {}".format(ident_token.value, ident_token.location)
+                    errstr = compiler_errstr("Undefined Identifier: '{}'".format(ident_token.value), ident_token)
                 raise ParseException(errstr)
             sym = parent_ast.symboltable.fetch(ident_token.value)
             if not isinstance(sym, ConstantSymbol) and not isinstance(sym, pascaltypes.EnumeratedTypeValue):
                 if optionalconstid != "":
-                    errstr = "Constant '{}' must be defined as a literal or another constant, cannot use '{}' in {}"
-                    errstr = errstr.format(optionalconstid, ident_token.value, ident_token.location)
+                    errstr = "Constant '{}' must be defined as a literal or another constant, cannot use '{}'"
+                    errstr = errstr.format(optionalconstid, ident_token.value)
                 else:
-                    errstr = "Constant expected, must be literal or another constant, cannot use '{}' in {}"
-                    errstr = errstr.format(ident_token.value, ident_token.location)
+                    errstr = "Constant expected, must be literal or another constant, cannot use '{}'"
+                    errstr = errstr.format(ident_token.value)
+                errstr = compiler_errstr(errstr, ident_token)
                 raise ParseException(errstr)
             if sawsign:
                 invalidsign = False
@@ -322,9 +318,8 @@ class Parser:
                     else:
                         errstr += " Cannot define constant "
                     errstr += "by putting a sign before a non-numeric constant."
-                    errstr += " In: {}"
-                    errstr = errstr.format(ident_token.value, ident_token.location)
-                    raise ParseException(errstr)
+                    errstr = errstr.format(ident_token.value)
+                    raise ParseException(compiler_errstr(errstr, ident_token))
             elif isinstance(sym, pascaltypes.EnumeratedTypeValue):
                 enumerated_type = parent_ast.symboltable.fetch_originalsymtable_andtype(sym.typeidentifier)[1]
                 ret = enumerated_type, ident_token.value
@@ -334,8 +329,8 @@ class Parser:
                 ret = sym.pascaltype, tokval
         else:
             nexttok = self.tokenstream.eattoken()
-            errstr = "Unexpected token {} in {}.".format(str(nexttok.value), nexttok.location)
-            raise ParseException(errstr)
+            errstr = "Unexpected token {}".format(str(nexttok.value))
+            raise ParseException(compiler_errstr(errstr, nexttok))
 
         assert ret is not None  # None isn't valid, but we assigned to None to avoid ret not assigned warning below
         return ret
@@ -411,14 +406,14 @@ class Parser:
         if type_token.tokentype not in (TokenType.INTEGER, TokenType.REAL, TokenType.BOOLEAN,
                                         TokenType.CHAR, TokenType.TEXT, TokenType.IDENTIFIER):
             errstr = "Invalid type identifier '{}'".format(type_token.value)
-            raise ParseException(token_errstr(errstr, type_token))
+            raise ParseException(compiler_errstr(errstr, type_token))
 
         if type_token.tokentype == TokenType.IDENTIFIER:
             symboltype = parent_ast.symboltable.fetch(type_token.value)
         else:
             symboltype = parent_ast.symboltable.fetch(str(type_token.tokentype))
         if not isinstance(symboltype, pascaltypes.BaseType):
-            raise ParseException(token_errstr("Invalid type identifier", type_token))
+            raise ParseException(compiler_errstr("Invalid type identifier '{}'".format(type_token.value), type_token))
         return symboltype
 
     def generate_anonymous_typeidentifier(self):
@@ -448,18 +443,18 @@ class Parser:
         const2type, const2value = self.parse_constant(parent_ast)
         if not parent_ast.symboltable.are_same_type(const1type.identifier, const2type.identifier):
             errstr = "Both elements of subrange type {} must be same type."
-            errstr += "'{}' is type {} and '{}' is type {} in {}."
+            errstr += "'{}' is type {} and '{}' is type {}"
             # optionaltypename may be blank here, and that's ok for the error message, rather than
             # plugging in an anonymous type
             errstr = errstr.format(optionaltypeidentifier, const1value, const1type.identifier,
-                                   const2value, const2type.identifier, nexttok.location)
-            raise ParseException(errstr)
+                                   const2value, const2type.identifier)
+            raise ParseException(compiler_errstr(errstr, nexttok))
 
         if not isinstance(const1type, pascaltypes.OrdinalType) or not isinstance(const2type, pascaltypes.OrdinalType):
             errstr = "Both elements of subrange type {} must be ordinal type."
-            errstr += " Types {} and {} are used in {}"
-            errstr = errstr.format(optionaltypeidentifier, const1type.identifier, const2type.identifier, nexttok.location)
-            raise ParseException(errstr)
+            errstr += " Types {} and {} are used"
+            errstr = errstr.format(optionaltypeidentifier, const1type.identifier, const2type.identifier)
+            raise ParseException(compiler_errstr(errstr, nexttok))
 
         if optionaltypeidentifier == "":
             typeidentifier = self.generate_anonymous_typeidentifier()
@@ -469,8 +464,7 @@ class Parser:
         try:
             ret = pascaltypes.SubrangeType(typeidentifier, const1type, const1value, const2value)
         except pascaltypes.PascalTypeException as e:
-            errstr = str(e) + " in {}".format(nexttok.location)
-            raise ParseException(errstr)
+            raise ParseException(compiler_errstr(e, nexttok))
 
         parent_ast.symboltable.add(ret)
         return ret
@@ -499,7 +493,7 @@ class Parser:
             try:
                 parent_ast.symboltable.add(newetv)
             except SymbolException:
-                errstr = token_errstr("Identifier redefined: '{}'".format(idtoken.value), idtoken)
+                errstr = compiler_errstr("Identifier redefined: '{}'".format(idtoken.value), idtoken)
                 raise ParseException(errstr)
 
         ret = pascaltypes.EnumeratedType(typename, etvlist)
@@ -522,7 +516,7 @@ class Parser:
             tmptok = self.tokenstream.peektoken()  # used for error messages
             newtype = self.parse_typedenoter(parent_ast)
             if not isinstance(newtype, pascaltypes.OrdinalType):
-                raise ParseException(token_errstr("Invalid type for array index", tmptok))
+                raise ParseException(compiler_errstr("Invalid type for array index '{}'".format(tmptok.value), tmptok))
             ret.append(newtype)
             if self.tokenstream.peektokentype() == TokenType.COMMA:
                 self.getexpectedtoken(TokenType.COMMA)
@@ -594,7 +588,7 @@ class Parser:
 
         else:
             tok = self.tokenstream.eattoken()
-            raise ParseException(token_errstr("Invalid Structured Type {}".format(tok.value), tok))
+            raise ParseException(compiler_errstr("Invalid Structured Type {}".format(tok.value), tok))
 
     def parse_typedenoter(self, parent_ast, optionaltypeidentifier=""):
         # 6.4.1 <type-denoter> ::= <type-identifier> | <new-type>
@@ -674,8 +668,8 @@ class Parser:
                         if isinstance(tmpsym, ProgramParameterSymbol):
                             if not isinstance(symboltype, pascaltypes.FileType):
                                 errstr = "Variable '{}' is declared as a program parameter, must be File or Text type"
-                                errstr += " in: {}"
-                                errstr = errstr.format(identifier_token.value, identifier_token.location)
+                                errstr = errstr.format(identifier_token.value)
+                                errstr = compiler_errstr(errstr, identifier_token)
                                 raise ParseException(errstr)
                             else:
                                 do_not_add = True
@@ -766,20 +760,19 @@ class Parser:
                         pass  # errors are ok here.
 
                     if tmp_symboltype is None:
-                        errstr = "Function {} missing return type at {}".format(tok_procfuncname.value,
-                                                                                tok_procfunc.location)
+                        errstr = compiler_errstr("Function {} missing return type".format(tok_procfuncname.value),
+                                                 tok_procfunc)
                     else:
-                        errstr = "Expected ':' but saw '{}' in {}".format(tmp_token.value, tmp_token.location)
+                        errstr = compiler_errstr("Expected ':' but saw '{}'".format(tmp_token.value), tmp_token)
                     raise ParseException(errstr)
                 self.getexpectedtoken(TokenType.COLON)
                 resulttype = self.parse_typeidentifier(ast_procfunc)
                 # 6.6.2 - functions can only return simple types or pointers
                 if not (isinstance(resulttype, pascaltypes.SimpleType) or
                         isinstance(resulttype, pascaltypes.PointerType)):
-                    errstr = "Function {} has invalid return type: {} at {}".format(tok_procfuncname.value,
-                                                                                    str(resulttype),
-                                                                                    str(tok_procfunc.location))
-                    raise ParseException(errstr)
+                    errstr = "Function {} has invalid return type: {}".format(tok_procfuncname.value,
+                                                                                    str(resulttype),)
+                    raise ParseException(compiler_errstr(errstr, tok_procfunc))
                 ast_procfunc.symboltable.add(FunctionResultVariableSymbol(tok_procfuncname.value,
                                                                           tok_procfuncname.location,
                                                                           resulttype))
@@ -891,7 +884,7 @@ class Parser:
                         ret.token.tokentype = TokenType.LBRACKET
                         # and now we go back to the arrayloop, parsing the expression
                     else:
-                        raise ParseException(token_errstr("Invalid Token:", nexttok))
+                        raise ParseException(compiler_errstr("Invalid Token: '{}'".format(nexttok.value), nexttok))
             else:
                 mainloopdone = True
 
@@ -958,21 +951,21 @@ class Parser:
                         # a procedure call.
                         if isinstance(sym, ActivationSymbol) and sym.returntype is None:
                             if parent_ast.token.tokentype == TokenType.ASSIGNMENT:
-                                errstr = "Procedure {} cannot be used as right value to assignment in {}"
-                                errstr = errstr.format(nexttok.value, ret.token.location)
+                                errstr = "Procedure {} cannot be used as right value to assignment"
+                                errstr = errstr.format(nexttok.value)
                             elif parent_ast.token.tokentype in (TokenType.TO, TokenType.DOWNTO):
-                                errstr = "Procedure {} cannot be used as the final value of a 'for' statement in {}"
-                                errstr = errstr.format(nexttok.value, ret.token.location)
+                                errstr = "Procedure {} cannot be used as the final value of a 'for' statement"
+                                errstr = errstr.format(nexttok.value)
                             else:
-                                errstr = "Procedure {} cannot be used as parameter to {}() in {}"
-                                errstr = errstr.format(nexttok.value, parent_ast.token.value, ret.token.location)
-                            raise ParseException(errstr)
+                                errstr = "Procedure {} cannot be used as parameter to {}()"
+                                errstr = errstr.format(nexttok.value, parent_ast.token.value)
+                            raise ParseException(compiler_errstr(errstr, ret.token))
                         self.parse_actualparameterlist(ret)
                 else:
                     return self.parse_variableaccess(parent_ast)
             else:
                 errtok = self.tokenstream.eattoken()
-                raise ParseException(token_errstr("Invalid <unsigned-constant>", errtok))
+                raise ParseException(compiler_errstr("Invalid <unsigned-constant> '{}'".format(errtok.value), errtok))
         return ret
 
     def parse_term(self, parent_ast):
@@ -1112,14 +1105,14 @@ class Parser:
                 assert isinstance(tmp_ast, AST)
                 if tmp_ast.parent is None:
                     # we made it to the top of the AST without finding a param list.
-                    errstr = "Undefined Identifier: {} in {}".format(ident_token.value, ident_token.location)
-                    raise ParseException(errstr)
+                    errstr = "Undefined Identifier: {}".format(ident_token.value)
+                    raise ParseException(compiler_errstr(errstr, ident_token))
                 tmp_ast = tmp_ast.parent
                 tmp_paramlist = tmp_ast.paramlist
             assert isinstance(tmp_paramlist, ParameterList)
             param = tmp_paramlist.fetch(ident_token.value)
             if param is None:
-                raise ParseException("Undefined Identifier: {} in {}".format(ident_token.value, ident_token.location))
+                raise ParseException(compiler_errstr("Undefined Identifier: {}".format(ident_token.value), ident_token))
             else:
                 assert isinstance(param, Parameter)
         else:
@@ -1140,8 +1133,10 @@ class Parser:
         ret.children.append(self.parse_variableaccess(ret))
         # Now assign the real token to ret
         if self.tokenstream.peektokentype() == TokenType.EQUALS:
-            errstr = "Variable access followed by '=' seen at {}, was assignment intended?"
-            errstr = errstr.format(self.tokenstream.eattoken().location)
+            # TODO - is this a warning or an error?
+            # TODO - name the variable instead of generic "Variable access"
+            errstr = "Variable access followed by '=', was assignment intended?"
+            errstr = compiler_errstr(errstr, self.tokenstream.eattoken())
             raise ParseException(errstr)
 
         ret.token = self.getexpectedtoken(TokenType.ASSIGNMENT)
@@ -1153,7 +1148,7 @@ class Parser:
     def parse_gotostatement(self, parent_ast):
         assert parent_ast is not None
         assert self.tokenstream.peektokentype() == TokenType.GOTO, "Parser_parse_gotostatement called without goto"
-        raise ParseException(token_errstr("goto not handled at this time", self.tokenstream.eattoken()))
+        raise ParseException(compiler_errstr("goto not handled at this time", self.tokenstream.eattoken()))
 
     def parse_actualparameterlist(self, parent_ast):
         # 6.7.3 - <actual-parameter-list> ::= "(" <actual-parameter> {"," <actual-parameter>} ")"
@@ -1239,23 +1234,26 @@ class Parser:
             next_tokenname = self.tokenstream.peektoken().value
             tmpsym = parent_ast.nearest_symboldefinition(next_tokenname)
             if tmpsym is None:
-                raise ParseException(token_errstr("Identifier undefined", self.tokenstream.peektoken()))
+                raise ParseException(compiler_errstr("Identifier undefined '{}'".format(self.tokenstream.peektoken().value), self.tokenstream.peektoken()))
             elif isinstance(tmpsym, ActivationSymbol):
                 if tmpsym.returntype is not None:
-                    errstr = "Cannot invoke function without assigning its return value: "
-                    raise ParseException(token_errstr(errstr, self.tokenstream.eattoken()))
+                    tmptok = self.tokenstream.eattoken()
+                    errstr = "Cannot invoke function without assigning its return value: '{}'".format(tmptok.value)
+                    raise ParseException(compiler_errstr(errstr, tmptok))
                 return self.parse_procedurestatement(parent_ast)
             elif isinstance(tmpsym, VariableSymbol):
                 return self.parse_assignmentstatement(parent_ast)
             elif isinstance(tmpsym, ConstantSymbol):
-                errstr = "Cannot assign to constant".format(next_tokenname)
-                raise ParseException(token_errstr(errstr, self.tokenstream.eattoken()))
+                tmptok = self.tokenstream.eattoken()
+                errstr = "Cannot assign to constant '{}'".format(next_tokenname)
+                raise ParseException(compiler_errstr(errstr, tmptok))
             else:
                 tok = self.tokenstream.eattoken()
-                errstr = "Identifier '{}' seen at {}, unclear how to parse".format(tok.value, tok.location)
+                errstr = compiler_errstr("Identifier '{}' seen, unclear how to parse".format(tok.value), tok)
                 raise ParseException(errstr)
         else:
-            raise ParseException(token_errstr("Invalid Token:", self.tokenstream.eattoken()))
+            tmptok = self.tokenstream.eattoken()
+            raise ParseException(compiler_errstr("Invalid Token: '{}'".format(tmptok.value), tmptok))
 
     def parse_ifstatement(self, parent_ast):
         # 6.8.3.4 <if-statement> ::= "if" <Boolean-expression> "then" <statement> [else-part]
@@ -1339,8 +1337,9 @@ class Parser:
         ret = AST(self.getexpectedtoken(TokenType.FOR), parent_ast)
         nexttwo = self.tokenstream.peekmultitokentype(2)
         if nexttwo[0] != TokenType.IDENTIFIER:
-            errstr = token_errstr("Identifier expected following 'for' statement, instead saw:",
-                                  self.tokenstream.eattoken())
+            tmptok = self.tokenstream.eattoken()
+            errstr = compiler_errstr("Identifier expected following 'for' statement, instead saw: '{}'".format(tmptok.value),
+                                     tmptok)
             raise ParseException(errstr)
         if nexttwo[1] != TokenType.ASSIGNMENT:
             self.tokenstream.eattoken()  # eat the identifier
@@ -1352,7 +1351,7 @@ class Parser:
 
         if self.tokenstream.peektokentype() not in (TokenType.TO, TokenType.DOWNTO):
             tmptok = self.tokenstream.eattoken()
-            errstr = token_errstr("'to' or 'downto' expected, instead saw:".format(tmptok.value), tmptok)
+            errstr = compiler_errstr("'to' or 'downto' expected, instead saw: '{}'".format(tmptok.value), tmptok)
             raise ParseException(errstr)
 
         self.tokenstream.setstartpos()
@@ -1442,7 +1441,7 @@ class Parser:
         # compilation die on the first error.
         endtok = self.tokenstream.eattoken()
         if endtok.tokentype != TokenType.END:
-            errstr = "Expected 'end' but saw '{0}' in {1}".format(str(endtok.value), str(endtok.location))
+            errstr = compiler_errstr("Expected 'end' but saw '{0}'".format(str(endtok.value)), endtok)
             self.parseerrorlist.append(errstr)
             while endtok.tokentype != TokenType.END:
                 try:
@@ -1526,7 +1525,7 @@ class Parser:
                     ret.symboltable.add(ProgramParameterSymbol(tok.value, tok.location, ftd, position))
                     position += 1
                 else:
-                    raise ParseException(token_errstr("Invalid program parameter", tok))
+                    raise ParseException(compiler_errstr("Invalid program parameter '{}'".format(tok.value), tok))
                 if self.tokenstream.peektokentype() != TokenType.RPAREN:
                     self.getexpectedtoken(TokenType.COMMA)
             self.getexpectedtoken(TokenType.RPAREN)

@@ -1,1 +1,2 @@
-Both elements of subrange type  must be same type.'4' is type integer and 'q' is type char in file:tests/compilefail64.pas line:4     column:9  .
+[1mtests/compilefail64.pas:4:9: [0m[1m[91merror:[0m Both elements of subrange type  must be same type.'4' is type integer and 'q' is type char
+     4 | var b : 4 .. 'q';

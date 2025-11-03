@@ -1,1 +1,2 @@
-Constant 'localtwo' must be defined as a literal or another constant, cannot use 'globaltwo' in file:tests/compilefail31.pas line:9     column:18 
+[1mtests/compilefail31.pas:9:18: [0m[1m[91merror:[0m Constant 'localtwo' must be defined as a literal or another constant, cannot use 'globaltwo'
+     9 | const localtwo = globaltwo;

@@ -1,1 +1,2 @@
-Identifier undefined 'i' in file:tests/compilefail13.pas line:10    column:5  
+[1mtests/compilefail13.pas:10:5: [0m[1m[91merror:[0m Identifier undefined 'i'
+    10 | 	i:=one(7);

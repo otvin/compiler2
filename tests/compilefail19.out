@@ -1,1 +1,2 @@
-Expected ':' but saw 'integer' in file:tests/compilefail19.pas line:4     column:28 
+[1mtests/compilefail19.pas:4:28: [0m[1m[91merror:[0m Expected ':' but saw 'integer'
+     4 | function addone(r:integer) integer ;

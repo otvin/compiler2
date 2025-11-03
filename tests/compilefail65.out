@@ -1,1 +1,2 @@
-Invalid type identifier 'a' in file:tests/compilefail65.pas line:7     column:15 
+[1mtests/compilefail65.pas:7:15: [0m[1m[91merror:[0m Invalid type identifier 'a'
+     7 | var b : array[a] of boolean;

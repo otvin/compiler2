@@ -1,1 +1,2 @@
-Semicolon expected in file:tests/compilefail12.pas line:10    column:1  
+[1mtests/compilefail12.pas:10:1: [0m[1m[91merror:[0m Semicolon expected
+    10 | begin

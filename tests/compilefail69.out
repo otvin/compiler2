@@ -1,1 +1,2 @@
-Expected ':=' but saw 'is' in file:tests/compilefail69.pas line:10    column:11 
+[1mtests/compilefail69.pas:10:11: [0m[1m[91merror:[0m Expected ':=' but saw 'is'
+    10 | 	for i is 17 to 19 do

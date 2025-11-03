@@ -1,1 +1,2 @@
-Cannot invoke function without assigning its return value:  'oops' in file:tests/compilefail55.pas line:10    column:5  
+[1mtests/compilefail55.pas:10:5: [0m[1m[91merror:[0m Cannot invoke function without assigning its return value: 'oops'
+    10 | 	oops(3);

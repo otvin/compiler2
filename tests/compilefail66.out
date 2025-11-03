@@ -1,1 +1,2 @@
-Function x has invalid return type: q at file:tests/compilefail66.pas line:8     column:1  
+[1mtests/compilefail66.pas:8:1: [0m[1m[91merror:[0m Function x has invalid return type: q
+     8 | function x(a:integer):q;

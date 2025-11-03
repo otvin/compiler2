@@ -1,1 +1,2 @@
-Unexpected token writeln in file:tests/compilefail36.pas line:5     column:16 .
+[1mtests/compilefail36.pas:5:16: [0m[1m[91merror:[0m Unexpected token writeln
+     5 | 	mystring = writeln;

@@ -1,1 +1,2 @@
-Expected ')' but saw ';' in file:tests/compilefail33.pas line:9     column:20 
+[1mtests/compilefail33.pas:9:20: [0m[1m[91merror:[0m Expected ')' but saw ';'
+     9 | 	writeln(a + two;

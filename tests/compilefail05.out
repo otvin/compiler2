@@ -1,1 +1,2 @@
-Variable access followed by '=' seen at file:tests/compilefail05.pas line:9     column:10 , was assignment intended?
+[1mtests/compilefail05.pas:9:10: [0m[1m[91merror:[0m Variable access followed by '=', was assignment intended?
+     9 | 		i=i-1;

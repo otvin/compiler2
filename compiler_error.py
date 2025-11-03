@@ -28,7 +28,7 @@ def levstr(errlevel):
         ret = '{}{}error:{}'.format(ANSI_BOLD, ANSI_FAILRED, ANSI_ENDC)
     return ret
 
-def compiler_errstr(errstr, errlevel, errtok = None):
+def compiler_errstr(errstr, errtok = None):
     if errtok is not None:
         assert(isinstance(errtok, Token))
     prolog = ""
@@ -36,5 +36,5 @@ def compiler_errstr(errstr, errlevel, errtok = None):
     if errtok is not None:
         prolog = errtok.location.getprolog() + " "
         curlinestr = '{:>6} | {}\n\t'.format(errtok.location.line, errtok.location.curlinestr)
-    ret = '{}{}{}{} {}\n{}'.format(ANSI_BOLD, prolog, ANSI_ENDC, levstr(errlevel), errstr, curlinestr)
+    ret = '{}{}{}{} {}\n{}'.format(ANSI_BOLD, prolog, ANSI_ENDC, levstr(ErrLevel.ERROR), errstr, curlinestr)
     return ret

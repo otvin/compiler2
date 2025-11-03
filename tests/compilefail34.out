@@ -1,1 +1,2 @@
-Cannot have a sign before a Boolean constant in file:tests/compilefail34.pas line:5     column:16 
+[1mtests/compilefail34.pas:5:16: [0m[1m[91merror:[0m Cannot have a sign before a Boolean constant
+     5 | 	myfalse = -True;

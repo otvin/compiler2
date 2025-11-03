@@ -1,1 +1,2 @@
-Procedure sixtimes cannot be used as the final value of a 'for' statement in file:tests/compilefail50.pas line:20    column:31 
+[1mtests/compilefail50.pas:20:31: [0m[1m[91merror:[0m Procedure sixtimes cannot be used as the final value of a 'for' statement
+    20 | 	for a := threetimes(b) to sixtimes(b) do

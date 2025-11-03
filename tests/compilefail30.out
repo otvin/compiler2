@@ -1,1 +1,2 @@
-Semicolon expected in file:tests/compilefail30.pas line:4     column:15 
+[1mtests/compilefail30.pas:4:15: [0m[1m[91merror:[0m Semicolon expected
+     4 | const two = 1 + 1;

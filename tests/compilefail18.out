@@ -1,1 +1,2 @@
-Function addone missing return type at file:tests/compilefail18.pas line:4     column:1  
+[1mtests/compilefail18.pas:4:1: [0m[1m[91merror:[0m Function addone missing return type
+     4 | function addone(r:integer);

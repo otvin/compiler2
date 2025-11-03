@@ -1,1 +1,2 @@
-Identifier redefined: 'apple' 'apple' in file:tests/compilefail38.pas line:4     column:44 
+[1mtests/compilefail38.pas:4:44: [0m[1m[91merror:[0m Identifier redefined: 'apple'
+     4 | type fruit = (apple, pear, banana, cherry, apple);

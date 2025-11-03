@@ -1,1 +1,2 @@
-Variable 'fizzbuz' is declared as a program parameter, must be File or Text type in: file:tests/compilefail76.pas line:4     column:5  
+[1mtests/compilefail76.pas:4:5: [0m[1m[91merror:[0m Variable 'fizzbuz' is declared as a program parameter, must be File or Text type
+     4 | var fizzbuz:integer;

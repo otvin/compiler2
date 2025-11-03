@@ -1,1 +1,2 @@
-Self-referencing constant definition 'negpi' in file:tests/compilefail28.pas line:5     column:14 
+[1mtests/compilefail28.pas:5:14: [0m[1m[91merror:[0m Self-referencing constant definition 'negpi'
+     5 | 	negpi = -negpi;

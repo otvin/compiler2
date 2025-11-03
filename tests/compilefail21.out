@@ -1,1 +1,2 @@
-Invalid program parameter 'real' in file:tests/compilefail21.pas line:1     column:31 
+[1mtests/compilefail21.pas:1:31: [0m[1m[91merror:[0m Invalid program parameter 'real'
+     1 |

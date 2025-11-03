@@ -1,1 +1,2 @@
-Invalid Token: '[' in file:tests/compilefail67.pas line:10    column:10 
+[1mtests/compilefail67.pas:10:10: [0m[1m[91merror:[0m Invalid Token: '['
+    10 | 	myq[4[3] := true;

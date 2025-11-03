@@ -1,1 +1,2 @@
-Invalid Token: 'program' in file:tests/compilefail24.pas line:5     column:5  
+[1mtests/compilefail24.pas:5:5: [0m[1m[91merror:[0m Invalid Token: 'program'
+     5 | 	program compilefail24;

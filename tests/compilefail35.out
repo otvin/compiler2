@@ -1,1 +1,2 @@
-Cannot have a sign before a string constant in file:tests/compilefail35.pas line:5     column:17 
+[1mtests/compilefail35.pas:5:17: [0m[1m[91merror:[0m Cannot have a sign before a string constant
+     5 | 	mystring = -'four';

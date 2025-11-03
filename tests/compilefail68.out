@@ -1,1 +1,2 @@
-Identifier expected following 'for' statement, instead saw: '17' in file:tests/compilefail68.pas line:10    column:9  
+[1mtests/compilefail68.pas:10:9: [0m[1m[91merror:[0m Identifier expected following 'for' statement, instead saw: '17'
+    10 | 	for 17 to 19 do

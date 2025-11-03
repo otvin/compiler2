@@ -1,1 +1,2 @@
-Procedure two cannot be used as parameter to writeln() in file:tests/compilefail14.pas line:11    column:13 
+[1mtests/compilefail14.pas:11:13: [0m[1m[91merror:[0m Procedure two cannot be used as parameter to writeln()
+    11 | 	writeln(two(7));

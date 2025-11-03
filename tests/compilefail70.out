@@ -1,1 +1,2 @@
-'to' or 'downto' expected, instead saw: 'do' in file:tests/compilefail70.pas line:10    column:23 
+[1mtests/compilefail70.pas:10:23: [0m[1m[91merror:[0m 'to' or 'downto' expected, instead saw: 'do'
+    10 | 	for i := 17 or 19 do

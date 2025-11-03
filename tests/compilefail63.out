@@ -1,1 +1,2 @@
-Both elements of subrange type  must be ordinal type. Types real and real are used in file:tests/compilefail63.pas line:4     column:9  
+[1mtests/compilefail63.pas:4:9: [0m[1m[91merror:[0m Both elements of subrange type  must be ordinal type. Types real and real are used
+     4 | var b : 3.17 .. 7.26;

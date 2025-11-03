@@ -1,1 +1,2 @@
-Constant 'Ford' is not numeric. Cannot define constant 'mycar' by putting a sign before a non-numeric constant. In: file:tests/compilefail53.pas line:8     column:16 
+[1mtests/compilefail53.pas:8:16: [0m[1m[91merror:[0m Constant 'Ford' is not numeric. Cannot define constant 'mycar' by putting a sign before a non-numeric constant.
+     8 | const mycar = -Ford;
