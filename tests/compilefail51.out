@@ -1,1 +1,2 @@
-Semicolon expected in file:tests/compilefail51.pas line:9     column:12 
+[1mtests/compilefail51.pas:9:12: [0m[1m[91merror:[0m Semicolon expected
+     9 | 	addone := a;

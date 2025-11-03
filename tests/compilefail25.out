@@ -1,1 +1,2 @@
-Missing 'end' statement or Unexpected end of file
+[1mtests/compilefail25.pas:4:27: [0m[1m[91merror:[0m Missing 'end' statement or Unexpected end of file
+     4 | 	writeln('hello world');

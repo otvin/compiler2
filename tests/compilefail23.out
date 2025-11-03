@@ -1,1 +1,2 @@
-Undefined Identifier: 'd' in file:tests/compilefail23.pas line:6     column:14 
+[1mtests/compilefail23.pas:6:14: [0m[1m[91merror:[0m Undefined Identifier: 'd'
+     6 | 	b := c + d;

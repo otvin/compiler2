@@ -1,1 +1,2 @@
-Symbol Redefined: a in file:tests/compilefail08.pas line:6     column:15 
+[1mtests/compilefail08.pas:6:15: [0m[1m[91merror:[0m Symbol Redefined: a
+     6 | function oops(a:integer):integer;

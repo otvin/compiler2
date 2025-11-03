@@ -295,18 +295,27 @@ class TokenStream:
         self.pos = 0
 
     def eattoken(self):
+        from compiler_error import compiler_errstr
         try:
             ret = self.tokenlist[self.pos]
         except IndexError:
-            raise LexerException("Missing 'end' statement or Unexpected end of file")
+            if self.pos > 0:
+                # TODO add compile fail test for empty file.
+                raise LexerException(compiler_errstr("Missing 'end' statement or Unexpected end of file", self.tokenlist[self.pos - 1]))
+            else:
+                raise LexerException("Missing 'end' statement or Unexpected end of file")
         self.pos += 1
         return ret
 
     def peektoken(self):
+        from compiler_error import compiler_errstr
         try:
             ret = self.tokenlist[self.pos]
         except IndexError:
-            raise LexerException("Unexpected end of file")
+            if self.pos > 0:
+                raise LexerException(compiler_errstr("Unexpected end of file", self.tokenlist[self.pos - 1]))
+            else:
+                raise LexerException("Unexpected end of file")
         assert isinstance(ret, Token)
         return ret
 
@@ -343,7 +352,7 @@ class Lexer:
         self.text = ""
         self.length = 0
         self.curpos = 0
-        self.location = FileLocation(filename, 1, 1, self.peekrestofcurrentline())
+        self.location = FileLocation(filename, 1, 1, "")
 
     def at_eof(self):
         return self.curpos >= self.length
@@ -518,7 +527,7 @@ class Lexer:
             self.text = f.read()
             self.length = len(self.text)
             f.close()
-            self.location.curline = self.peekrestofcurrentline()
+            self.location.curlinestr = self.peekrestofcurrentline()
         except FileNotFoundError:
             print("Invalid filename: {}".format(self.location.filename))
             raise

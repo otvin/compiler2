@@ -1,1 +1,2 @@
-Parameter Redefined: a in file:tests/compilefail09.pas line:3     column:38 
+[1mtests/compilefail09.pas:3:38: [0m[1m[91merror:[0m Parameter Redefined: a
+     3 | function oops(a:integer; b: boolean; a:real):integer;

@@ -1,5 +1,6 @@
 from enum import Enum
 from lexer import Token
+from filelocation import FileLocation
 
 # source: https://stackoverflow.com/questions/287871/how-do-i-print-colored-text-to-the-terminal
 # usage: print one of the formats and then print ENDC
@@ -28,13 +29,20 @@ def levstr(errlevel):
         ret = '{}{}error:{}'.format(ANSI_BOLD, ANSI_FAILRED, ANSI_ENDC)
     return ret
 
-def compiler_errstr(errstr, errtok = None):
+def compiler_errstr(errstr, errtok = None, errloc = None):
+    # if errtok is not defined, then will look at location in errloc.  If both errtok and errloc are defined
+    # errloc is ignored.
+
     if errtok is not None:
         assert(isinstance(errtok, Token))
+    if errloc is not None:
+        assert(isinstance(errloc, FileLocation))
     prolog = ""
     curlinestr = ""
     if errtok is not None:
-        prolog = errtok.location.getprolog() + " "
-        curlinestr = '{:>6} | {}\n\t'.format(errtok.location.line, errtok.location.curlinestr)
+        errloc = errtok.location
+    if errloc is not None:
+        prolog = errloc.getprolog() + " "
+        curlinestr = '{:>6} | {}\n\t'.format(errloc.line, errloc.curlinestr)
     ret = '{}{}{}{} {}\n{}'.format(ANSI_BOLD, prolog, ANSI_ENDC, levstr(ErrLevel.ERROR), errstr, curlinestr)
     return ret

@@ -1,1 +1,2 @@
-Constant Redefined: pi in file:tests/compilefail26.pas line:6     column:5  
+[1mtests/compilefail26.pas:6:5: [0m[1m[91merror:[0m Constant Redefined: pi
+     6 | 	pi = 3.1415;

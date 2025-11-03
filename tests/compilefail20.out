@@ -1,1 +1,2 @@
-Symbol Redefined: input in file:tests/compilefail20.pas line:1     column:38 
+[1mtests/compilefail20.pas:1:38: [0m[1m[91merror:[0m Symbol Redefined: input
+     1 | program compilefail20(input, output, input);

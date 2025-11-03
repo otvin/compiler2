@@ -937,7 +937,7 @@ class Parser:
                 nexttok = self.tokenstream.peektoken()
                 sym = parent_ast.nearest_symboldefinition(nexttok.value)
                 if sym is None:
-                    raise ParseException("Undefined Identifier: '{}' in {}".format(nexttok.value, nexttok.location))
+                    raise ParseException(compiler_errstr("Undefined Identifier: '{}'".format(nexttok.value), nexttok))
                 elif isinstance(sym, pascaltypes.EnumeratedTypeValue) or isinstance(sym, ConstantSymbol):
                     return AST(self.getexpectedtoken(TokenType.IDENTIFIER), parent_ast)
                 elif isinstance(sym, ActivationSymbol) or isinstance(sym, FunctionResultVariableSymbol):
@@ -1064,8 +1064,8 @@ class Parser:
 
             # TODO - this is a temporary error check
             if not parent_ast.nearest_symboltable().existsanywhere("output"):
-                raise ParseException("{}() called without 'output' defined in {}".format(ret.token.value,
-                                                                                         ret.token.location))
+                errstr = "{}() called without 'output' defined".format(ret.token.value)
+                raise ParseException(compiler_errstr(errstr, ret.token))
 
             done = False
             while not done:
@@ -1427,7 +1427,8 @@ class Parser:
                 # TODO - insert a semicolon into the stream and allow parsing to continue
                 # special case error if we don't see the end token and don't see a semicolon
                 nexttok = self.tokenstream.peektoken()
-                raise ParseException("Semicolon expected in {}".format(nexttok.location))
+                # TODO - for both Semicolon expected errors, need to show the previous line too.
+                raise ParseException(compiler_errstr ("Semicolon expected", nexttok))
 
     def parse_compoundstatement(self, parent_ast):
         # 6.8.3.2 - <compound-statement> ::= "begin" <statement-sequence> "end"

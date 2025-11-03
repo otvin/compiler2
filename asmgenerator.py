@@ -4,6 +4,7 @@ from tac_ir import TACBlock, TACLabelNode, TACParamNode, TACCallSystemFunctionNo
     TACFunctionReturnNode, TACCallFunctionNode, TACBinaryNodeWithBoundsCheck
 from symboltable import StringLiteral, IntegerLiteral, Symbol, Parameter, ActivationSymbol, RealLiteral, \
     FunctionResultVariableSymbol, CharacterLiteral, ConstantSymbol, ProgramParameterSymbol
+from compiler_error import compiler_errstr
 from editor_settings import NUM_SPACES_IN_TAB, NUM_TABS_FOR_COMMENT
 import pascaltypes
 
@@ -365,7 +366,8 @@ class AssemblyGenerator:
                     litname = 'stringlit_{}'.format(nextid)
                     nextid += 1
                     if len(lit.value) > 255:
-                        raise ASMGeneratorError("String literal {} exceeds 255 char max length.".format(lit.value))
+                        errstr = compiler_errstr("String literal '{}' exceeds 255 char max length.".format(lit.value), None, lit.location)
+                        raise ASMGeneratorError(errstr)
                     self.emitcode("{} db `{}`, 0".format(litname, lit.value.replace('`', '\\`')))
                     lit.memoryaddress = litname
                 elif isinstance(lit, RealLiteral):
