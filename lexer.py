@@ -307,6 +307,12 @@ class TokenStream:
         self.pos += 1
         return ret
 
+    def peekprevioustoken(self):
+        if self.pos == 0:
+            return None
+        else:
+            return self.tokenlist[self.pos - 1]
+
     def peektoken(self):
         from compiler_error import compiler_errstr
         try:

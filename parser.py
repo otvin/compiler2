@@ -188,7 +188,8 @@ class Parser:
         if ret.tokentype != tokentype:
             if tokentype == tokentype.SEMICOLON:
                 # TODO - insert a semicolon into the stream and allow parsing to continue
-                errstr = compiler_errstr("Semicolon expected",ret)
+                # TODO - this needs a test case.
+                errstr = compiler_errstr("Semicolon expected",self.tokenstream.peekprevioustoken())
             else:
                 errstr = compiler_errstr("Expected '{0}' but saw '{1}'".format(str(tokentype), str(ret.value)),
                                          ret)
@@ -1428,7 +1429,7 @@ class Parser:
                 # special case error if we don't see the end token and don't see a semicolon
                 nexttok = self.tokenstream.peektoken()
                 # TODO - for both Semicolon expected errors, need to show the previous line too.
-                raise ParseException(compiler_errstr ("Semicolon expected", nexttok))
+                raise ParseException(compiler_errstr ("Semicolon expected", self.tokenstream.peekprevioustoken()))
 
     def parse_compoundstatement(self, parent_ast):
         # 6.8.3.2 - <compound-statement> ::= "begin" <statement-sequence> "end"

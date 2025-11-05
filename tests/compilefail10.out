@@ -1,2 +1,2 @@
-[1mtests/compilefail10.pas:8:5: [0m[1m[91merror:[0m Semicolon expected
-     8 | 	writeln(i+j);
+[1mtests/compilefail10.pas:7:8: [0m[1m[91merror:[0m Semicolon expected
+     7 | 	j:=7
