@@ -1205,9 +1205,14 @@ class Parser:
         assert self.tokenstream.peektokentype() == TokenType.IDENTIFIER, \
             "Parser.parseprocedurestatement called and identifier not next token."
         self.tokenstream.setstartpos()
-        ret = AST(self.getexpectedtoken(TokenType.IDENTIFIER), parent_ast)
-        if self.tokenstream.peektokentype() == TokenType.LPAREN:
+        curtok = self.getexpectedtoken(TokenType.IDENTIFIER)
+        ret = AST(curtok, parent_ast)
+        nexttok = self.tokenstream.peektoken()
+        if nexttok.tokentype == TokenType.LPAREN:
             self.parse_actualparameterlist(ret)
+        elif nexttok.tokentype == TokenType.ASSIGNMENT:
+            errstr = compiler_errstr("Cannot assign to Procedure name '{}'".format(curtok.value), nexttok)
+            raise ParseException(errstr)
         self.tokenstream.setendpos()
         ret.comment = "Call procedure: {}".format(self.tokenstream.printstarttoend())
         return ret

@@ -1,2 +1,2 @@
-[1mtests/compilefail51.pas:9:12: [0m[1m[91merror:[0m Semicolon expected
+[1mtests/compilefail51.pas:9:12: [0m[1m[91merror:[0m Cannot assign to Procedure name 'addone'
      9 | 	addone := a;
