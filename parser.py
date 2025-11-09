@@ -1387,7 +1387,13 @@ class Parser:
         self.getexpectedtoken(TokenType.DO)
         self.tokenstream.setendpos()
         ret.comment = self.tokenstream.printstarttoend()
-        ret.children.append(self.parse_statement(ret))
+
+        if self.tokenstream.peektokentype() == TokenType.SEMICOLON:
+            # Special case <empty-statement>
+            nooptok = Token(TokenType.EMPTYTOKEN, self.tokenstream.peektoken().location, '')
+            ret.children.append(AST(nooptok, ret))
+        else:
+            ret.children.append(self.parse_statement(ret))
 
         return ret
 
