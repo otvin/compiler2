@@ -1,1 +1,2 @@
-Enumerated type 'fruit' has 264 identifiers.  Maximum is 255.
+[1mtests/compilefail39.pas:4:6: [0m[1m[91merror:[0m Enumerated type 'fruit' has 264 identifiers.  Maximum is 255.
+     4 | type fruit = (apple, pear, banana, cherry,

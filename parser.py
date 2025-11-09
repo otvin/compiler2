@@ -391,7 +391,7 @@ class Parser:
             while not done:
                 identifier = self.getexpectedtoken(TokenType.IDENTIFIER)
                 self.getexpectedtoken(TokenType.EQUALS)
-                self.parse_typedenoter(parent_ast, identifier.value)
+                self.parse_typedenoter(parent_ast, identifier)
                 self.getexpectedtoken(TokenType.SEMICOLON)
                 if self.tokenstream.peektokentype() != TokenType.IDENTIFIER:
                     done = True
@@ -423,7 +423,7 @@ class Parser:
         self.anonymous_type_counter += 1
         return ret
 
-    def parse_subrangetype(self, parent_ast, optionaltypeidentifier=""):
+    def parse_subrangetype(self, parent_ast, optionaltypeidentifiertok=None):
         # 6.4.2.4 <subrange-type> ::= <constant> ".." <constant>
         # 6.3 <constant> ::= [sign](<unsigned-number> | <constant-identifier>) | <character-string>
         #   (character-string is not valid for subrange types, however)
@@ -437,6 +437,10 @@ class Parser:
         # anonymously.  See page 69 of Cooper for discussion of anonymous types.
 
         assert self.next_three_tokens_contain_subrange()
+
+        optionaltypeidentifier = ""
+        if optionaltypeidentifiertok is not None:
+            optionaltypeidentifier = optionaltypeidentifiertok.value
 
         nexttok = self.tokenstream.peektoken()  # used for error messages
         const1type, const1value = self.parse_constant(parent_ast)
@@ -470,7 +474,7 @@ class Parser:
         parent_ast.symboltable.add(ret)
         return ret
 
-    def parse_enumeratedtype(self, parent_ast, optionaltypename=""):
+    def parse_enumeratedtype(self, parent_ast, optionaltypenametok=None):
         # 6.4.2.3 <enumerated-type> ::= "(" <identifier-list> ")"
         # 6.4.2.3 <identifier-list> ::= <identifier> {"," <identifier>}
         #
@@ -481,10 +485,10 @@ class Parser:
 
         self.getexpectedtoken(TokenType.LPAREN)
 
-        if optionaltypename == "":
+        if optionaltypenametok is None:
             typename = self.generate_anonymous_typeidentifier()
         else:
-            typename = optionaltypename
+            typename = optionaltypenametok.value
 
         idlist = self.parse_identifierlist()
         etvlist = []
@@ -497,7 +501,10 @@ class Parser:
                 errstr = compiler_errstr("Identifier redefined: '{}'".format(idtoken.value), idtoken)
                 raise ParseException(errstr)
 
-        ret = pascaltypes.EnumeratedType(typename, etvlist)
+        try:
+            ret = pascaltypes.EnumeratedType(typename, etvlist)
+        except pascaltypes.PascalTypeException as e:
+            raise ParseException(compiler_errstr(e, optionaltypenametok))
         self.getexpectedtoken(TokenType.RPAREN)
 
         parent_ast.symboltable.add(ret)
@@ -525,7 +532,7 @@ class Parser:
                 done = True
         return ret
 
-    def parse_structuredtype(self, parent_ast, optionaltypeidentifier=""):
+    def parse_structuredtype(self, parent_ast, optionaltypeidentifiertok=None):
         # 6.4.3.1 <new-structured-type> ::= ["packed"] <unpacked-structured-type>
         # 6.4.3.1 <unpacked-structured-type> ::= <array-type> | <record-type> | <set-type> | <file-type>
         # 6.4.3.2 <array-type> ::= "array" "[" <index-type> {"," <index-type>} "]" "of" <component-type>
@@ -553,6 +560,10 @@ class Parser:
         #       array [Boolean, 1..10, size] of real
         #       array [Boolean, 1..10] of array [size] of real
         #
+        optionaltypeidentifier = ""
+        if optionaltypeidentifiertok is not None:
+            optionaltypeidentifier = optionaltypeidentifiertok.value
+
         if self.tokenstream.peektokentype() == TokenType.PACKED:
             self.getexpectedtoken(TokenType.PACKED)
             ispacked = True
@@ -591,7 +602,7 @@ class Parser:
             tok = self.tokenstream.eattoken()
             raise ParseException(compiler_errstr("Invalid Structured Type {}".format(tok.value), tok))
 
-    def parse_typedenoter(self, parent_ast, optionaltypeidentifier=""):
+    def parse_typedenoter(self, parent_ast, optionaltypeidentifiertok=None):
         # 6.4.1 <type-denoter> ::= <type-identifier> | <new-type>
         # 6.4.1 <type-identifier> ::= <identifier>
         #   The valid type-identifiers are the simple types (integer, char, boolean, real) and identifiers
@@ -607,21 +618,21 @@ class Parser:
         # anonymously.  See page 69 of Cooper for discussion of anonymous types.
 
         if self.next_three_tokens_contain_subrange():
-            return self.parse_subrangetype(parent_ast, optionaltypeidentifier)
+            return self.parse_subrangetype(parent_ast, optionaltypeidentifiertok)
         elif self.tokenstream.peektokentype() == TokenType.LPAREN:
-            return self.parse_enumeratedtype(parent_ast, optionaltypeidentifier)
+            return self.parse_enumeratedtype(parent_ast, optionaltypeidentifiertok)
         elif self.tokenstream.peektokentype() in (TokenType.PACKED, TokenType.ARRAY, TokenType.RECORD, TokenType.SET,
                                                   TokenType.FILE):
-            return self.parse_structuredtype(parent_ast, optionaltypeidentifier)
+            return self.parse_structuredtype(parent_ast, optionaltypeidentifiertok)
         else:
             existingtype = self.parse_typeidentifier(parent_ast)
-            if optionaltypeidentifier != "":
+            if optionaltypeidentifiertok is not None:
                 # if we have an existing type, we don't need to create a symbol for an anonymous type.  But if we
                 # were given a new type name, then we do need to create a symbol for it, as the statement
                 # we are parsing is a type with an alias.
 
                 newtype = deepcopy(existingtype)
-                newtype.identifier = optionaltypeidentifier
+                newtype.identifier = optionaltypeidentifiertok.value
                 newtype.denoter = existingtype
 
                 parent_ast.symboltable.add(newtype)
