@@ -218,7 +218,7 @@ def main(onlytest=""):
     run_test_list("mod", 1, 2)
     run_test_list("ord", 1, 6)
     # note testprocedure02 was "testproc01" in the old Compiler suite
-    run_test_list("procedure", 1, 8)
+    run_test_list("procedure", 1, 9)
     run_test_list("real", 1, 8)
     run_test_list("recursion", 1, 1)
     run_test_list("relop", 1, 6)

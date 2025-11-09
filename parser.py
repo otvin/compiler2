@@ -1447,10 +1447,17 @@ class Parser:
 
     def parse_compoundstatement(self, parent_ast):
         # 6.8.3.2 - <compound-statement> ::= "begin" <statement-sequence> "end"
+        # 6.8.3.1 - <statement-sequence> ::= <statement> [ ";" <statement> ]
+        # 6.8.1 - <statement> ::= [<label>:] (<simple-statement> | <structured-statement>)
+        # 6.8.2.1 - <simple-statement> ::= <empty-statement> | <assignment-statement> | <procedure-statement>
+        #                                   | <goto-statement>
         # This function returns an AST node using the BEGIN as the token, and with one child for each
         # statement.
         ret = AST(self.getexpectedtoken(TokenType.BEGIN), parent_ast)
-        self.parse_statementsequence(TokenType.END, ret)
+        # If we see the END right after the BEGIN we have an <empty-statement> so we do nothing
+        # else we parse the statement sequence
+        if self.tokenstream.peektokentype() != TokenType.END:
+            self.parse_statementsequence(TokenType.END, ret)
 
         # The expected token here is an END.  However, if the END does not appear, we will try to keep parsing
         # so that other parse errors could be displayed later.  It is frustrating for an end user to have
