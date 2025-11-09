@@ -67,7 +67,7 @@ class BooleanLiteral(OrdinalLiteral):
         assert value in ('0', '1')
         super().__init__(value, location, pascaltypes.BooleanType())
 
-    def __str__(self):
+    def __str__(self): # pragma: no cover
         if self.value == 0:
             return "FALSE"
         else:
@@ -92,8 +92,7 @@ class LiteralTable:
         self.numericliterals = {}
 
     def add(self, lit):
-        if not isinstance(lit, Literal):
-            raise SymbolException("Can only add Literals to LiteralTables")
+        assert isinstance(lit, Literal), "Can only add Literals to LiteralTables"
         # character literals are treated like numbers, not string literals
         if isinstance(lit.pascaltype, pascaltypes.StringLiteralType):
             if lit.value not in self.stringliterals.keys():
@@ -109,7 +108,7 @@ class LiteralTable:
                 ret = self.stringliterals[value]
             else:
                 ret = self.numericliterals[value]
-        except KeyError:
+        except KeyError: # pragma: no cover
             errstr = "Literal not found: {}.{}".format(str(value), pascaltype)
             raise SymbolException(errstr)
         return ret
@@ -155,7 +154,7 @@ class Symbol:
     def __str__(self):
         return self.name
 
-    def __repr__(self):
+    def __repr__(self): # pragma: no cover
         return "{} ({}): {} @{}".format(self.name, self.location, str(self.pascaltype), self.memoryaddress)
 
 
@@ -177,7 +176,7 @@ class ConstantSymbol(Symbol):
         super().__init__(name, location, pascaltype)
         self.value = value
 
-    def __repr__(self):
+    def __repr__(self): # pragma: no cover
         ret = super().__repr__()
         ret += ' CONSTANT - value = {}'.format(self.value)
         return ret
@@ -310,8 +309,7 @@ class SymbolTable:
                 foundit = True
             else:
                 curtable = curtable.parent
-        if not foundit:
-            raise SymbolException("Identifier not found: '{}'".format(name))
+        assert foundit, "Identifier not found: '{}'".format(name)
         assert isinstance(ret, Symbol) or isinstance(ret, Label) or \
             isinstance(ret, pascaltypes.BaseType) or isinstance(ret, pascaltypes.EnumeratedTypeValue)
         return ret
@@ -387,7 +385,7 @@ class SymbolTable:
             ptr = ptr.parent
         return ret
 
-    def __str__(self):
+    def __str__(self): # pragma: no cover
         ret = ""
         for key in self.symbols.keys():
             ret += repr(self.symbols[key]) + "\n"

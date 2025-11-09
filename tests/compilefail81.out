@@ -1,0 +1,3 @@
+[1mtests/compilefail81.pas:4:15: [0m[1m[91merror:[0m Invalid Structured Type char
+     4 | 	a: packed char;
+	

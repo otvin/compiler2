@@ -559,6 +559,7 @@ class Parser:
         #       array [Boolean, 1..10, size] of real
         #       array [Boolean, 1..10] of array [size] of real
         #
+
         optionaltypeidentifier = ""
         if optionaltypeidentifiertok is not None:
             optionaltypeidentifier = optionaltypeidentifiertok.value
@@ -851,7 +852,8 @@ class Parser:
         if isinstance(sym, ProgramParameterSymbol):
             # special case for files that are declared as Program Parameters.
             return AST(ident_token, parent_ast)
-        assert isinstance(sym, VariableSymbol), "non-variable access: {}".format(sym.name)
+        if not isinstance(sym, VariableSymbol):
+            raise ParseException(compiler_errstr("Access of non-variable: {}".format(sym.name), ident_token))
 
         # if the identifier is an array, we could see one of a few valid things. Assume the array variable
         # is named myarr and has 2 dimensions.  We could see myarr by itself - meaning it's being passed into a
@@ -976,7 +978,8 @@ class Parser:
                     return self.parse_variableaccess(parent_ast)
             else:
                 errtok = self.tokenstream.eattoken()
-                raise ParseException(compiler_errstr("Invalid <unsigned-constant> '{}'".format(errtok.value), errtok))
+                errstr = compiler_errstr("Unsigned constant expected, instead saw '{}'".format(errtok.value), errtok)
+                raise ParseException(errstr)
         return ret
 
     def parse_term(self, parent_ast):
@@ -1117,18 +1120,12 @@ class Parser:
             tmp_paramlist = tmp_ast.paramlist
             while tmp_paramlist is None:
                 assert isinstance(tmp_ast, AST)
-                if tmp_ast.parent is None:
-                    # we made it to the top of the AST without finding a param list.
-                    errstr = "Undefined Identifier: {}".format(ident_token.value)
-                    raise ParseException(compiler_errstr(errstr, ident_token))
+                assert tmp_ast.parent is not None, "Top of AST without finding param list"
                 tmp_ast = tmp_ast.parent
                 tmp_paramlist = tmp_ast.paramlist
             assert isinstance(tmp_paramlist, ParameterList)
             param = tmp_paramlist.fetch(ident_token.value)
-            if param is None:
-                raise ParseException(compiler_errstr("Undefined Identifier: {}".format(ident_token.value), ident_token))
-            else:
-                assert isinstance(param, Parameter)
+            assert isinstance(param, Parameter)
         else:
             sym = symtab.fetch(ident_token.value)
             assert isinstance(sym, VariableSymbol)
@@ -1266,7 +1263,7 @@ class Parser:
                 tmptok = self.tokenstream.eattoken()
                 errstr = "Cannot assign to constant '{}'".format(next_tokenname)
                 raise ParseException(compiler_errstr(errstr, tmptok))
-            else:
+            else: # pragma: no cover
                 tok = self.tokenstream.eattoken()
                 errstr = compiler_errstr("Identifier '{}' seen, unclear how to parse".format(tok.value), tok)
                 raise ParseException(errstr)
@@ -1575,7 +1572,8 @@ class Parser:
     def parse(self):
         self.tokenstream.resetpos()
         self.AST = self.parse_program()
-        if len(self.parseerrorlist) > 0:
+        if len(self.parseerrorlist) > 0: # pragma: no cover
+            # We currently end on first parse error.  If we ever leverage parserrorlist then remove the pragma
             for e in self.parseerrorlist:
                 print(e)
             raise ParseException("Parsing Failed")

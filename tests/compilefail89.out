@@ -1,0 +1,3 @@
+[1mtests/compilefail89.pas:9:10: [0m[1m[91merror:[0m Operator 'not' can only be applied to Boolean factors
+     9 | 	b := not i;
+	

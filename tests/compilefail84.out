@@ -1,0 +1,3 @@
+[1mtests/compilefail84.pas:4:5: [0m[1m[91merror:[0m If statements must be followed by Boolean expressions
+     4 | 	if 4 then writeln('yes');
+	

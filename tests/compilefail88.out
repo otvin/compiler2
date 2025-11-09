@@ -1,0 +1,3 @@
+[1mtests/compilefail88.pas:9:12: [0m[1m[91merror:[0m Cannot use integer division with real values.
+     9 | 	i := r div 5;
+	

@@ -170,7 +170,7 @@ class TokenType(Enum):
     def __str__(self):
         if self.value is not None:
             return self.value
-        else:
+        else: # pragma: no cover
             return 'EMPTY TOKEN'
 
 
@@ -242,7 +242,7 @@ class Token:
         else:  # pragma: no cover
             raise TypeError("Invalid Token Type")
 
-    def __str__(self):
+    def __str__(self): # pragma: no cover
         return '{0:<18} val: {1:<15} {2:<35}\n'.format(self.tokentype, self.value, str(self.location))
 
 
@@ -279,17 +279,16 @@ class TokenStream:
         return ret
 
     def addtoken(self, token):
-        if not isinstance(token, Token):
-            raise TypeError("Only Tokens may be added to TokenStream")
+        assert isinstance(token, Token), "Only Tokens may be added to TokenStream"
         self.tokenlist.append(token)
 
     # One can iterate over a TokenStream if desired, primarily for debugging purposes
     # (e.g. printing out all the tokens in the stream)
-    def __iter__(self):
+    def __iter__(self): # pragma: no cover
         self.pos = 0
         return self
 
-    def __next__(self):
+    def __next__(self): # pragma: no cover
         try:
             ret = self.tokenlist[self.pos]
             self.pos += 1
@@ -306,24 +305,23 @@ class TokenStream:
             ret = self.tokenlist[self.pos]
         except IndexError:
             if self.pos > 0:
-                # TODO add compile fail test for empty file.
                 raise LexerException(compiler_errstr("Missing 'end' statement or Unexpected end of file", self.tokenlist[self.pos - 1]))
             else:
-                raise LexerException("Missing 'end' statement or Unexpected end of file")
+                raise LexerException("Cannot compile empty file")
         self.pos += 1
         return ret
 
     def peekprevioustoken(self):
-        if self.pos == 0:
-            return None
-        else:
+        if self.pos > 0:
             return self.tokenlist[self.pos - 1]
+        else: # pragma: no cover
+            return None
 
     def peektoken(self):
         from compiler_error import compiler_errstr
         try:
             ret = self.tokenlist[self.pos]
-        except IndexError:
+        except IndexError: # pragma: no cover
             if self.pos > 0:
                 raise LexerException(compiler_errstr("Unexpected end of file", self.tokenlist[self.pos - 1]))
             else:
@@ -353,7 +351,7 @@ class TokenStream:
             while i < self.pos + num:
                 ret.append(self.tokenlist[i].tokentype)
                 i += 1
-        except IndexError:
+        except IndexError: # pragma: no cover
             pass
         return ret
 
@@ -380,10 +378,10 @@ class Lexer:
         # returns the character that is num characters ahead.  Passing 0 for num is synonymous with peek().
         assert (num >= 0), "Cannot peek behind current position"
         pos = self.curpos + num
-        if pos >= self.length:
-            return ""
-        else:
+        if pos < self.length:
             return self.text[pos]
+        else: # pragma: no cover
+            return ""
 
     def peekrestofcurrentline(self):
         # returns the text from the current position until the end of current line or end of file, whichever
@@ -400,7 +398,7 @@ class Lexer:
         return self.text[self.curpos:self.curpos + num]
 
     def eat(self):
-        if self.at_eof():
+        if self.at_eof(): # pragma: no cover
             raise IndexError("Length Exceeded")
         else:
             ret = self.text[self.curpos]
@@ -443,13 +441,14 @@ class Lexer:
         # characters, on multiple lines.  Comments do not nest, so the string "{ (* a comment *) }" is invalid, as the
         # comment ends on the *), so the } would be flagged as an invalid token.
         # Returns empty string if the next character(s) in the input stream is not a comment opening.
+        assert self.peek() == '{' or self.peekmulti(2) == '(*'
+
         ret = ""
         if self.peek() == '{':
             self.eat()
         elif self.peekmulti(2) == '(*':
             self.eatmulti(2)
-        else:
-            return ""
+
         while self.peek() != '}' and self.peekmulti(2) != '*)':
             ret += self.eat()
         if self.peek() == '}':
@@ -527,13 +526,13 @@ class Lexer:
                     try:
                         ret += self.eat()
                     except IndexError:
-                        print("Unterminated character string")
-                        raise
+                        raise LexerException("Unterminated character string")
         return ret
 
     def lex(self):
-        if self.location.filename == "":
-            raise LexerException("Filename not set, cannot Tokenize")
+        from compiler_error import compiler_errstr
+
+        assert self.location.filename != "", "Filename not set, cannot Tokenize"
         try:
             f = open(self.location.filename, "r")
             self.text = f.read()
@@ -541,8 +540,7 @@ class Lexer:
             f.close()
             self.location.curlinestr = self.peekrestofcurrentline()
         except FileNotFoundError:
-            print("Invalid filename: {}".format(self.location.filename))
-            raise
+            raise LexerException("Invalid filename: {}".format(self.location.filename))
 
         self.eatwhitespace()
         while not self.at_eof():
@@ -590,9 +588,9 @@ class Lexer:
                     toktype = SYMBOL_LOOKUP[val]
                     self.tokenstream.addtoken(Token(toktype, curlocation, val))
                 else:
-                    errstr = 'Unexpected character: {} in {}'.format(self.peek(), curlocation)
-                    raise LexerException(errstr)
-            except Exception:
-                print("Parse error in {} ".format(curlocation))
-                raise
+                    #errstr = compiler_errstr('Unexpected character: {}'.format(self.peek()), None, curlocation)
+                    raise LexerException('Unexpected character: {}'.format(self.peek()))
+            except Exception as e:
+                raise LexerException(compiler_errstr(e, None, curlocation))
+
             self.eatwhitespace()

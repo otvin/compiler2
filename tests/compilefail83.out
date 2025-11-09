@@ -1,0 +1,3 @@
+[1mtests/compilefail83.pas:6:8: [0m[1m[91merror:[0m Access of non-variable: q
+     6 | 	if q then writeln('yes');
+	

@@ -1,0 +1,3 @@
+[1mtests/compilefail85.pas:7:13: [0m[1m[91merror:[0m Cannot use control variable 'a' of a 'for' statement as a control variable of a nested 'for'
+     7 | 		for a := 6 to 9 do
+	

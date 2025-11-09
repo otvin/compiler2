@@ -1,0 +1,3 @@
+[1mtests/compilefail79.pas:7:10: [0m[1m[91merror:[0m Unexpected character: !
+     7 | 	a := !true;
+	

@@ -69,8 +69,8 @@
 from enum import Enum, unique
 from copy import deepcopy
 from parser import AST, isrelationaloperator, is_isorequiredfunction
-from symboltable import Symbol, Label, Literal, IntegerLiteral, RealLiteral, StringLiteral, BooleanLiteral,\
-    SymbolTable, LiteralTable, ParameterList, ActivationSymbol, Parameter, VariableSymbol,\
+from symboltable import Symbol, Label, Literal, IntegerLiteral, RealLiteral, StringLiteral, BooleanLiteral, \
+    SymbolTable, LiteralTable, ParameterList, ActivationSymbol, Parameter, VariableSymbol, \
     FunctionResultVariableSymbol, ConstantSymbol, CharacterLiteral
 from lexer import TokenType, Token
 from compiler_error import compiler_errstr
@@ -253,19 +253,6 @@ class TACLabelNode(TACNode):
 
     def __str__(self):  # pragma: no cover
         return "{}:".format(self.label)
-
-
-class TACDeclareFunctionNode(TACLabelNode):
-    def __init__(self, label, paramlist, resulttype=None):
-        super().__init__(label)
-        assert isinstance(paramlist, ParameterList)
-        self.paramlist = paramlist
-        assert resulttype is None or isinstance(resulttype, pascaltypes.SimpleType) or \
-            isinstance(resulttype, pascaltypes.PointerType)
-        self.returntype = resulttype
-
-    def __str__(self):  # pragma: no cover
-        return ""
 
 
 class TACFunctionReturnNode(TACNode):
@@ -552,7 +539,7 @@ class TACBlock:
                                               , tok))
 
         elif requiredfunction_acceptsinteger_or_real(tok.tokentype):
-            if isinstance(tmp.pascaltype, pascaltypes.IntegerType):
+            if pascaltypes.is_integer_or_subrange_of_integer(tmp.pascaltype):
                 self.addnode(TACParamNode(tmp))
                 self.addnode(TACCallSystemFunctionNode(Label(maptoken_to_systemfunction_name(tok, "I")), 1, lval))
             elif isinstance(tmp.pascaltype, pascaltypes.RealType):
@@ -561,13 +548,7 @@ class TACBlock:
             else:
                 raise TACException(compiler_errstr('Function {}() requires parameter of integer or real type'.format(tok.tokentype), tok))
         elif requiredfunction_acceptsinteger(tok.tokentype):
-            isinteger = False
-            if isinstance(tmp.pascaltype, pascaltypes.IntegerType):
-                isinteger = True
-            elif isinstance(tmp.pascaltype, pascaltypes.SubrangeType):
-                if isinstance(tmp.pascaltype.hosttype, pascaltypes.IntegerType):
-                    isinteger = True
-            if isinteger:
+            if pascaltypes.is_integer_or_subrange_of_integer(tmp.pascaltype):
                 self.addnode(TACParamNode(tmp))
                 self.addnode(TACCallSystemFunctionNode(Label(maptoken_to_systemfunction_name(tok, "I")), 1, lval))
             else:
@@ -677,7 +658,7 @@ class TACBlock:
         labeldone = self.getlabel()
         condition = self.processast(ast.children[0])
         if not isinstance(condition.pascaltype, pascaltypes.BooleanType):
-            raise TACException("If statements must be followed by Boolean Expressions: ", tok)
+            raise TACException(compiler_errstr("If statements must be followed by Boolean expressions", tok))
 
         if len(ast.children) == 2:
             self.addnode(TACIFZNode(condition, labeldone))
@@ -904,9 +885,8 @@ class TACBlock:
         assert ast.token.tokentype == TokenType.IDENTIFIER
 
         tok = ast.token
-        if not self.symboltable.existsanywhere(tok.value):
-            errstr = compiler_errstr("Undefined Identifier: {}".format(tok.value), tok)
-            raise TACException(errstr)
+        # undefined identifiers are caught upstream
+        assert self.symboltable.existsanywhere(tok.value)
         sym = self.symboltable.fetch(tok.value)
         if isinstance(sym, FunctionResultVariableSymbol):
             # need to see if it's really the result of a function, or a recursive function call
@@ -1193,12 +1173,14 @@ class TACBlock:
             lval_reftype = lval.pascaltype
             assignop = TACOperator.ASSIGN
 
-        if isinstance(lval, ConstantSymbol):
-            raise TACException(compiler_errstr("Cannot assign a value to a constant", ast.token))
+        # assigning to constant is caught upstream
+        assert not isinstance(lval, ConstantSymbol), "TAC Error: attempted to assign to constant"
 
         rval = self.deref_ifneeded(self.processast(ast.children[1]))
 
         if isinstance(rval, pascaltypes.EnumeratedTypeValue):
+            # Note 2025-11-09 - unsure how to execute this block, may need to assert that we do not have
+            # an enumerated type as an rval
             comment = "Convert literal {} to integer value {}".format(rval.identifier, rval.value)
             self.addnode(TACCommentNode(comment))
             self.addnode(TACUnaryLiteralNode(lval, TACOperator.ASSIGN,
@@ -1263,7 +1245,7 @@ class TACBlock:
         if tok.tokentype in (TokenType.IDIV, TokenType.MOD) and \
                 (isinstance(child1.pascaltype, pascaltypes.RealType) or
                  isinstance(child2.pascaltype, pascaltypes.RealType)):
-            raise TACException(compiler_errstr("Cannot use integer division with Real values.", tok))
+            raise TACException(compiler_errstr("Cannot use integer division with real values.", tok))
 
         # The addition, subtraction, multiplication operators can take integers or reals, and return
         # integer if both operands are integers, or a real if one or both operands are reals.  The

@@ -8,6 +8,13 @@ NEGMAXINT = -1 * MAXINT
 STRMAXINT = str(MAXINT)
 STRNEGMAXINT = str(NEGMAXINT)
 
+def is_integer_or_subrange_of_integer(pascaltype):
+    if isinstance(pascaltype, IntegerType):
+        return True
+    elif isinstance(pascaltype, SubrangeType) and isinstance(pascaltype.hosttype, IntegerType):
+        return True
+    else:
+        return False
 
 class BaseType:
     def __init__(self, identifier, denoter=None):
@@ -80,7 +87,7 @@ class IntegerType(OrdinalType):
         super().__init__(identifier, denoter)
         self.size = 4
 
-    def __getitem__(self, n):
+    def __getitem__(self, n): # pragma: no cover
         assert isinstance(n, int)
         assert n <= MAXINT
         assert n >= NEGMAXINT
@@ -106,7 +113,7 @@ class CharacterType(OrdinalType):
         super().__init__(identifier, denoter)
         self.size = 1
 
-    def __getitem__(self, n):
+    def __getitem__(self, n): # pragma: no cover
         assert isinstance(n, int)
         assert n >= 0
         assert n <= 255
@@ -129,7 +136,7 @@ class BooleanType(OrdinalType):
         super().__init__(identifier, denoter)
         self.size = 1
 
-    def __getitem__(self, n):
+    def __getitem__(self, n): # pragma: no cover
         assert n in (0, 1)
         return str(n)
 
@@ -164,10 +171,10 @@ class EnumeratedTypeValue:
     def name(self):
         return self.identifier
 
-    def __str__(self):
+    def __str__(self): # pragma: no cover
         return self.identifier
 
-    def __repr__(self):
+    def __repr__(self): # pragma: no cover
         return "ID:{} for Type:{} with value:{}".format(self.identifier, self.identifier, self.value)
 
 
@@ -202,7 +209,7 @@ class EnumeratedType(OrdinalType):
         ret = ret[:-2] + ')'
         return ret
 
-    def __getitem__(self, n):
+    def __getitem__(self, n): # pragma: no cover
         assert isinstance(n, int)
         assert n >= 0
         assert n < len(self.value_list)
@@ -217,7 +224,7 @@ class EnumeratedType(OrdinalType):
                 foundit = True
             else:
                 i += 1
-        if not foundit:
+        if not foundit: # pragma: no cover
             # side note - this error is caught upstream by checking the types, so I cannot come up with a
             # coverage scenario for this.
             errstr = "'{}' is not a valid value for enumerated type '{}'"
@@ -249,7 +256,7 @@ class SubrangeType(OrdinalType):
             errstr = errstr.format(self.rangemin, self.rangemax)
             raise PascalTypeException(errstr)
 
-    def __getitem__(self, n):
+    def __getitem__(self, n): # pragma: no cover
         assert self.rangemin_int + n <= self.rangemax_int
         return self.hosttype[n - self.rangemin_int]
 
@@ -365,7 +372,7 @@ class FileType(StructuredType):
         # mode-type = 2 : inspection
         self.size = 9 + self.componenttype.size
 
-    def __str__(self):
+    def __str__(self): # pragma: no cover
         return "file of {}".format(self.componenttype.identifier)
 
 

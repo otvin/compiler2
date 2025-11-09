@@ -1,0 +1,3 @@
+[1mtests/compilefail87.pas:9:12: [0m[1m[91merror:[0m Cannot use boolean type with math operators
+     9 | 	i := 1 + b;
+	

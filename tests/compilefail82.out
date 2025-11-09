@@ -1,0 +1,3 @@
+[1mtests/compilefail82.pas:4:14: [0m[1m[91merror:[0m Unsigned constant expected, instead saw '-'
+     4 |   fred:=(4 * -3);
+	
