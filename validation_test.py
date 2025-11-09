@@ -43,7 +43,7 @@ def do_conform():
                 elif testresult[:5] == " FAIL":
                     print(testresult[1:])
                 else:
-                    print(testresult ({}).format(test))
+                    print('{} ({})'.format(testresult,test))
             else:
                 print("Compile error: {} ({})\n".format(t, test))
         except Exception as e:

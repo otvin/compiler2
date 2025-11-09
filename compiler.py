@@ -3,7 +3,7 @@ import traceback
 
 from lexer import Lexer
 from parser import Parser
-from tac_ir import TACGenerator, TACException
+from tac_ir import TACGenerator
 from asmgenerator import AssemblyGenerator
 
 

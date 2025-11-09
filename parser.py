@@ -1,4 +1,3 @@
-from enum import Enum, unique, auto
 from lexer import TokenType, Token, TokenStream, LexerException
 from symboltable import StringLiteral, LiteralTable, SymbolTable, VariableSymbol, ParameterList, \
     ActivationSymbol, FunctionResultVariableSymbol, Parameter, SymbolException, ConstantSymbol, RealLiteral, \
@@ -186,7 +185,7 @@ class Parser:
         assert(isinstance(tokentype, TokenType)), "Parser.getexpectedtoken: Expected Token must be a token"
         ret = self.tokenstream.eattoken()
         if ret.tokentype != tokentype:
-            if tokentype == tokentype.SEMICOLON:
+            if tokentype == TokenType.SEMICOLON:
                 # TODO - insert a semicolon into the stream and allow parsing to continue
                 # TODO - this needs a test case.
                 errstr = compiler_errstr("Semicolon expected",self.tokenstream.peekprevioustoken())
@@ -550,7 +549,7 @@ class Parser:
         # array type which we are parsing.
         #
         # Also note, in 6.4.3.2 of the ISO standard, it states that an Array type that specifies 2 or more
-        # index types shall be viewed as short-hand for an array that has the first index type as its index
+        # index types shall be viewed as shorthand for an array that has the first index type as its index
         # type, containing other arrays.  Thus, we will represent arrays that way in our system.  Reason
         # is that these types are the same type when it comes to type compatibility, assume "size" is an
         # ordinal type:
@@ -1361,7 +1360,7 @@ class Parser:
         if nexttwo[1] != TokenType.ASSIGNMENT:
             self.tokenstream.eattoken()  # eat the identifier
             self.getexpectedtoken(TokenType.ASSIGNMENT)  # will generate the exception and exit
-            assert False  # pragma: no cover (only here so reader can see we exited at the line immediately above))
+            assert False  # pragma: no cover (only here so reader can see we exited at the line immediately above)
 
         assignast = self.parse_assignmentstatement(ret)
         ret.children.append(assignast)
@@ -1443,7 +1442,6 @@ class Parser:
                     and self.tokenstream.peektokentype() != endtokentype:
                 # TODO - insert a semicolon into the stream and allow parsing to continue
                 # special case error if we don't see the end token and don't see a semicolon
-                nexttok = self.tokenstream.peektoken()
                 # TODO - for both Semicolon expected errors, need to show the previous line too.
                 raise ParseException(compiler_errstr ("Semicolon expected", self.tokenstream.peekprevioustoken()))
 
@@ -1522,7 +1520,8 @@ class Parser:
         ret = AST(self.getexpectedtoken(TokenType.PROGRAM), None)
         # this will be the symbol table for globals
         ret.initsymboltable()
-        tok = self.getexpectedtoken(TokenType.IDENTIFIER)
+        # currently we do not do anything with the program name, so no need to assign getexpectedtoken to a value
+        self.getexpectedtoken(TokenType.IDENTIFIER)
         if self.tokenstream.peektokentype() == TokenType.LPAREN:
             position = 1
             self.getexpectedtoken(TokenType.LPAREN)
