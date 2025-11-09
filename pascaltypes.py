@@ -118,7 +118,7 @@ class CharacterType(OrdinalType):
         return ord(s)
 
     def min_item(self):
-        return chr(1)
+        return chr(0)
 
     def max_item(self):
         return chr(255)

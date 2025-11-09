@@ -558,7 +558,13 @@ class TACBlock:
             else:
                 raise TACException(compiler_errstr('Function {}() requires parameter of integer or real type'.format(tok.tokentype), tok))
         elif requiredfunction_acceptsinteger(tok.tokentype):
+            isinteger = False
             if isinstance(tmp.pascaltype, pascaltypes.IntegerType):
+                isinteger = True
+            elif isinstance(tmp.pascaltype, pascaltypes.SubrangeType):
+                if isinstance(tmp.pascaltype.hosttype, pascaltypes.IntegerType):
+                    isinteger = True
+            if isinteger:
                 self.addnode(TACParamNode(tmp))
                 self.addnode(TACCallSystemFunctionNode(Label(maptoken_to_systemfunction_name(tok, "I")), 1, lval))
             else:
