@@ -239,6 +239,9 @@ class TACCommentNode(TACNode):
     def __str__(self):  # pragma: no cover
         return "\t\t;{}".format(self.comment)
 
+class TACNoOpNode(TACCommentNode):
+    def __init__(self):
+        super().__init__('NO-OP')
 
 class TACLabelNode(TACNode):
     def __init__(self, label, comment=None):
@@ -1419,6 +1422,8 @@ class TACBlock:
             ret = self.processast_relationaloperator(ast)
         elif tok.tokentype in (TokenType.AND, TokenType.OR, TokenType.NOT):
             ret = self.processast_booleanoperator(ast)
+        elif tok.tokentype == TokenType.EMPTYTOKEN:
+            self.addnode(TACNoOpNode())
         else:  # pragma: no cover
             raise TACException(compiler_errstr("TACBlock.processast - cannot process token:".format(str(tok)), tok))
 

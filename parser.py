@@ -1314,8 +1314,12 @@ class Parser:
         self.tokenstream.setendpos()
         # this makes the comment "while <condition> do" which is fine.
         ret.comment = self.tokenstream.printstarttoend()
-
-        ret.children.append(self.parse_statement(ret))
+        if self.tokenstream.peektokentype() == TokenType.SEMICOLON:
+            # Special case <empty-statement>
+            nooptok = Token(TokenType.EMPTYTOKEN, self.tokenstream.peektoken().location, '')
+            ret.children.append(AST(nooptok, ret))
+        else:
+            ret.children.append(self.parse_statement(ret))
         return ret
 
     def parse_repeatstatement(self, parent_ast):
@@ -1428,12 +1432,20 @@ class Parser:
 
     def parse_statementsequence(self, endtokentype, current_ast):
         # 6.8.3.1 - <statement-sequence> ::= <statement> [ ";" <statement> ]
-
-        # statement sequences are, as they are named, sequences of statements.  However,
+        # 6.8.1 - <statement> ::= [<label>:] (<simple-statement> | <structured-statement>)
+        # 6.8.2.1 - <simple-statement> ::= <empty-statement> | <assignment-statement> | <procedure-statement>
+        #                                   | <goto-statement>
+        #
+        # Statement sequences are, as they are named, sequences of statements.  However,
         # the end of the sequence is denoted by different tokens depending on where the
         # statement sequence is embedded.  Two examples are compound-statement, which is
         # "begin" <statement-sequence> "end" and the repeat-statement, which is
         # "repeat" <statement-sequence> "until."
+
+        # Since the first <statement> in the <statement-sequence>could be <empty-statement>, check to see if the
+        # endtokentype is the next token and, if so, exit.
+        if self.tokenstream.peektokentype() == endtokentype:
+            return
 
         # current_ast is the location where the children should be added
         current_ast.children.append(self.parse_statement(current_ast))
@@ -1450,17 +1462,10 @@ class Parser:
 
     def parse_compoundstatement(self, parent_ast):
         # 6.8.3.2 - <compound-statement> ::= "begin" <statement-sequence> "end"
-        # 6.8.3.1 - <statement-sequence> ::= <statement> [ ";" <statement> ]
-        # 6.8.1 - <statement> ::= [<label>:] (<simple-statement> | <structured-statement>)
-        # 6.8.2.1 - <simple-statement> ::= <empty-statement> | <assignment-statement> | <procedure-statement>
-        #                                   | <goto-statement>
         # This function returns an AST node using the BEGIN as the token, and with one child for each
         # statement.
         ret = AST(self.getexpectedtoken(TokenType.BEGIN), parent_ast)
-        # If we see the END right after the BEGIN we have an <empty-statement> so we do nothing
-        # else we parse the statement sequence
-        if self.tokenstream.peektokentype() != TokenType.END:
-            self.parse_statementsequence(TokenType.END, ret)
+        self.parse_statementsequence(TokenType.END, ret)
 
         # The expected token here is an END.  However, if the END does not appear, we will try to keep parsing
         # so that other parse errors could be displayed later.  It is frustrating for an end user to have

@@ -164,8 +164,14 @@ class TokenType(Enum):
     INPUT = 'input'
     OUTPUT = 'output'
 
+    # Empty Statements do not have a token, but for some special cases, I need an AST that is a NOOP.
+    EMPTYTOKEN = None
+
     def __str__(self):
-        return self.value
+        if self.value is not None:
+            return self.value
+        else:
+            return 'EMPTY TOKEN'
 
 
 # To make it easy to lex various tokens, we can use a lookup from the reserved words back to the
