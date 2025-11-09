@@ -1017,6 +1017,9 @@ class Parser:
                 self.literaltable.add(RealLiteral(newtok.value, newtok.location))
                 ret.token = newtok
         else:
+            if self.tokenstream.peektokentype() == TokenType.PLUS:
+                # a plus sign here is a no-op
+                self.getexpectedtoken(TokenType.PLUS)
             ret = self.parse_term(parent_ast)
 
         while isaddingoperator(self.tokenstream.peektokentype()):

@@ -92,7 +92,7 @@ One of the cool things that I have done is used the compiler to generate assembl
 
 ### Unit tests
 
-Compiler2 currently passes 240 unit tests, including the 48 (of 60) unit tests created for Compiler which did not use Concat() and an additional test which represented the one known bug from Compiler.  You can execute the unit test suite by running:
+Compiler2 currently passes 241 unit tests, including the 48 (of 60) unit tests created for Compiler which did not use Concat() and an additional test which represented the one known bug from Compiler.  You can execute the unit test suite by running:
 
 ```python3 compiler_test.py```
 
@@ -116,7 +116,7 @@ _Code for exceptions that should never occur are excluded, as is code that only 
 
 Cloned from: https://github.com/pascal-validation/validation-suite. More details may be found [here](tests/BSI-validation-suite/README.md).
 
-Compiler2 currently passes 74 of 221 "conform" tests from the BSI suite.  You can execute the suite by running:
+Compiler2 currently passes 75 of 221 "conform" tests from the BSI suite.  You can execute the suite by running:
 
 ```python3 validation_test.py```
 
