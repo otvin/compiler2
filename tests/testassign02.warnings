@@ -1,0 +1,21 @@
+[1mtests/testassign02.pas:8:13: [0m[1m[93mwarning:[0m Variable possibly used before assignment: i
+     8 | 	writeln(i);
+[1mtests/testassign02.pas:9:14: [0m[1m[93mwarning:[0m Variable possibly used before assignment: i
+     9 | 	j := ord(i);
+[1mtests/testassign02.pas:11:16: [0m[1m[93mwarning:[0m Variable possibly used before assignment: i
+    11 | 	writeln(j, i);
+[1mtests/testassign02.pas:12:9: [0m[1m[93mwarning:[0m Variable possibly used before assignment: i
+    12 | 	arr[i] := 5;
+[1mtests/testassign02.pas:13:10: [0m[1m[93mwarning:[0m Variable possibly used before assignment: i
+    13 | 	j := i;
+[1mtests/testassign02.pas:14:8: [0m[1m[93mwarning:[0m Variable possibly used before assignment: i
+    14 | 	if i < j then writeln('less');
+[1mtests/testassign02.pas:15:12: [0m[1m[93mwarning:[0m Variable possibly used before assignment: i
+    15 | 	if j < i then writeln('less');
+[1mtests/testassign02.pas:17:14: [0m[1m[93mwarning:[0m Variable possibly used before assignment: b
+    17 | 	if a and b then writeln('and');
+[1mtests/testassign02.pas:18:8: [0m[1m[93mwarning:[0m Variable possibly used before assignment: b
+    18 | 	if b or a then writeln('or');
+[1mtests/testassign02.pas:19:13: [0m[1m[93mwarning:[0m Variable possibly used before assignment: b
+    19 | 	if (not b) then writeln('not');
+

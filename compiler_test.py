@@ -42,6 +42,7 @@ def dotest2(pascal_filename, numparamfiles=0, pipefile=False, paramfile_comparel
         exefilename = fileroot
         stdoutfilename = fileroot + ".testoutput"
         resultfilename = fileroot + ".out"
+        warningsfilename = fileroot + ".warnings"
 
         paramfilestr = ""
         for i in range(numparamfiles):
@@ -51,7 +52,7 @@ def dotest2(pascal_filename, numparamfiles=0, pipefile=False, paramfile_comparel
         if pipefile:
             pipefilestr = " < " + fileroot + "_pipein" + ".file"
 
-        compiler.compile(pascal_filename, asmfilename=asmfilename, objfilename=objfilename, exefilename=exefilename)
+        comparestr = compiler.compile(pascal_filename, asmfilename=asmfilename, objfilename=objfilename, exefilename=exefilename).rstrip()
 
         exestr = "./{} {} {} > {}".format(exefilename, paramfilestr, pipefilestr, stdoutfilename)
         os.system(exestr)
@@ -74,6 +75,17 @@ def dotest2(pascal_filename, numparamfiles=0, pipefile=False, paramfile_comparel
                         passed = False
                         print("FAIL: {}".format(pascal_filename))
                     compare_two_files(actualfilename, expectedfilename, True)
+
+        warnstr = ""
+        if os.path.exists(warningsfilename):
+            warningsfile = open(warningsfilename, "r")
+            warnstr = warningsfile.read().rstrip()
+            warningsfile.close()
+        if comparestr != warnstr:
+            passed = False
+            print("FAIL: {}".format(pascal_filename))
+            print("Actual warnings: {}".format(comparestr))
+            print("Expected warnings: {}".format(warnstr))
 
         if passed:
             print("PASS: {}".format(pascal_filename))
@@ -123,9 +135,9 @@ def do_compilefailtest(infilename, resultfilename):
             print("PASS: {0}".format(infilename))
             NUM_SUCCESSES += 1
         else:
+            print("FAIL: {0}".format(infilename))
             print("Actual: " + comparestr)
             print("Expected: " + resultvalue)
-            print("FAIL: {0}".format(infilename))
     except Exception as e:
         print("FAIL: {0}".format(infilename))
         print(e)
@@ -176,7 +188,7 @@ def main(onlytest=""):
     ONLYTEST = onlytest
 
     run_test_list("array", 1, 23)
-    run_test_list("assign", 1, 1)
+    run_test_list("assign", 1, 3)
     run_test_list("boolean", 1, 2)
     run_test_list("bugfix", 1, 1)
     do_compilefail_bugfixtest("02")

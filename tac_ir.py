@@ -454,7 +454,10 @@ class TACBlock:
                         # if a and b are arrays of same type, "a := b" is legal syntax, but code won't assign to
                         # b.  It would assign to the array elements.  So we exclude warning on an array assignment.
                         if not isinstance(sym.pascaltype, pascaltypes.ArrayType):
-                            warnstr = compiler_warnstr("Variable possibly used before assignment: {}".format(sym_use_token.value),sym_use_token)
+                            if sym.was_assignedto:
+                                warnstr = compiler_warnstr("Variable possibly used when undefined: {}".format(sym_use_token.value),sym_use_token)
+                            else:
+                                warnstr = compiler_warnstr("Variable possibly used before assignment: {}".format(sym_use_token.value),sym_use_token)
                             self.generator.warningslist.append(warnstr)
             return sym
 

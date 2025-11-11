@@ -1,0 +1,3 @@
+[1mtests/testassign03.pas:8:10: [0m[1m[93mwarning:[0m Variable possibly used when undefined: i
+     8 | 	i := i + 1;
+

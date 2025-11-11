@@ -131,7 +131,9 @@ class Symbol:
         self.location = location
         self.pascaltype = pascaltype
         self.memoryaddress = None
-        self.is_assignedto = False
+        self.__is_assignedto = False
+        # if a variable is used then undefined, is_assignedto will be False but __was_assignedto will be True
+        self.__was_assignedto = False
         # TODO - look at removing symbol.is_byref - why do symbols and parameters both have is_byref set?
         self.is_byref = False
 
@@ -159,7 +161,13 @@ class Symbol:
     @is_assignedto.setter
     def is_assignedto(self, assignedto):
         assert isinstance(assignedto, bool)
+        if self.__is_assignedto and (not assignedto):
+            self.__was_assignedto = True
         self.__is_assignedto = assignedto
+
+    @property
+    def was_assignedto(self):
+        return self.__was_assignedto
 
     def __str__(self):
         return self.name
