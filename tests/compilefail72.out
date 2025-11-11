@@ -1,2 +1,5 @@
+[1mtests/compilefail72.pas:9:14: [0m[1m[93mwarning:[0m Variable possibly used before assignment: r
+     9 | 	r := sqr(r);
 [1mtests/compilefail72.pas:9:10: [0m[1m[91merror:[0m Function sqr() requires parameter of integer or real type
      9 | 	r := sqr(r);
+

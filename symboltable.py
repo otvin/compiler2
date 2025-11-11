@@ -131,6 +131,7 @@ class Symbol:
         self.location = location
         self.pascaltype = pascaltype
         self.memoryaddress = None
+        self.is_assignedto = False
         # TODO - look at removing symbol.is_byref - why do symbols and parameters both have is_byref set?
         self.is_byref = False
 
@@ -150,6 +151,15 @@ class Symbol:
     def is_byref(self, byref):
         assert isinstance(byref, bool)
         self.__is_byref = byref
+
+    @property
+    def is_assignedto(self):
+        return self.__is_assignedto
+
+    @is_assignedto.setter
+    def is_assignedto(self, assignedto):
+        assert isinstance(assignedto, bool)
+        self.__is_assignedto = assignedto
 
     def __str__(self):
         return self.name
@@ -381,6 +391,16 @@ class SymbolTable:
         ret = False
         ptr = self
         while (not ret) and (ptr is not None):
+            ret = ptr.exists(name)
+            ptr = ptr.parent
+        return ret
+
+    def existspriortoglobalscope(self, name):
+        # Looks in current symbol table and parents EXCEPT the global scope
+        # Used to check for variable unassigned before usage warning.
+        ret = False
+        ptr = self
+        while (not ret) and (ptr.parent is not None):
             ret = ptr.exists(name)
             ptr = ptr.parent
         return ret

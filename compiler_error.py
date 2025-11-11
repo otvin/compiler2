@@ -29,20 +29,26 @@ def levstr(errlevel):
         ret = '{}{}error:{}'.format(ANSI_BOLD, ANSI_FAILRED, ANSI_ENDC)
     return ret
 
-def compiler_errstr(errstr, errtok = None, errloc = None):
+def compiler_notifystr(errstr, errlevel, errtok = None, errloc = None):
     # if errtok is not defined, then will look at location in errloc.  If both errtok and errloc are defined
     # errloc is ignored.
 
     if errtok is not None:
-        assert(isinstance(errtok, Token))
+        assert (isinstance(errtok, Token))
     if errloc is not None:
-        assert(isinstance(errloc, FileLocation))
+        assert (isinstance(errloc, FileLocation))
     prolog = ""
     curlinestr = ""
     if errtok is not None:
         errloc = errtok.location
     if errloc is not None:
         prolog = errloc.getprolog() + " "
-        curlinestr = '{:>6} | {}\n\t'.format(errloc.line, errloc.curlinestr)
-    ret = '{}{}{}{} {}\n{}'.format(ANSI_BOLD, prolog, ANSI_ENDC, levstr(ErrLevel.ERROR), errstr, curlinestr)
+        curlinestr = '{:>6} | {}\n'.format(errloc.line, errloc.curlinestr)
+    ret = '{}{}{}{} {}\n{}'.format(ANSI_BOLD, prolog, ANSI_ENDC, levstr(errlevel), errstr, curlinestr)
     return ret
+
+def compiler_warnstr(errstr, errtok = None, errloc = None):
+    return compiler_notifystr(errstr, ErrLevel.WARNING, errtok, errloc)
+
+def compiler_errstr(errstr, errtok = None, errloc = None):
+    return compiler_notifystr(errstr, ErrLevel.ERROR, errtok, errloc)

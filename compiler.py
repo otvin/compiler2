@@ -70,8 +70,13 @@ def compile(infilename, asmfilename=None, objfilename=None, exefilename=None,
         if verbose:  # set to True to debug
             g.printblocks()
             traceback.print_exc()
+        for warnstr in g.warningslist:
+            retstr += warnstr
         retstr += str(err)
         return retstr
+
+    for warnstr in g.warningslist:
+        retstr += warnstr
 
     if verbose:
         print("\n\nTHREE-ADDRESS CODE")
