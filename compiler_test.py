@@ -4,8 +4,6 @@ import compiler
 
 NUM_ATTEMPTS = 0
 NUM_SUCCESSES = 0
-TEST_FPC_INSTEAD = False  # switch to true to validate the .out files using fpc
-
 
 def compare_two_files(actualfile, expectedfile, printdiffs=False):
     testfile1 = open(actualfile, "r")
@@ -53,10 +51,7 @@ def dotest2(pascal_filename, numparamfiles=0, pipefile=False, paramfile_comparel
         if pipefile:
             pipefilestr = " < " + fileroot + "_pipein" + ".file"
 
-        if not TEST_FPC_INSTEAD:
-            compiler.compile(pascal_filename, asmfilename=asmfilename, objfilename=objfilename, exefilename=exefilename)
-        else:
-            os.system("fpc -Miso -v0 {}".format(pascal_filename))
+        compiler.compile(pascal_filename, asmfilename=asmfilename, objfilename=objfilename, exefilename=exefilename)
 
         exestr = "./{} {} {} > {}".format(exefilename, paramfilestr, pipefilestr, stdoutfilename)
         os.system(exestr)
@@ -81,15 +76,11 @@ def dotest2(pascal_filename, numparamfiles=0, pipefile=False, paramfile_comparel
                     compare_two_files(actualfilename, expectedfilename, True)
 
         if passed:
-            if not TEST_FPC_INSTEAD:
-                print("PASS: {}".format(pascal_filename))
-            else:
-                print("FPC PASS: {}".format(pascal_filename))
+            print("PASS: {}".format(pascal_filename))
 
             # remove the files from passed tests; we will leave the files from failed tests so we can debug
-            if not TEST_FPC_INSTEAD:
-                os.system("rm {}".format(asmfilename))
-                os.system("rm {}".format(objfilename))
+            os.system("rm {}".format(asmfilename))
+            os.system("rm {}".format(objfilename))
             os.system("rm {}".format(exefilename))
             os.system("rm {}".format(stdoutfilename))
             if paramfile_comparelist is not None:
@@ -114,33 +105,30 @@ def do_compilefailtest(infilename, resultfilename):
     global NUM_ATTEMPTS
     global NUM_SUCCESSES
 
-    if not TEST_FPC_INSTEAD:
-        # FPC errors are totally different so don't try to test those
+    NUM_ATTEMPTS += 1
 
-        NUM_ATTEMPTS += 1
+    try:
+        # the carriage return is included in the output files to end the line
+        asmfilename = infilename[:-4] + ".asm"
+        comparestr = compiler.compile(infilename, asmfilename=asmfilename).rstrip()
 
-        try:
-            # the carriage return is included in the output files to end the line
-            asmfilename = infilename[:-4] + ".asm"
-            comparestr = compiler.compile(infilename, asmfilename=asmfilename).rstrip()
+        if os.path.exists(asmfilename):
+            os.system("rm {}".format(asmfilename))
 
-            if os.path.exists(asmfilename):
-                os.system("rm {}".format(asmfilename))
+        resultfile = open(resultfilename, "r")
+        resultvalue = resultfile.read().rstrip()
+        resultfile.close()
 
-            resultfile = open(resultfilename, "r")
-            resultvalue = resultfile.read().rstrip()
-            resultfile.close()
-
-            if resultvalue == comparestr:
-                print("PASS: {0}".format(infilename))
-                NUM_SUCCESSES += 1
-            else:
-                print("Actual: " + comparestr)
-                print("Expected: " + resultvalue)
-                print("FAIL: {0}".format(infilename))
-        except Exception as e:
+        if resultvalue == comparestr:
+            print("PASS: {0}".format(infilename))
+            NUM_SUCCESSES += 1
+        else:
+            print("Actual: " + comparestr)
+            print("Expected: " + resultvalue)
             print("FAIL: {0}".format(infilename))
-            print(e)
+    except Exception as e:
+        print("FAIL: {0}".format(infilename))
+        print(e)
 
 def do_compilefail_bugfixtest(numstr):
     # some bugfix tests are compile fail tests
@@ -242,8 +230,5 @@ def main(onlytest=""):
 if __name__ == '__main__':  # pragma: no cover
     onlytest = ""
     if len(sys.argv) >= 2:
-        if sys.argv[1].lower() == "fpc":
-            TEST_FPC_INSTEAD = True
-        else:
-            onlytest = sys.argv[1].lower()
+        onlytest = sys.argv[1].lower()
     main(onlytest)
