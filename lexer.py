@@ -307,7 +307,7 @@ class TokenStream:
             if self.pos > 0:
                 raise LexerException(compiler_errstr("Missing 'end' statement or Unexpected end of file", self.tokenlist[self.pos - 1]))
             else:
-                raise LexerException("Cannot compile empty file")
+                raise LexerException(compiler_errstr("Cannot compile empty file"))
         self.pos += 1
         return ret
 
