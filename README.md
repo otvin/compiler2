@@ -92,7 +92,7 @@ One of the cool things that I have done is used the compiler to generate assembl
 
 ### Unit tests
 
-Compiler2 currently passes 258 unit tests, including the 48 (of 60) unit tests created for Compiler which did not use Concat() and an additional test which represented the one known bug from Compiler.  You can execute the unit test suite by running:
+You can execute the Compiler2 unit test suite by running:
 
 ```python3 compiler_test.py```
 
