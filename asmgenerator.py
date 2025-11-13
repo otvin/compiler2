@@ -4,7 +4,7 @@ from tac_ir import TACBlock, TACLabelNode, TACParamNode, TACCallSystemFunctionNo
     TACFunctionReturnNode, TACCallFunctionNode, TACBinaryNodeWithBoundsCheck
 from symboltable import StringLiteral, IntegerLiteral, Symbol, Parameter, ActivationSymbol, RealLiteral, \
     FunctionResultVariableSymbol, CharacterLiteral, ConstantSymbol, ProgramParameterSymbol
-from compiler_error import compiler_errstr
+from compiler_error import compiler_errstr, compiler_failstr
 from editor_settings import NUM_SPACES_IN_TAB, NUM_TABS_FOR_COMMENT
 import pascaltypes
 
@@ -993,6 +993,27 @@ class AssemblyGenerator:
                         # a local temporary, not a byref parameter, so this is safe.  I don't want to write
                         # a fstp equivalent for that function when I don't need it.
                         self.emitcode("fstp qword [{}]".format(node.lval.memoryaddress), comment)
+                    elif node.label.name == "_ARCTANR":
+                        self.used_x87_code = True
+                        comment = "parameter {} for arctan()".format(str(params[-1].paramval))
+                        self.emit_movtoxmmregister_fromstack("xmm0", params[-1].paramval, comment)
+                        # sin() and cos() use the legacy x87 FPU.  This is slow but also very few instructions
+                        # so easy for the compiler writer.  In x86-64 one is supposed to use library functions
+                        # for this, but this is faster to code.
+                        # Cannot move directly from xmm0 to the FPU stack; cannot move directly from a standard
+                        # register to the FPU stack.  Can only move from memory
+                        self.emitcode("movsd [{}], xmm0".format(node.lval.memoryaddress),
+                                      "use {} to move value to FPU".format(node.lval.name))
+                        self.emitcode("fld qword [{}]".format(node.lval.memoryaddress))
+                        # Pascal uses atan but x87 uses atan2.
+                        self.emitcode("fld1")
+                        self.emitcode("fpatan")
+                        comment = "assign return value of function to {}".format(node.lval.name)
+                        # TODO - see comment to _SQRTR where I use the movtostack() functions.  Technically
+                        # there should be a test for node.lval.is_byref here, but for now I know it has to be
+                        # a local temporary, not a byref parameter, so this is safe.  I don't want to write
+                        # a fstp equivalent for that function when I don't need it.
+                        self.emitcode("fstp qword [{}]".format(node.lval.memoryaddress), comment)
                     elif node.label.name == '_LNR':
                         self.used_x87_code = True
                         comment = "parameter {} for ln()".format(str(params[-1].paramval))
@@ -1203,7 +1224,7 @@ class AssemblyGenerator:
                         comment = "assign return value of function to {}".format(node.lval.name)
                         self.emit_movtostack_fromregister(node.lval, destreg, comment)
                     else:  # pragma: no cover
-                        raise ASMGeneratorError("Invalid System Function: {}".format(node.label.name))
+                        raise ASMGeneratorError(compiler_failstr("Invalid System Function: {}".format(node.label.name)))
                 elif isinstance(node, TACBinaryNodeWithBoundsCheck):
                     # currently only used for math with structured types where we have pointers
                     assert isinstance(node.result.pascaltype, pascaltypes.PointerType)

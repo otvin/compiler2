@@ -8,7 +8,8 @@ ANSI_OKBLUE = '\033[94m'
 ANSI_OKCYAN = '\033[96m'
 ANSI_OKGREEN = '\033[92m'
 ANSI_WARNINGYELLOW = '\033[93m'
-ANSI_FAILRED = '\033[91m'
+ANSI_ERRORRED = '\033[91m'
+ANSI_FAIL = '\033[91;104m'
 ANSI_BOLD = '\033[1m'
 ANSI_UNDERLINE = '\033[4m'
 
@@ -18,15 +19,18 @@ class ErrLevel(Enum):
     INFO = 0
     WARNING = 1
     ERROR = 2
+    FAIL = 3
 
 def levstr(errlevel):
-    assert(errlevel in [ErrLevel.INFO, ErrLevel.WARNING, ErrLevel.ERROR])
+    assert(errlevel in [ErrLevel.INFO, ErrLevel.WARNING, ErrLevel.ERROR, ErrLevel.FAIL])
     if errlevel == ErrLevel.INFO:
         ret = '{}{}note:{}'.format(ANSI_BOLD, ANSI_OKCYAN, ANSI_ENDC)
     elif errlevel == ErrLevel.WARNING:
         ret = '{}{}warning:{}'.format(ANSI_BOLD, ANSI_WARNINGYELLOW,ANSI_ENDC)
+    elif errlevel == ErrLevel.ERROR:
+        ret = '{}{}error:{}'.format(ANSI_BOLD, ANSI_ERRORRED, ANSI_ENDC)
     else:
-        ret = '{}{}error:{}'.format(ANSI_BOLD, ANSI_FAILRED, ANSI_ENDC)
+        ret = '{}{}!!FAIL:{}'.format(ANSI_BOLD, ANSI_FAIL, ANSI_ENDC)
     return ret
 
 def compiler_notifystr(errstr, errlevel, errtok = None, errloc = None):
@@ -52,3 +56,6 @@ def compiler_warnstr(errstr, errtok = None, errloc = None):
 
 def compiler_errstr(errstr, errtok = None, errloc = None):
     return compiler_notifystr(errstr, ErrLevel.ERROR, errtok, errloc)
+
+def compiler_failstr(errstr):
+    return '{}{}'.format(levstr(ErrLevel.FAIL), errstr)
