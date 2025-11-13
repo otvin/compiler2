@@ -1037,40 +1037,30 @@ class AssemblyGenerator:
                         self.used_x87_code = True
                         comment = "parameter {} for exp()".format(str(params[-1].paramval))
                         self.emit_movtoxmmregister_fromstack("xmm0", params[-1].paramval, comment)
-                        # exp() also uses the legacy x87 FPU.  The legacy FPU has a command for (2^x)-1.
-                        # However, the instruction F2XM1 requires an X between -1 and 1.  Since Pascal EXP() can take
-                        # an arbitrary real, this is less desirable.
-                        # Let's say that we have a real number.  Represent that number as a + b where a is an integer
-                        # and b is the remainder.  e^(a+b) = e^a * e^b where 0 <= b < 1 which is in the range of this
-                        # command.
-                        # To compute e^b, note that e^b = 2^(log2(e) * b).
-                        #       2 ^ (log2(e) * b) = (2^log2(e))^b
-                        #       (2^log2(e)) = e
-                        #       (2^log2(e)) ^ b = e^b
-                        # So call the F2XM1 on b, then add 1 to that, and you get e^b
-                        # Need to add that to e^a.  a is an integer, and the FSCALE instruction computes 2^a
-                        # See: https://stackoverflow.com/questions/44957136
-                        # See: http://www.ray.masmcode.com/tutorial/fpuchap11.htm
-                        self.emitcode("movsd [{}], xmm0".format(node.lval.memoryaddress),
-                                      "use {} to move value to FPU".format(node.lval.name))
-                        self.emitcode("FLDL2E")  # loads log base 2 of e into ST0
-                        assert node.lval.pascaltype.size in (4, 8)
-                        if node.lval.pascaltype.size == 4:
-                            opsize = "DWORD"
-                        else:
-                            opsize = "QWORD"
-                        self.emitcode("FMUL {} [{}]".format(opsize, node.lval.memoryaddress))  # ST0 contains x*log2(e)
-                        self.emitcode("FLD1")  # ST0 now contains 1, ST1 contains x * log2(e)
-                        self.emitcode("FLD ST1")  # Pushes a copy of ST1 to the top of the stack.  So now
-                                                    # ST0 = x * log2(e), ST1 = 1, and ST2 = x * log2(e)
-                        self.emitcode("FPREM1")  # This is clever.  To get the non-integer portion of x * log2(e),
-                                                 # we divide it by 1 and take the remainder.  So now
-                                                 # ST0 has this remainder, ST1 has 1
-                                                 # and ST2 has x * log2(e)
-                        self.emitcode("F2XM1")  # now ST0 has (2^remainder) - 1, ST1 has 1, St2 has x * log2(e)
-                        self.emitcode("FADDP ST1, ST0")  # this adds ST1 to ST0, pops the stack (moving the 1 into
-                                                        # ST0) but then overwrites ST0 with the result.  So
-                                                        # ST0 has 2^remainder and ST1 has x * log2(e)
+                        # The code that I got from https://stackoverflow.com/questions/44957136
+                        # and http://www.ray.masmcode.com/tutorial/fpuchap11.htm worked in many cases but not all.
+                        # Used ChatGPT to assist.
+
+
+                        self.emitcode("movsd [{}], xmm0".format(node.lval.memoryaddress), "use {} to move value to FPU".format(node.lval.name))
+                        self.emitcode("FLD QWORD [{}]".format(node.lval.memoryaddress))
+
+                        # compute y = x * log2(e)
+                        self.emitcode("FLDL2E") # ST0 = log2(e), ST1 = x
+                        self.emitcode("FMULP ST1, ST0") # ST0 = x * log2(e) = y
+
+                        # split y into integer n and fractional f
+                        self.emitcode("FLD ST0") # ST0 = y, ST1 = y
+                        self.emitcode("FRNDINT") # ST0 = n (rounded y), ST1 = y
+                        self.emitcode("FSUB ST1, ST0") # ST1 = y-n = f, ST0 = n
+                        self.emitcode("FXCH ST1") # ST0 = y-n = f, ST1 = n
+
+                        # compute 2^f using f2xm1
+                        self.emitcode("F2XM1") # ST0 = 2^f - 1, ST1 = n
+                        self.emitcode("FLD1") # ST0 = 1, ST1 = 2^f - 1, ST2 = n
+                        self.emitcode("FADDP ST1, ST0") # ST0 = 2^f, ST1 = n
+
+                        # scale by 2^n: result = 2^(n+f) = e^x
                         self.emitcode("FSCALE")  # Per the fpuchap11.htm link above, FSCALE multiplies ST0 by
                                                  # 2^(ST1), first truncating ST1 to an integer.  It leaves ST1 intact.
                                                  # ST0 has 2^remainder of (x * log2(e)) * 2^integer part of (x*log2(e))

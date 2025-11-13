@@ -206,7 +206,7 @@ def main(onlytest=""):
         dotest2("tests/testfiles03.pas", 1, False, [0])
 
     run_test_list("for", 1, 5)
-    run_test_list("fpmath", 1, 8)
+    run_test_list("fpmath", 1, 9)
     run_test_list("functions", 1, 11)
     run_test_list("functions", 13, 17)
     run_test_list("globalvar", 1, 3)
