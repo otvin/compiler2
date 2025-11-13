@@ -16,7 +16,7 @@ Compiler2 supports the following Pascal Language features:
     * Supports Parentheses
         * Note a quirk in the ISO 7185 BNF - to multiply -7 times -3 you need to write ```-7 * (-3)``` and put parentheses around the second factor, because you cannot have the ```*``` token be immediately followed by the ```-``` token
     * Supports following arithmetic functions required by ISO standard: 
-        * ```abs()```, ```sqr()```, ```sin()```, ```cos()```, ```exp()```, ```ln()```, and ```sqrt()```
+        * ```abs()```, ```sqr()```, ```sin()```, ```cos()```, ```arctan()```, ```exp()```, ```ln()```, and ```sqrt()```
     * Supports following transfer functions required by ISO standard:
         * ```trunc()``` and ```round()``` 
     * Supports following ordinal functions required by ISO standard:
