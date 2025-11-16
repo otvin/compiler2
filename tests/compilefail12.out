@@ -1,2 +1,3 @@
-[1mtests/compilefail12.pas:10:1: [0m[1m[91merror:[0m Semicolon expected
-    10 | begin
+[1mtests/compilefail12.pas:9:28: [0m[1m[91merror:[0m Semicolon expected
+     9 | procedure two(var b:integer)	
+

@@ -2,7 +2,7 @@ from lexer import TokenType, Token, TokenStream, LexerException
 from symboltable import StringLiteral, LiteralTable, SymbolTable, VariableSymbol, ParameterList, \
     ActivationSymbol, FunctionResultVariableSymbol, Parameter, SymbolException, ConstantSymbol, RealLiteral, \
     CharacterLiteral, ProgramParameterSymbol
-from compiler_error import compiler_errstr
+from compiler_error import compiler_errstr, compiler_failstr
 from copy import deepcopy
 import pascaltypes
 
@@ -182,18 +182,20 @@ class Parser:
         self.anonymous_type_counter = 0
 
     def getexpectedtoken(self, tokentype):
-        assert(isinstance(tokentype, TokenType)), "Parser.getexpectedtoken: Expected Token must be a token"
-        ret = self.tokenstream.eattoken()
-        if ret.tokentype != tokentype:
+        assert isinstance(tokentype, TokenType), compiler_failstr("Parser.getexpectedtoken: Expected Token must be a token not {}".format(type(tokentype)))
+
+        tmptok = self.tokenstream.peektoken()
+        if tmptok.tokentype != tokentype:
             if tokentype == TokenType.SEMICOLON:
                 # TODO - insert a semicolon into the stream and allow parsing to continue
-                # TODO - this needs a test case.
                 errstr = compiler_errstr("Semicolon expected",self.tokenstream.peekprevioustoken())
             else:
-                errstr = compiler_errstr("Expected '{0}' but saw '{1}'".format(str(tokentype), str(ret.value)),
-                                         ret)
+                errstr = compiler_errstr("Expected '{0}' but saw '{1}'".format(str(tokentype), str(tmptok.value)),
+                                         tmptok)
             raise ParseException(errstr)
-        assert isinstance(ret, Token)
+
+        ret = self.tokenstream.eattoken()
+        assert isinstance(ret, Token), compiler_failstr("Parser.getexpectedtoken: attempt to return non-Token {}".format(type(ret)))
         return ret
 
     def parse_labeldeclarationpart(self, parent_ast):
@@ -361,7 +363,17 @@ class Parser:
                 else:
                     newsymtype = consttype
                 parent_ast.symboltable.add(ConstantSymbol(const_id.value, const_id.location, newsymtype, constval))
-                self.getexpectedtoken(TokenType.SEMICOLON)
+                try:
+                    self.getexpectedtoken(TokenType.SEMICOLON)
+                except ParseException as e:
+                    if self.tokenstream.peektokentype() in (TokenType.PLUS, TokenType.MINUS, TokenType.MULTIPLY,
+                                                            TokenType.DIVIDE, TokenType.LPAREN, TokenType.RPAREN,
+                                                            TokenType.IDIV, TokenType.MOD):
+                        # if the token is related to expressions, we will do a specific error for that.
+                        errstr = compiler_errstr("Semicolon expected, cannot define a constant in terms of an expression", self.tokenstream.peektoken())
+                        raise ParseException(errstr)
+                    else:
+                        raise e
                 if self.tokenstream.peektokentype() != TokenType.IDENTIFIER:
                     done = True
 

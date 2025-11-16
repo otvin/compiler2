@@ -11,7 +11,7 @@ class LexerException(Exception):
 @unique
 class TokenType(Enum):
     # Special Symbols come from 6.1.2 in the ISO standard.  Section 6.1.9 of the
-    # standard specifies some alternate representations for symnbols.  We will
+    # standard specifies some alternate representations for symbols.  We will
     # handle those via a lookup mapping later.
     PLUS = '+'
     MINUS = "-"
@@ -321,11 +321,11 @@ class TokenStream:
         from compiler_error import compiler_errstr
         try:
             ret = self.tokenlist[self.pos]
-        except IndexError: # pragma: no cover
+        except IndexError:
             if self.pos > 0:
-                raise LexerException(compiler_errstr("Unexpected end of file", self.tokenlist[self.pos - 1]))
+                raise LexerException(compiler_errstr("Missing 'end' statement or Unexpected end of file", self.tokenlist[self.pos - 1]))
             else:
-                raise LexerException("Unexpected end of file")
+                raise LexerException(compiler_errstr("Cannot compile empty file"))
         assert isinstance(ret, Token)
         return ret
 
@@ -473,6 +473,7 @@ class Lexer:
         # As a note, the 'e' in the unsigned-real can be lower or upper case.
         #
         # Returns empty string if the next character in the input stream is not numeric.
+        from compiler_error import compiler_errstr
         ret = ""
         while self.peek().isnumeric():
             ret += self.eat()
@@ -494,7 +495,7 @@ class Lexer:
                     while self.peek().isnumeric():
                         ret += self.eat()
                 else:
-                    errstr = "Invalid real number format: {}".format(ret + self.peek())
+                    errstr = compiler_errstr("Invalid real number format: {}{}".format(ret,self.peek()), None, self.location)
                     raise ValueError(errstr)
         return ret
 

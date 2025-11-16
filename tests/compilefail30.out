@@ -1,2 +1,3 @@
-[1mtests/compilefail30.pas:4:15: [0m[1m[91merror:[0m Semicolon expected
+[1mtests/compilefail30.pas:4:15: [0m[1m[91merror:[0m Semicolon expected, cannot define a constant in terms of an expression
      4 | const two = 1 + 1;
+
