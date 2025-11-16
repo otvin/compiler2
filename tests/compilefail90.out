@@ -1,0 +1,3 @@
+[1mtests/compilefail90.pas:8:11: [0m[1m[91merror:[0m Error D.49: Cannot assign value '-11' of type integer to type myrange
+     8 |     q := -11;  {should be caught at compile-time, was then only caught at run-time}
+

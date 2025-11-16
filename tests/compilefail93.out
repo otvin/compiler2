@@ -1,0 +1,3 @@
+[1mtests/compilefail93.pas:4:5: [0m[1m[91merror:[0m Expected 'ident' but saw '4'
+     4 | 	4 = 7;
+

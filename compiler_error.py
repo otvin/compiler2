@@ -29,7 +29,7 @@ def levstr(errlevel):
         ret = '{}{}warning:{}'.format(ANSI_BOLD, ANSI_WARNINGYELLOW,ANSI_ENDC)
     elif errlevel == ErrLevel.ERROR:
         ret = '{}{}error:{}'.format(ANSI_BOLD, ANSI_ERRORRED, ANSI_ENDC)
-    else:
+    else: # pragma: no cover
         ret = '{}{}!!FAIL:{}'.format(ANSI_BOLD, ANSI_FAIL, ANSI_ENDC)
     return ret
 

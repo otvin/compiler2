@@ -85,17 +85,17 @@ You can execute the Compiler2 unit test suite by running:
 
 ```python3 compiler_test.py```
 
-Current code coverage (as of 2025-11-09):
+Current code coverage (as of 2025-11-16):
 
 | File | Coverage |
 |------|---------:|
 |asm_generator.py|      99% |
 |editor_settings.py|     100% |
 |filelocation.py|     100% |
-|lexer.py|      97% |
+|lexer.py|      98% |
 |parser.py|      96% |
 |pascaltypes.py|      99% |
-|symboltable.py|      95% |
+|symboltable.py|      96% |
 |tac_ir.py|      99% |
 
 _Code for exceptions that should never occur are excluded, as is code that only prints text for debugging purposes.  Regular compiler errors e.g. syntax errors in Pascal code are covered via "compilefail" tests.  Code written for future features, e.g. the code that handles 64-bit integers in spots, does count against code coverage, so I do not forget to add them back to the code to be tested._

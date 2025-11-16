@@ -484,7 +484,8 @@ class Lexer:
                         ret += self.eat()
                 else:
                     # Cannot end a real with a period and no digits following.
-                    raise ValueError("Invalid character '.'")
+                    errstr = compiler_errstr("Invalid character '.'", None, self.location)
+                    raise ValueError(errstr)
             if self.peek().lower() == 'e':
                 if self.peekahead(1) in ['+', '-'] and self.peekahead(2).isnumeric():
                     ret += self.eatmulti(2)  # grab the 'e' and the sign
@@ -495,7 +496,9 @@ class Lexer:
                     while self.peek().isnumeric():
                         ret += self.eat()
                 else:
-                    errstr = compiler_errstr("Invalid real number format: {}{}".format(ret,self.peek()), None, self.location)
+                    errstr = compiler_errstr("Invalid real number format: {}{}{}".format(ret, self.peek(),
+                                                                                         self.peekahead(1)),
+                                             None, self.location)
                     raise ValueError(errstr)
         return ret
 
@@ -570,6 +573,12 @@ class Lexer:
                             self.peekahead(lookahead).lower() == 'e'):
                         val = self.eatrealnumber()
                         self.tokenstream.addtoken(Token(TokenType.UNSIGNED_REAL, curlocation, val))
+                    elif self.peekahead(lookahead) == '.' and self.peekahead(lookahead+1) != '.':
+                        # if we see two periods, it is a subrange token.  If we see one period, it is invalid;
+                        # see definition of <unsigned-real>.  Without this special case, the error is
+                        # 'Expected 'end' but saw '.' which is unhelpful.
+                        errstr = compiler_errstr('Invalid real number format: "{}"'.format(self.peekmulti(lookahead+1)), None, curlocation)
+                        raise ValueError(errstr)
                     else:
                         val = ""
                         while self.peek().isnumeric():
@@ -592,6 +601,9 @@ class Lexer:
                     #errstr = compiler_errstr('Unexpected character: {}'.format(self.peek()), None, curlocation)
                     raise LexerException('Unexpected character: {}'.format(self.peek()))
             except Exception as e:
-                raise LexerException(compiler_errstr(e, None, curlocation))
+                if isinstance(e, ValueError):
+                    raise e
+                else:
+                    raise LexerException(compiler_errstr(e, None, curlocation))
 
             self.eatwhitespace()

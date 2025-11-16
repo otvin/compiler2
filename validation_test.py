@@ -44,6 +44,7 @@ def do_conform():
                     os.system("rm {}".format(stdoutfilename))
                 elif testresult[:5] == " FAIL":
                     print(testresult[1:])
+                    os.system("rm {}".format(stdoutfilename))
                 else:
                     print('{} ({})'.format(testresult,test))
             else:

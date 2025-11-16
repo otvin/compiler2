@@ -1,9 +1,19 @@
 import os
 import sys
 import compiler
+import glob
 
 NUM_ATTEMPTS = 0
 NUM_SUCCESSES = 0
+
+def list_files(directory, mask="*"):
+    # written by chatGPT
+    """Return a list of file names in the given directory matching the mask."""
+    return [
+        f
+        for f in glob.glob(os.path.join(directory, mask))
+        if os.path.isfile(f)
+    ]
 
 def compare_two_files(actualfile, expectedfile, printdiffs=False):
     testfile1 = open(actualfile, "r")
@@ -23,8 +33,8 @@ def compare_two_files(actualfile, expectedfile, printdiffs=False):
     return testvalue1 == testvalue2
 
 
-def dotest2(pascal_filename, numparamfiles=0, pipefile=False, paramfile_comparelist=None):
-    assert pascal_filename[-4:] == ".pas"
+def dotest(pascal_filename, numparamfiles=0, pipefile=False, paramfile_comparelist=None):
+    assert pascal_filename[-4:] == ".pas", "compiler_test.dotest: invalid file name: {}".format(pascal_filename)
     assert numparamfiles >= 0
     assert isinstance(pipefile, bool)
     assert paramfile_comparelist is None or isinstance(paramfile_comparelist, list)
@@ -107,12 +117,10 @@ def dotest2(pascal_filename, numparamfiles=0, pipefile=False, paramfile_comparel
         print(e)
 
 
-def dotest(infilename, resultfilename):
-    dotest2(infilename)
 
-
-def do_compilefailtest(infilename, resultfilename):
+def do_compilefailtest(infilename):
     # For testing situations where the file fails to compile
+    assert infilename[-4:] == ".pas", "compiler_test.do_compilefailtest: invalid file name: {}".format(infilename)
 
     global NUM_ATTEMPTS
     global NUM_SUCCESSES
@@ -121,6 +129,7 @@ def do_compilefailtest(infilename, resultfilename):
 
     try:
         # the carriage return is included in the output files to end the line
+        resultfilename = infilename[:-4] + ".out"
         asmfilename = infilename[:-4] + ".asm"
         comparestr = compiler.compile(infilename, asmfilename=asmfilename).rstrip()
 
@@ -142,98 +151,23 @@ def do_compilefailtest(infilename, resultfilename):
         print("FAIL: {0}".format(infilename))
         print(e)
 
-def do_compilefail_bugfixtest(numstr):
-    # some bugfix tests are compile fail tests
-    global ONLYTEST
-    if ONLYTEST == "" or ONLYTEST == "bugfix":
-        pasfile = "tests/testbugfix" + numstr + ".pas"
-        outfile = "tests/testbugfix" + numstr + ".out"
-        do_compilefailtest(pasfile, outfile)
-
-def generate_test_list(topic, start, end):
-    testlist = []
-    for i in range(start, end + 1):
-        test = topic
-        if i < 10:
-            test += "0"
-        test += str(i)
-        testlist.append(test)
-    return testlist
-
-ONLYTEST = ""
-def run_test_list(topic, start, end):
-    global ONLYTEST
-    if ONLYTEST == "" or ONLYTEST == topic:
-        testlist = generate_test_list(topic, start, end)
-        for test in testlist:
-            pasfile = "tests/test" + test + ".pas"
-            outfile = "tests/test" + test + ".out"
-            dotest(pasfile, outfile)
-
-def run_compilefail_test_list(start, end):
-    global ONLYTEST
-    if ONLYTEST == "" or ONLYTEST == "compilefail":
-        testlist = generate_test_list("compilefail", start, end)
-        for test in testlist:
-            pasfile = "tests/" + test + ".pas"
-            outfile = "tests/" + test + ".out"
-            do_compilefailtest(pasfile, outfile)
-
-
 def main(onlytest=""):
     global NUM_ATTEMPTS
     global NUM_SUCCESSES
-    global ONLYTEST
 
-    ONLYTEST = onlytest
+    testfilelist = list_files("tests", "test{}*pas".format(onlytest))
+    testfilelist.sort()
+    for filename in testfilelist:
+        if "testfiles" in filename:
+            dotest(filename, 1, False, [0])
+        else:
+            dotest(filename)
 
-    run_test_list("array", 1, 23)
-    run_test_list("assign", 1, 3)
-    run_test_list("boolean", 1, 2)
-    run_test_list("bugfix", 1, 1)
-    do_compilefail_bugfixtest("02")
-    # note testbyref06 in Compiler2 was "known_bug1.pas" in the old Compiler suite
-    run_test_list("bugfix", 3, 5)
-    run_test_list("byref", 1, 6)
-    run_test_list("char", 1, 3)
-    run_test_list("comments", 1, 2)
-    run_test_list("const", 1, 6)
-    run_test_list("divide", 1, 1)
-
-    if ONLYTEST == "" or ONLYTEST == "files":
-        dotest2("tests/testfiles01.pas", 1, False, [0])
-        dotest2("tests/testfiles02.pas", 1, False, [0])
-        dotest2("tests/testfiles03.pas", 1, False, [0])
-
-    run_test_list("for", 1, 5)
-    run_test_list("fpmath", 1, 9)
-    run_test_list("functions", 1, 11)
-    run_test_list("functions", 13, 17)
-    run_test_list("globalvar", 1, 3)
-    run_test_list("idiv", 1, 2)
-    run_test_list("if", 1, 3)
-    run_test_list("localvar", 1, 2)
-    run_test_list("math", 1, 7)
-    run_test_list("misc", 1, 1)
-    run_test_list("mod", 1, 2)
-    run_test_list("ord", 1, 6)
-    # note testprocedure02 was "testproc01" in the old Compiler suite
-    run_test_list("procedure", 1, 9)
-    run_test_list("real", 1, 8)
-    run_test_list("recursion", 1, 1)
-    run_test_list("relop", 1, 6)
-    run_test_list("repeat", 1, 2)
-    run_test_list("scope", 1, 3)
-    run_test_list("sqrt", 1, 2)
-    run_test_list("string", 1, 1)
-    run_test_list("string", 3, 3)
-    run_test_list("string", 5, 11)
-    run_test_list("typedef", 1, 14)
-    run_test_list("while", 1, 3)
-    run_test_list("write", 1, 2)
-    run_test_list("writeln", 1, 3)
-
-    run_compilefail_test_list(0, 89)
+    if onlytest == "" or onlytest =="compilefail":
+        compilefaillist = list_files("tests", "compilefail*pas")
+        compilefaillist.sort()
+        for filename in compilefaillist:
+            do_compilefailtest(filename)
 
     print("Tests Attempted: " + str(NUM_ATTEMPTS))
     print("Tests Succeeded: " + str(NUM_SUCCESSES))
