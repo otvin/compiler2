@@ -61,18 +61,7 @@ Compiler2 supports the following Pascal Language features:
 
 At this point, Compiler2 has all features from Compiler1 except for the non-standard "Concat()" function from Compiler1.  However, the String type in the original compiler is not ISO standard, it was modeled after Turbo Pascal, and Concat() would not work as a built-in in Compiler2.  
 
-Compiler2 also has the following functionality that compiler1 did not:
-* Boolean and Character types
-* Constants
-* REPEAT..UNTIL construct
-* FOR loops
-* Ability to do relational operations comparing Integer and Real types, and relational operations involving enumerated types.
-* abs(), sqr(), sin(), cos(), exp(), ln(), sqrt(), trunc(), round(), chr(), ord(), succ(), pred(), and odd()
-* Boolean operators not, or, and
-* Writing to Text Files in addition to stdout
-* Type Definitions, including Subrange Types, Enumerated Types, and arrays.
-
-Compiler2 also uses the official BNF from the ISO standard, whereas Compiler1 used a BNF that I updated based on a variation I had downloaded from a random website.
+Compiler2 also has significant functionality that compiler1 did not, and uses the official BNF from the ISO standard, whereas Compiler1 used a BNF that I updated based on a variation I had downloaded from a random website.
 
 The big improvement in Compiler2 is that this version has been designed like a more classic compiler.  There is a lexer, which identifies all tokens in the ISO Pascal standard.
 The parser generates an Abstract Syntax Tree (AST).  The compiler then transforms the AST into Three-Address Code (TAC), which is an intermediate language.  
