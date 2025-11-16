@@ -573,12 +573,14 @@ class Lexer:
                             self.peekahead(lookahead).lower() == 'e'):
                         val = self.eatrealnumber()
                         self.tokenstream.addtoken(Token(TokenType.UNSIGNED_REAL, curlocation, val))
-                    elif self.peekahead(lookahead) == '.' and self.peekahead(lookahead+1) != '.':
-                        # if we see two periods, it is a subrange token.  If we see one period, it is invalid;
-                        # see definition of <unsigned-real>.  Without this special case, the error is
-                        # 'Expected 'end' but saw '.' which is unhelpful.
-                        errstr = compiler_errstr('Invalid real number format: "{}"'.format(self.peekmulti(lookahead+1)), None, curlocation)
-                        raise ValueError(errstr)
+                    elif (self.peekahead(lookahead) == '.' and self.peekahead(lookahead+1) != '.' and
+                          self.peekahead(lookahead+1) != ')'):
+                            # if we see two periods, it is a subrange token.  If we see a period followed by a paren,
+                            # it's a lexical alternative for right bracket.  If we see one period otherwise, it is invalid;
+                            # see definition of <unsigned-real>.  Without this special case, the error is
+                            # 'Expected 'end' but saw '.' which is unhelpful.
+                            errstr = compiler_errstr('Invalid real number format: "{}"'.format(self.peekmulti(lookahead+1)), None, curlocation)
+                            raise ValueError(errstr)
                     else:
                         val = ""
                         while self.peek().isnumeric():
