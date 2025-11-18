@@ -115,13 +115,15 @@ class AST:
 
     def rpn_print(self, level=0):  # pragma: no cover
         # used only for debugging
+        ret = ""
+        if self.comment != "":
+            ret = "{};{}\n".format((level * " "), self.comment)
+
+        ret += "{}{}\n".format((level * " "), str(self.token))
+
         for x in self.children:
-            x.rpn_print(level + 1)
-        if self.comment == "":
-            ret = "{}{}".format((level * " "), str(self.token))
-        else:
-            ret = "{}{}\t\t;{}".format((level * " "), str(self.token), self.comment)
-        print(ret)
+            ret += x.rpn_print(level + 1)
+        return ret
 
     def nearest_symboltable(self):
         ptr = self

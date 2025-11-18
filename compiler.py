@@ -44,7 +44,7 @@ def compile(infilename, asmfilename=None, objfilename=None, exefilename=None,
 
     if verbose:
         print("\n\nPARSER OUTPUT")
-        p.AST.rpn_print(0)
+        print(p.AST.rpn_print(0))
 
     if len(p.parseerrorlist) > 0:
         raise Exception("I need to display the compiler errors")
