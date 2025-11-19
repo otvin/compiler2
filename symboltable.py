@@ -63,12 +63,13 @@ class IntegerLiteral(OrdinalLiteral):
 
 
 class BooleanLiteral(OrdinalLiteral):
+    # TODO - check why these values are strings instead of integers?
     def __init__(self, value, location):
         assert value in ('0', '1')
         super().__init__(value, location, pascaltypes.BooleanType())
 
     def __str__(self): # pragma: no cover
-        if self.value == 0:
+        if self.value == '0':
             return "FALSE"
         else:
             return "TRUE"
@@ -400,6 +401,19 @@ class SymbolTable:
         ptr = self
         while (not ret) and (ptr is not None):
             ret = ptr.exists(name)
+            ptr = ptr.parent
+        return ret
+
+    def existsexactly(self, sym):
+        # looks to see if the exact symbol is defined in the symbol table, not just by name
+        return sym in self.symbols.values()
+
+    def existsanywhereexactly(self, sym):
+        # looks in current symbol table and parents
+        ret = False
+        ptr = self
+        while (not ret) and (ptr is not None):
+            ret = ptr.existsexactly(sym)
             ptr = ptr.parent
         return ret
 
