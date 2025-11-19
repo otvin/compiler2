@@ -73,7 +73,7 @@ from symboltable import Symbol, Label, Literal, IntegerLiteral, RealLiteral, Str
     SymbolTable, LiteralTable, ParameterList, ActivationSymbol, Parameter, VariableSymbol, \
     FunctionResultVariableSymbol, ConstantSymbol, CharacterLiteral
 from lexer import TokenType, Token
-from compiler_error import compiler_errstr, compiler_warnstr
+from compiler_error import compiler_errstr, compiler_warnstr, compiler_failstr
 import pascaltypes
 
 
@@ -461,27 +461,67 @@ class TACBlock:
                             self.generator.warningslist.append(warnstr)
             return sym
 
-    def validate_function_returnsvalue(self, functionidentifier, ast):
+    def validate_function_returnsvalue(self, returnvaluesym, ast):
         # 6.7.3 of the ISO standard states that it shall be an error if the result of a function is undefined
-        # upon completion of the algorithm.  We will need a runtime check later, similar to how we need a
-        # runtime check that a variable is assigned before it is used, but for now we will just validate
+        # upon completion of the algorithm.  The runtime check will be handled in track_function_returnval_assignments()
+        # similar to how we need a runtime check that a variable is assigned before it is used. We also validate
         # at compile time that there is at least one assignment statement with the function-identifier is
         # on the left side.
         # Per Cooper, p.77: "Every function must contain at least one assignment to its identifier."  Also,
         # "[T]he function-identifier alone ... represents a storage location ... that may only be assigned to."
         # I infer from this that you cannot set the return value of a function by passing the function-identifier
         # to a procedure as a byref argument or such.
-        # TODO - Add the runtime checks described above.
-        assert isinstance(ast, AST)
+        assert isinstance(returnvaluesym, FunctionResultVariableSymbol), (
+            compiler_failstr("tac_ir.validate_function_returnsvalue: returnvaluesym is not a symbol"))
+        assert isinstance(ast, AST), compiler_failstr("tac_ir.validate_function_returnsvalue: ast is not an AST")
 
         if ast.token.tokentype == TokenType.ASSIGNMENT:
-            return ast.children[0].token.value.lower() == functionidentifier.lower()
+            if ast.nearest_symboltable().exists(ast.children[0].token.value.lower()):
+                lvalsym = ast.nearest_symboltable().fetch(ast.children[0].token.value.lower())
+                return lvalsym is returnvaluesym
+            else:
+                return False
         else:
             for child in ast.children:
-                tmp = self.validate_function_returnsvalue(functionidentifier, child)
+                tmp = self.validate_function_returnsvalue(returnvaluesym, child)
                 if tmp:
                     return True
             return False
+
+    def track_function_returnval_assignments(self, returnvaluesym, retvalisassignedsym, ast):
+        assert isinstance(returnvaluesym, FunctionResultVariableSymbol), (
+            compiler_failstr("tac_ir.track_function_returnval_assignment: returnvaluesym is not a symbol"))
+        assert isinstance(retvalisassignedsym, VariableSymbol), (
+            compiler_failstr("tac_ir.track_function_returnval_assignment: retvalisassignedsym is not a symbol"))
+        assert isinstance(ast, AST), compiler_failstr("tac_ir.track_function_returnval_assignment: ast is not an AST")
+
+        # if we modify the ast while we are iterating through it, we can get an infinite loop
+        indexlist = []
+        for child in ast.children:
+            if child.token.tokentype == TokenType.ASSIGNMENT:
+                if child.nearest_symboltable().exists(child.children[0].token.value.lower()):
+                    lvalsym = child.nearest_symboltable().fetch(child.children[0].token.value.lower())
+                    if lvalsym is returnvaluesym:
+                        indexlist.append(ast.children.index(child))
+            self.track_function_returnval_assignments(returnvaluesym, retvalisassignedsym, child)
+        if len(indexlist) > 0:
+            # add from the end to the beginning, else the indexes get messed up
+            for index in reversed(indexlist):
+                child = ast.children[index]
+                newbegin = AST(Token(TokenType.BEGIN, child.token.location, "Begin"), ast, "Track assignment to {}".format(returnvaluesym.name))
+                child.parent = newbegin
+                newbegin.children.append(child)
+
+                track_assignment_ast = AST(Token(TokenType.ASSIGNMENT, child.token.location, ":="), newbegin, "Assign {} to true".format(retvalisassignedsym.name))
+                lvaltoken = Token(TokenType.IDENTIFIER, child.token.location, retvalisassignedsym.name)
+                truetoken = Token(TokenType.TRUE, child.token.location, 'true')
+                track_assignment_ast.children.append(AST(lvaltoken, track_assignment_ast))
+                track_assignment_ast.children.append(AST(truetoken, track_assignment_ast))
+                newbegin.children.append(track_assignment_ast)
+
+                ast.children[index] = newbegin
+            # TODO - am betting if we return true from here we can track whether an assignment existed
+            # and get rid of validate_function_returnsvalue.
 
     def processast_procedurefunction(self, ast):
         assert isinstance(ast, AST)
@@ -492,14 +532,15 @@ class TACBlock:
         # matters because we are going to copy the parameter list from the AST to the TACBlock
         # and cannot do that if we have multiple parameter lists for nested procs.
         # We need some other structure.
-        assert len(self.tacnodes) == 0
+        assert len(self.tacnodes) == 0, compiler_failstr("tac_ir.processast_procedurefunction: cannot declare functions or procedures inside other functions or procedures yet")
 
         # first child of a Procedure or Function is an identifier with the name of the proc/func
-        assert len(ast.children) >= 1
-        assert ast.children[0].token.tokentype == TokenType.IDENTIFIER
+        assert len(ast.children) >= 1, compiler_failstr("tac_id.processast_procedurefunction: procedure/function with no children")
+        assert ast.children[0].token.tokentype == TokenType.IDENTIFIER, compiler_failstr("tac_ir.processast_procedurefunction: first child of procedure/function must be an identifier")
 
         tok = ast.token
         str_procname = ast.children[0].token.value
+
         self.paramlist = ast.paramlist
         # need to copy each parameter into the SymbolTable.  If the parameter is a variable parameter (ByRef),
         # the type of the symbol is a pointer to the type of the Parameter.  If the parameter is a value
@@ -509,8 +550,6 @@ class TACBlock:
             assert isinstance(param, Parameter)
             tmpsym = deepcopy(param.symbol)
             tmpsym.is_assignedto = True
-            # wonder if I should copy this instead of just assigning to it
-
             self.symboltable.add(tmpsym)
 
         # we need to go to the parent to fetch the activation symbol.  If we do the fetch on
@@ -520,7 +559,67 @@ class TACBlock:
         proclabel = self.getlabel(str_procname)
         actsym.label = proclabel
         if tok.tokentype == TokenType.FUNCTION:
+            if len(ast.children) < 2:
+                errstr = 'Error D.48: Function {} must have a return value'.format(str_procname)
+                raise TACException(compiler_errstr(errstr, tok))
             comment = "Function {}({})".format(str_procname, str(self.paramlist))
+            # Error D.48 states "It is an error if the result of an activation of a function is undefined upon
+            # completion of the function.  At compile time, we can validate that there is at least one assignment
+            # statement, but we cannot validate, in the general case, that it executes.  We need to track at runtime
+            # whether the return value is ever assigned.  This local variable will do that.  Beginning name with
+            # underscore ensures it will not collide with any user-defined identifier.
+
+            # create a variable to track whether or not the retval is assigned
+            retvalisassigned_variablename = '_{}_isassigned'.format(str_procname)
+            retvalisassignedsym = VariableSymbol(retvalisassigned_variablename, tok.location, pascaltypes.BooleanType())
+            self.symboltable.add(retvalisassignedsym)
+            ast.symboltable.add(retvalisassignedsym)
+
+            # create an AST that initializes this variable to False, and make that the first statement executed
+            # in the current AST.
+            retvalisassigned_initialize_ast = AST(Token(TokenType.ASSIGNMENT, None, ":="), ast, "initialize {} to false".format(retvalisassigned_variablename))
+            retvalisassignedtoken = Token(TokenType.IDENTIFIER, tok.location, retvalisassigned_variablename)
+            falsetoken = Token(TokenType.FALSE, tok.location, 'false')
+            retvalisassigned_initialize_ast.children.append(AST(retvalisassignedtoken, retvalisassigned_initialize_ast))
+            retvalisassigned_initialize_ast.children.append(AST(falsetoken, retvalisassigned_initialize_ast))
+            # make this assignment become the first statement in the function
+            ast.children[1].children.insert(0, retvalisassigned_initialize_ast)
+            # debugprintast = AST(Token(TokenType.WRITELN, None, 'writeln'), ast, "Debug print {}".format(retvalisassigned_variablename))
+            # debugprintast.children.append(
+            #     AST(Token(TokenType.IDENTIFIER, None, retvalisassigned_variablename), ast))
+            # ast.children[1].children.insert(1, debugprintast)
+
+            # recursively iterate through the children of the current AST, starting with the one following the
+            # assignment we just inserted, and identify any assignments to the retval.  This requires matching on
+            # the symbols themselves, not the names, as function declared inside a function could reuse a name.
+            retvalsym = ast.symboltable.fetch(str_procname)
+            for child in ast.children[1].children[1:]:
+                self.track_function_returnval_assignments(retvalsym, retvalisassignedsym, child)
+
+            # check if the return value is assigned to at least once in the ast.
+            function_has_returnvalue = self.validate_function_returnsvalue(retvalsym, ast)
+            if not function_has_returnvalue:
+                errstr = 'Error D.48: Function {} must have a return value'.format(str_procname)
+                raise TACException(compiler_errstr(errstr, tok))
+
+            # now we need to test that the returnvalue was assigned
+            testast = AST(Token(TokenType.IF, child.token.location, 'if'), ast, 'if {} = False, then error'.format(retvalisassigned_variablename))
+            conditionast = AST(Token(TokenType.EQUALS, child.token.location, '='), testast, 'if {} = false'.format(retvalisassigned_variablename))
+            # I could probably reuse these tokens but I'm very conservative
+            conditionast.children.append(AST(deepcopy(retvalisassignedtoken), conditionast))
+            conditionast.children.append(AST(deepcopy(falsetoken), conditionast))
+            testast.children.append(conditionast)
+
+
+            '''
+            debugprintast = AST(Token(TokenType.WRITELN, child.token.location, 'writeln'), testast, "Debug print {}".format(retvalisassigned_variablename))
+            # debugprintast.children.append(AST(Token(TokenType.CHARSTRING, child.token.location, "RETURN VALUE NOT ASSIGNED ERROR"), debugprintast))
+            debugprintast.children.append(AST(Token(TokenType.IDENTIFIER, child.token.location, retvalisassigned_variablename), debugprintast))
+            testast.children.append(debugprintast)
+            ast.children.append(testast)
+            # ast.children[1].children.append(debugprintast)
+            # print(ast.rpn_print(0))
+            '''
         else:
             comment = "Procedure {}({})".format(str_procname, str(self.paramlist))
         self.addnode(TACLabelNode(proclabel, comment))
@@ -529,10 +628,6 @@ class TACBlock:
             self.processast(child)
 
         if tok.tokentype == TokenType.FUNCTION:
-            function_has_returnvalue = self.validate_function_returnsvalue(str_procname, ast)
-            if not function_has_returnvalue:
-                errstr = 'Error D.48: Function {} must have a return value'.format(str_procname)
-                raise TACException(compiler_errstr(errstr, tok))
             self.addnode(TACFunctionReturnNode(self.symboltable.fetch(str_procname)))
         else:
             self.addnode(TACFunctionReturnNode(None))
