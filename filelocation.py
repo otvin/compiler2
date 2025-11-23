@@ -8,5 +8,5 @@ class FileLocation:
     def getprolog(self):
         return '{}:{}:{}:'.format(self.filename, self.line, self.column)
 
-    def __str__(self): # pragma: no cover
+    def __str__(self):  # pragma: no cover
         return 'file:{0:<15} line:{1:<5} column:{2:<3}'.format(self.filename, self.line, self.column)

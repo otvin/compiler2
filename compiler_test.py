@@ -6,6 +6,7 @@ import glob
 NUM_ATTEMPTS = 0
 NUM_SUCCESSES = 0
 
+
 def list_files(directory, mask="*"):
     # written by chatGPT
     """Return a list of file names in the given directory matching the mask."""
@@ -14,6 +15,7 @@ def list_files(directory, mask="*"):
         for f in glob.glob(os.path.join(directory, mask))
         if os.path.isfile(f)
     ]
+
 
 def compare_two_files(actualfile, expectedfile, printdiffs=False):
     testfile1 = open(actualfile, "r")
@@ -62,7 +64,8 @@ def dotest(pascal_filename, numparamfiles=0, pipefile=False, paramfile_compareli
         if pipefile:
             pipefilestr = " < " + fileroot + "_pipein" + ".file"
 
-        comparestr = compiler.compile(pascal_filename, asmfilename=asmfilename, objfilename=objfilename, exefilename=exefilename).rstrip()
+        comparestr = compiler.compile(pascal_filename, asmfilename=asmfilename, objfilename=objfilename,
+                                      exefilename=exefilename).rstrip()
 
         exestr = "./{} {} {} > {}".format(exefilename, paramfilestr, pipefilestr, stdoutfilename)
         os.system(exestr)
@@ -117,7 +120,6 @@ def dotest(pascal_filename, numparamfiles=0, pipefile=False, paramfile_compareli
         print(e)
 
 
-
 def do_compilefailtest(infilename):
     # For testing situations where the file fails to compile
     assert infilename[-4:] == ".pas", "compiler_test.do_compilefailtest: invalid file name: {}".format(infilename)
@@ -151,6 +153,7 @@ def do_compilefailtest(infilename):
         print("FAIL: {0}".format(infilename))
         print(e)
 
+
 def main(onlytest=""):
     global NUM_ATTEMPTS
     global NUM_SUCCESSES
@@ -163,7 +166,7 @@ def main(onlytest=""):
         else:
             dotest(filename)
 
-    if onlytest == "" or onlytest =="compilefail":
+    if onlytest == "" or onlytest == "compilefail":
         compilefaillist = list_files("tests", "compilefail*pas")
         compilefaillist.sort()
         for filename in compilefaillist:

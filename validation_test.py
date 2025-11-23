@@ -4,6 +4,7 @@ import compiler
 NUM_ATTEMPTS = 0
 NUM_SUCCESSES = 0
 
+
 def do_conform():
     global NUM_ATTEMPTS
     global NUM_SUCCESSES
@@ -25,7 +26,8 @@ def do_conform():
         stdoutfilename = "tests/BSI-validation-suite/CONFORM/" + test + ".testoutput"
 
         try:
-            t = compiler.compile(pascal_filename, asmfilename=asmfilename, objfilename=objfilename, exefilename=exefilename)
+            t = compiler.compile(pascal_filename, asmfilename=asmfilename, objfilename=objfilename,
+                                 exefilename=exefilename)
             if os.path.exists(exefilename):
                 exestr = "./{} > {}".format(exefilename, stdoutfilename)
                 os.system(exestr)
@@ -46,7 +48,7 @@ def do_conform():
                     print(testresult[1:])
                     os.system("rm {}".format(stdoutfilename))
                 else:
-                    print('{} ({})'.format(testresult,test))
+                    print('{} ({})'.format(testresult, test))
             else:
                 print("Compile error: {} ({})\n".format(t, test))
         except Exception as e:
@@ -64,6 +66,7 @@ def main():
     print("Tests Attempted: " + str(NUM_ATTEMPTS))
     print("Tests Succeeded: " + str(NUM_SUCCESSES))
 
-#TODO: refactor validation_test and compiler_test to use shared library vs. copying code
+
+# TODO: refactor validation_test and compiler_test to use shared library vs. copying code
 if __name__ == '__main__':  # pragma: no cover
     main()

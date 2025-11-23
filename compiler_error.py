@@ -15,25 +15,28 @@ ANSI_UNDERLINE = '\033[4m'
 
 ANSI_ENDC = '\033[0m'
 
+
 class ErrLevel(Enum):
     INFO = 0
     WARNING = 1
     ERROR = 2
     FAIL = 3
 
+
 def levstr(errlevel):
-    assert(errlevel in [ErrLevel.INFO, ErrLevel.WARNING, ErrLevel.ERROR, ErrLevel.FAIL])
+    assert errlevel in [ErrLevel.INFO, ErrLevel.WARNING, ErrLevel.ERROR, ErrLevel.FAIL]
     if errlevel == ErrLevel.INFO:
         ret = '{}{}note:{}'.format(ANSI_BOLD, ANSI_OKCYAN, ANSI_ENDC)
     elif errlevel == ErrLevel.WARNING:
-        ret = '{}{}warning:{}'.format(ANSI_BOLD, ANSI_WARNINGYELLOW,ANSI_ENDC)
+        ret = '{}{}warning:{}'.format(ANSI_BOLD, ANSI_WARNINGYELLOW, ANSI_ENDC)
     elif errlevel == ErrLevel.ERROR:
         ret = '{}{}error:{}'.format(ANSI_BOLD, ANSI_ERRORRED, ANSI_ENDC)
-    else: # pragma: no cover
+    else:  # pragma: no cover
         ret = '{}{}!!FAIL:{}'.format(ANSI_BOLD, ANSI_FAIL, ANSI_ENDC)
     return ret
 
-def compiler_notifystr(errstr, errlevel, errtok = None, errloc = None):
+
+def compiler_notifystr(errstr, errlevel, errtok=None, errloc=None):
     # if errtok is not defined, then will look at location in errloc.  If both errtok and errloc are defined
     # errloc is ignored.
 
@@ -51,11 +54,14 @@ def compiler_notifystr(errstr, errlevel, errtok = None, errloc = None):
     ret = '{}{}{}{} {}\n{}'.format(ANSI_BOLD, prolog, ANSI_ENDC, levstr(errlevel), errstr, curlinestr)
     return ret
 
-def compiler_warnstr(errstr, errtok = None, errloc = None):
+
+def compiler_warnstr(errstr, errtok=None, errloc=None):
     return compiler_notifystr(errstr, ErrLevel.WARNING, errtok, errloc)
 
-def compiler_errstr(errstr, errtok = None, errloc = None):
+
+def compiler_errstr(errstr, errtok=None, errloc=None):
     return compiler_notifystr(errstr, ErrLevel.ERROR, errtok, errloc)
+
 
 def compiler_failstr(errstr):
     return '{}{}'.format(levstr(ErrLevel.FAIL), errstr)

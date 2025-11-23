@@ -27,7 +27,7 @@ FILESTATE_INSPECTION = 2
 
 
 class PascalError:
-    def __init__(self, errorstr, label, isused = False):
+    def __init__(self, errorstr, label, isused=False):
         # we will only write the error information to the .asm file if it is invoked someplace
         assert isinstance(errorstr, str)
         assert isinstance(label, str)
@@ -124,18 +124,18 @@ class AssemblyGenerator:
         self.pascalerrors[2] = PascalError("Error D.46: Divisor in Mod must be positive", "_PASCAL_MOD_ERROR")
         self.pascalerrors[3] = PascalError("Error D.34: Cannot take sqrt() of negative number", "_PASCAL_SQRT_ERROR")
         self.pascalerrors[4] = PascalError("Error D.33: Cannot take ln() of number less than or equal to zero",
-                                      "_PASCAL_LN_ERROR")
+                                           "_PASCAL_LN_ERROR")
         self.pascalerrors[5] = PascalError("Error D.37: value to chr() exceeds 0-255 range for Char type",
-                                      "_PASCAL_CHR_ERROR")
+                                           "_PASCAL_CHR_ERROR")
         self.pascalerrors[6] = PascalError("Error D.38 or D.39: succ() or pred() exceeds range for enumerated type",
-                                      "_PASCAL_SUCC_PRED_ERROR")
+                                           "_PASCAL_SUCC_PRED_ERROR")
         self.pascalerrors[7] = PascalError("Error: value exceeds range for subrange type", "_PASCAL_SUBRANGE_ERROR")
         self.pascalerrors[8] = PascalError("Error: array index out of range.", "_PASCAL_ARRAYINDEX_ERROR")
         self.pascalerrors[9] = PascalError("Error: dynamic memory allocation failed.", "_PASCAL_CALLOC_ERROR")
         self.pascalerrors[10] = PascalError("Error: unable to de-allocate dynamic memory.", "_PASCAL_DISPOSE_ERROR")
         # D.14 is referenced in compiler2_system_io.asm
         self.pascalerrors[11] = PascalError("Error D.14: file not in inspection mode prior to get() or read().",
-                                       "_PASCAL_WRONGMODE_GET_ERROR", True)
+                                            "_PASCAL_WRONGMODE_GET_ERROR", True)
         # D.16 is referenced in compiler2_system_io.asm
         self.pascalerrors[12] = PascalError("Error D.16: EOF encountered during get() or read().",
                                             "_PASCAL_EOF_GET_ERROR", True)
@@ -143,11 +143,11 @@ class AssemblyGenerator:
             "Error D.9: File not in generation mode prior to put(), write(), writeln(), or page().",
             "_PASCAL_FILENOTGENERATION_ERROR")
         self.pascalerrors[14] = PascalError("Error D.14: File not in inspection mode prior to get() or read().",
-                                       "_PASCAL_FILENOTINSPECTION_ERROR")
+                                            "_PASCAL_FILENOTINSPECTION_ERROR")
         self.pascalerrors[15] = PascalError("Error D.10 or D.15: File undefined prior to access.",
-                                       "_PASCAL_UNDEFINEDFILE_ERROR")
+                                            "_PASCAL_UNDEFINEDFILE_ERROR")
         self.pascalerrors[16] = PascalError("Error: insufficient number of command-line arguments.",
-                                       "_PASCAL_INSUFFICIENT_ARGC_ERROR")
+                                            "_PASCAL_INSUFFICIENT_ARGC_ERROR")
         self.pascalerrors[17] = PascalError("Error opening file.", "_PASCAL_FOPEN_ERROR")
         self.pascalerrors[18] = PascalError("Error D.48: Activation of function is undefined upon function completion.",
                                             "_PASCAL_NORETURNVAL_ERROR")
@@ -287,8 +287,8 @@ class AssemblyGenerator:
         assert isinstance(destsym, Symbol) or (isinstance(destsym, str) and destsym.upper() in VALID_REGISTER_LIST)
         assert numbytes > 0
         assert isinstance(sourcesym.pascaltype, pascaltypes.PointerType) or \
-            isinstance(sourcesym.pascaltype, pascaltypes.ArrayType) or \
-            isinstance(sourcesym.pascaltype, pascaltypes.StringLiteralType)
+               isinstance(sourcesym.pascaltype, pascaltypes.ArrayType) or \
+               isinstance(sourcesym.pascaltype, pascaltypes.StringLiteralType)
 
         if isinstance(destsym, Symbol):
             assert isinstance(destsym.pascaltype, pascaltypes.PointerType) or \
@@ -368,7 +368,8 @@ class AssemblyGenerator:
                     litname = 'stringlit_{}'.format(nextid)
                     nextid += 1
                     if len(lit.value) > 255:
-                        errstr = compiler_errstr("String literal '{}' exceeds 255 char max length.".format(lit.value), None, lit.location)
+                        errstr = compiler_errstr("String literal '{}' exceeds 255 char max length.".format(lit.value),
+                                                 None, lit.location)
                         raise ASMGeneratorError(errstr)
                     self.emitcode("{} db `{}`, 0".format(litname, lit.value.replace('`', '\\`')))
                     lit.memoryaddress = litname
@@ -613,14 +614,14 @@ class AssemblyGenerator:
         for symname in self.tacgenerator.globalsymboltable.symbols.keys():
             sym = self.tacgenerator.globalsymboltable.fetch(symname)
             if isinstance(sym, ProgramParameterSymbol) and sym.name not in ("input", "output"):
-                symlist.append((sym.position, sym.filenamememoryaddress))
+                symlist.append((sym.position, sym.filenamememoryaddress, sym.name))
 
         if len(symlist) > 0:
             self.emitcode("cmp RDI, {}".format(len(symlist)), "Test number of command-line arguments")
             self.emit_jumptoerror("jl", "_PASCAL_INSUFFICIENT_ARGC_ERROR")
             for syminfo in symlist:
                 rsi_offset = 8 * syminfo[0]
-                comment = "retrieve file name for variable {}".format(sym.name)
+                comment = "retrieve file name for variable {}".format(syminfo[2])
                 self.emitcode("mov RAX, [RSI+{}]".format(rsi_offset), comment)
                 self.emitcode("mov [{}], rax".format(syminfo[1]))
 
@@ -974,7 +975,7 @@ class AssemblyGenerator:
                         self.emit_jumptoerror("jb", "_PASCAL_SQRT_ERROR")
                         self.emitcode("sqrtsd xmm0, xmm0", 'sqrt()')
                         comment = "assign return value of function to {}".format(node.lval.name)
-                        # Currently all of the system functions use a temporary, which I know is not byref.
+                        # Currently all the system functions use a temporary, which I know is not byref.
                         # So, technically it would be quicker to do this:
                         # self.emitcode("MOVSD [{}], XMM0".format(node.lval.memoryaddress), comment)
                         # however, to future-proof this for optimizations, I'll use the movtostack() functions
@@ -1046,30 +1047,30 @@ class AssemblyGenerator:
                         # and http://www.ray.masmcode.com/tutorial/fpuchap11.htm worked in many cases but not all.
                         # Used ChatGPT to assist.
 
-
-                        self.emitcode("movsd [{}], xmm0".format(node.lval.memoryaddress), "use {} to move value to FPU".format(node.lval.name))
+                        self.emitcode("movsd [{}], xmm0".format(node.lval.memoryaddress),
+                                      "use {} to move value to FPU".format(node.lval.name))
                         self.emitcode("FLD QWORD [{}]".format(node.lval.memoryaddress))
 
                         # compute y = x * log2(e)
-                        self.emitcode("FLDL2E") # ST0 = log2(e), ST1 = x
-                        self.emitcode("FMULP ST1, ST0") # ST0 = x * log2(e) = y
+                        self.emitcode("FLDL2E")  # ST0 = log2(e), ST1 = x
+                        self.emitcode("FMULP ST1, ST0")  # ST0 = x * log2(e) = y
 
                         # split y into integer n and fractional f
-                        self.emitcode("FLD ST0") # ST0 = y, ST1 = y
-                        self.emitcode("FRNDINT") # ST0 = n (rounded y), ST1 = y
-                        self.emitcode("FSUB ST1, ST0") # ST1 = y-n = f, ST0 = n
-                        self.emitcode("FXCH ST1") # ST0 = y-n = f, ST1 = n
+                        self.emitcode("FLD ST0")  # ST0 = y, ST1 = y
+                        self.emitcode("FRNDINT")  # ST0 = n (rounded y), ST1 = y
+                        self.emitcode("FSUB ST1, ST0")  # ST1 = y-n = f, ST0 = n
+                        self.emitcode("FXCH ST1")  # ST0 = y-n = f, ST1 = n
 
                         # compute 2^f using f2xm1
-                        self.emitcode("F2XM1") # ST0 = 2^f - 1, ST1 = n
-                        self.emitcode("FLD1") # ST0 = 1, ST1 = 2^f - 1, ST2 = n
-                        self.emitcode("FADDP ST1, ST0") # ST0 = 2^f, ST1 = n
+                        self.emitcode("F2XM1")  # ST0 = 2^f - 1, ST1 = n
+                        self.emitcode("FLD1")  # ST0 = 1, ST1 = 2^f - 1, ST2 = n
+                        self.emitcode("FADDP ST1, ST0")  # ST0 = 2^f, ST1 = n
 
                         # scale by 2^n: result = 2^(n+f) = e^x
                         self.emitcode("FSCALE")  # Per the fpuchap11.htm link above, FSCALE multiplies ST0 by
-                                                 # 2^(ST1), first truncating ST1 to an integer.  It leaves ST1 intact.
-                                                 # ST0 has 2^remainder of (x * log2(e)) * 2^integer part of (x*log2(e))
-                                                 # So ST0 has e^x in it.  Neat.  ST1 still has x * log2(e) in it.
+                        # 2^(ST1), first truncating ST1 to an integer.  It leaves ST1 intact.
+                        # ST0 has 2^remainder of (x * log2(e)) * 2^integer part of (x*log2(e))
+                        # So ST0 has e^x in it.  Neat.  ST1 still has x * log2(e) in it.
                         self.emitcode("FSTP ST1")  # We need to clean up the stack, so this gets rid of ST1
                         comment = "assign return value of function to {}".format(node.lval.name)
                         self.emitcode("fstp qword [{}]".format(node.lval.memoryaddress), comment)
@@ -1259,8 +1260,8 @@ class AssemblyGenerator:
                 elif isinstance(node, TACBinaryNode):
 
                     assert isinstance(node.result.pascaltype, pascaltypes.IntegerType) or \
-                            isinstance(node.result.pascaltype, pascaltypes.BooleanType) or \
-                            isinstance(node.result.pascaltype, pascaltypes.RealType)
+                           isinstance(node.result.pascaltype, pascaltypes.BooleanType) or \
+                           isinstance(node.result.pascaltype, pascaltypes.RealType)
 
                     comment = "{} := {} {} {}".format(node.result.name, node.arg1.name, node.operator, node.arg2.name)
 
@@ -1395,9 +1396,9 @@ class AssemblyGenerator:
                                     raise ASMGeneratorError("Invalid Relational Operator {}".format(node.operator))
                             else:
                                 assert isinstance(n1type, pascaltypes.RealType) or \
-                                    isinstance(n1type, pascaltypes.CharacterType) or \
-                                    isinstance(n1type, pascaltypes.EnumeratedType) or \
-                                    isinstance(n1type, pascaltypes.SubrangeType)
+                                       isinstance(n1type, pascaltypes.CharacterType) or \
+                                       isinstance(n1type, pascaltypes.EnumeratedType) or \
+                                       isinstance(n1type, pascaltypes.SubrangeType)
                                 if node.operator == TACOperator.EQUALS:
                                     jumpinstr = "JE"
                                 elif node.operator == TACOperator.NOTEQUAL:

@@ -70,7 +70,7 @@ from enum import Enum, unique
 from copy import deepcopy
 from parser import AST, isrelationaloperator, is_isorequiredfunction
 from symboltable import Symbol, Label, Literal, IntegerLiteral, RealLiteral, StringLiteral, BooleanLiteral, \
-    SymbolTable, LiteralTable, ParameterList, ActivationSymbol, Parameter, VariableSymbol, \
+    SymbolTable, LiteralTable, ActivationSymbol, Parameter, VariableSymbol, \
     FunctionResultVariableSymbol, ConstantSymbol, CharacterLiteral
 from lexer import TokenType, Token
 from compiler_error import compiler_errstr, compiler_warnstr, compiler_failstr
@@ -239,9 +239,11 @@ class TACCommentNode(TACNode):
     def __str__(self):  # pragma: no cover
         return "\t\t;{}".format(self.comment)
 
+
 class TACNoOpNode(TACCommentNode):
     def __init__(self):
         super().__init__('NO-OP')
+
 
 class TACLabelNode(TACNode):
     def __init__(self, label, comment=None):
@@ -431,7 +433,7 @@ class TACBlock:
         for child in ast.children:
             self.processast(child)
 
-    def deref_ifneeded(self, sym, sym_use_token = None):
+    def deref_ifneeded(self, sym, sym_use_token=None):
         assert isinstance(sym, Symbol) or isinstance(sym, Literal)
         assert sym_use_token is None or isinstance(sym_use_token, Token)
         if isinstance(sym, Literal):
@@ -455,24 +457,29 @@ class TACBlock:
                         # b.  It would assign to the array elements.  So we exclude warning on an array assignment.
                         if not isinstance(sym.pascaltype, pascaltypes.ArrayType):
                             if sym.was_assignedto:
-                                warnstr = compiler_warnstr("Variable possibly used when undefined: {}".format(sym_use_token.value),sym_use_token)
+                                warnstr = compiler_warnstr(
+                                    "Variable possibly used when undefined: {}".format(sym_use_token.value),
+                                    sym_use_token)
                             else:
-                                warnstr = compiler_warnstr("Variable possibly used before assignment: {}".format(sym_use_token.value),sym_use_token)
+                                warnstr = compiler_warnstr(
+                                    "Variable possibly used before assignment: {}".format(sym_use_token.value),
+                                    sym_use_token)
                             self.generator.warningslist.append(warnstr)
             return sym
 
     def processast_goto(self, ast):
-        # Right now, this only handles system gotos (specifically for one type of runtime
+        # Right now, this only handles system gotos, specifically for one type of runtime
         # error.  When this is user-written gotos, then we need to add handling for
         # user-defined labels.
         assert isinstance(ast, AST), compiler_failstr("tac_ir.processast_goto: ast is not an AST")
-        assert ast.token.tokentype == TokenType.GOTO, compiler_failstr("tac_ir.processast_goto: cannot process non-goto")
+        assert ast.token.tokentype == TokenType.GOTO, compiler_failstr(
+            "tac_ir.processast_goto: cannot process non-goto")
         assert len(ast.children) == 1, compiler_failstr("tac_ir.processast_goto: goto statements must have 1 child")
-        assert ast.children[0].token.tokentype == TokenType.LABEL, compiler_failstr("tac_ir.processast_goto: goto must have label destination")
+        assert ast.children[0].token.tokentype == TokenType.LABEL, compiler_failstr(
+            "tac_ir.processast_goto: goto must have label destination")
 
         label = Label(ast.children[0].token.value)
         self.addnode(TACGotoNode(label))
-
 
     def track_function_returnval_assignments(self, returnvaluesym, retvalisassignedsym, ast):
         # 6.7.3 of the ISO standard states that it shall be an error if the result of a function is undefined
@@ -497,10 +504,12 @@ class TACBlock:
             if ast.nearest_symboltable().exists(ast.children[0].token.value.lower()):
                 lvalsym = ast.nearest_symboltable().fetch(ast.children[0].token.value.lower())
                 if lvalsym is returnvaluesym:
-                    newbegin = AST(Token(TokenType.BEGIN, ast.token.location, "Begin"), ast.parent, "Track assignment to {}".format(returnvaluesym.name))
+                    newbegin = AST(Token(TokenType.BEGIN, ast.token.location, "Begin"), ast.parent,
+                                   "Track assignment to {}".format(returnvaluesym.name))
                     ast.parent = newbegin
                     newbegin.children.append(ast)
-                    track_assignment_ast = AST(Token(TokenType.ASSIGNMENT, ast.children[0].token.location, ":="), newbegin,
+                    track_assignment_ast = AST(Token(TokenType.ASSIGNMENT, ast.children[0].token.location, ":="),
+                                               newbegin,
                                                "Assign {} to true".format(retvalisassignedsym.name))
                     lvaltoken = Token(TokenType.IDENTIFIER, ast.children[0].token.location, retvalisassignedsym.name)
                     truetoken = Token(TokenType.TRUE, ast.children[0].token.location, 'true')
@@ -524,7 +533,9 @@ class TACBlock:
         # matters because we are going to copy the parameter list from the AST to the TACBlock
         # and cannot do that if we have multiple parameter lists for nested procs.
         # We need some other structure.
-        assert len(self.tacnodes) == 0, compiler_failstr("tac_ir.processast_procedurefunction: cannot declare functions or procedures inside other functions or procedures yet")
+        assert len(self.tacnodes) == 0, compiler_failstr(
+            "tac_ir.processast_procedurefunction:" + \
+            " cannot declare functions or procedures inside other functions or procedures yet")
 
         # first child of a Procedure or Function is an identifier with the name of the proc/func
         assert len(ast.children) >= 1, compiler_failstr("tac_id.processast_procedurefunction: procedure/function with no children")
@@ -556,12 +567,12 @@ class TACBlock:
                 raise TACException(compiler_errstr(errstr, tok))
             comment = "Function {}({})".format(str_procname, str(self.paramlist))
             # Error D.48 states "It is an error if the result of an activation of a function is undefined upon
-            # completion of the function.  At compile time, we can validate that there is at least one assignment
+            # completion of the function."  At compile time, we can validate that there is at least one assignment
             # statement, but we cannot validate, in the general case, that it executes.  We need to track at runtime
             # whether the return value is ever assigned.  This local variable will do that.  Beginning name with
             # underscore ensures it will not collide with any user-defined identifier.
 
-            # create a variable to track whether or not the retval is assigned
+            # create a variable to track that retval is assigned
             retvalisassigned_variablename = '_{}_isassigned'.format(str_procname)
             retvalisassignedsym = VariableSymbol(retvalisassigned_variablename, tok.location, pascaltypes.BooleanType())
             self.symboltable.add(retvalisassignedsym)
@@ -596,10 +607,10 @@ class TACBlock:
                 raise TACException(compiler_errstr(errstr, tok))
 
             # now we need to test that the returnvalue was assigned
-            child = ast.children[1]  # only needed to anchor the locations for the AST's I'm creating below.
+            child = ast.children[1]  # only needed to anchor the locations for the ASTs I'm creating below.
             testast = AST(Token(TokenType.IF, child.token.location, 'if'), ast, 'if {} = False, then error'.format(retvalisassigned_variablename))
             conditionast = AST(Token(TokenType.EQUALS, child.token.location, '='), testast, 'if {} = false'.format(retvalisassigned_variablename))
-            # I could probably reuse these tokens but I'm very conservative
+            # I could probably reuse these tokens, but I'm very conservative
             conditionast.children.append(AST(deepcopy(retvalisassignedtoken), conditionast))
             conditionast.children.append(AST(deepcopy(falsetoken), conditionast))
             testast.children.append(conditionast)

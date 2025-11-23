@@ -53,7 +53,7 @@ class StringLiteral(Literal):
 
 class OrdinalLiteral(Literal):
     def __init__(self, value, location, pascaltype):
-        assert(isinstance(pascaltype, pascaltypes.OrdinalType))
+        assert isinstance(pascaltype, pascaltypes.OrdinalType)
         super().__init__(value, location, pascaltype)
 
 
@@ -68,7 +68,7 @@ class BooleanLiteral(OrdinalLiteral):
         assert value in ('0', '1')
         super().__init__(value, location, pascaltypes.BooleanType())
 
-    def __str__(self): # pragma: no cover
+    def __str__(self):  # pragma: no cover
         if self.value == '0':
             return "FALSE"
         else:
@@ -109,7 +109,7 @@ class LiteralTable:
                 ret = self.stringliterals[value]
             else:
                 ret = self.numericliterals[value]
-        except KeyError: # pragma: no cover
+        except KeyError:  # pragma: no cover
             errstr = "Literal not found: {}.{}".format(str(value), pascaltype)
             raise SymbolException(errstr)
         return ret
@@ -173,7 +173,7 @@ class Symbol:
     def __str__(self):
         return self.name
 
-    def __repr__(self): # pragma: no cover
+    def __repr__(self):  # pragma: no cover
         return "{} ({}): {} @{}".format(self.name, self.location, str(self.pascaltype), self.memoryaddress)
 
 
@@ -195,7 +195,7 @@ class ConstantSymbol(Symbol):
         super().__init__(name, location, pascaltype)
         self.value = value
 
-    def __repr__(self): # pragma: no cover
+    def __repr__(self):  # pragma: no cover
         ret = super().__repr__()
         ret += ' CONSTANT - value = {}'.format(self.value)
         return ret
@@ -341,8 +341,8 @@ class SymbolTable:
         #   b = a;
         #   c = b;
         #
-        # The original typedef for all of these is the integer definition.  However c will be stored
-        # with both a reference to b as well as a reference to the integer type definition.  Most of the
+        # The original typedef for all of these is the integer definition.  However, c will be stored
+        # with both a reference to b and a reference to the integer type definition.  Most of the
         # code will care only about the BaseType.  However, when inserting a new typedef into the symbol
         # table, we need to find the BaseType (using this function), and when determining whether two
         # types are the same, we need not only the identifier that points to the BaseType
@@ -356,7 +356,7 @@ class SymbolTable:
         ret_symtable = self
         ret_type = None
 
-        # HACK - due to the way I defined literals with type name "integer literal" "real literal" etc,
+        # HACK - due to the way I defined literals with type name "integer literal" "real literal" etc.,
         # I can find the type by removing the " literal" from the end.
         if type_identifier[-7:] == "literal":
             type_identifier = type_identifier[:-8]
@@ -404,19 +404,6 @@ class SymbolTable:
             ptr = ptr.parent
         return ret
 
-    def existsexactly(self, sym):
-        # looks to see if the exact symbol is defined in the symbol table, not just by name
-        return sym in self.symbols.values()
-
-    def existsanywhereexactly(self, sym):
-        # looks in current symbol table and parents
-        ret = False
-        ptr = self
-        while (not ret) and (ptr is not None):
-            ret = ptr.existsexactly(sym)
-            ptr = ptr.parent
-        return ret
-
     def existspriortoglobalscope(self, name):
         # Looks in current symbol table and parents EXCEPT the global scope
         # Used to check for variable unassigned before usage warning.
@@ -427,7 +414,7 @@ class SymbolTable:
             ptr = ptr.parent
         return ret
 
-    def __str__(self): # pragma: no cover
+    def __str__(self):   # pragma: no cover
         ret = ""
         for key in self.symbols.keys():
             ret += repr(self.symbols[key]) + "\n"
@@ -488,7 +475,7 @@ class SymbolTable:
         #           r = z
         #           i2 = i
         #
-        # i, c, and r are both defined in terms of 'z', but they are different z's.  However i2 and i are both
+        # i, c, and r are both defined in terms of 'z', but they are different z's.  However, i2 and i are both
         # the same type.
         #
         # So, for the purpose of this function, we need to determine whether the types specified by the identifiers
@@ -497,7 +484,7 @@ class SymbolTable:
         # definitions, then keep following back until we get to the identifier that is mapped to the base type.
         # If both t1 and t2 map back to the same string identifier *in the same symboltable* then they are the same
         # type.  In the second example above, type r and type i both map to the string identifier z, but that's not
-        # a base type.  So one step further and we find that r maps to real and i maps to integer, so they are not
+        # a base type.  So one step further, and we find that r maps to real and i maps to integer, so they are not
         # the same type.
         #
         # Program foo2(output);
@@ -519,7 +506,7 @@ class SymbolTable:
         #
         # In this example, q1 is of type c1, which is of type Coordinates, which is a record with two real
         # fields: x and y.  q2 is of type c2, which is also of a type named Coordinates, which is also a record
-        # with two real fields x and y.  However, you can NOT assign q1 to q2 or vice-versa.
+        # with two real fields x and y.  However, you can NOT assign q1 to q2 or vice versa.
 
         t1_originalsymtable, t1_originaltype = self.fetch_originalsymtable_andtype(t1_identifier)
         t2_originalsymtable, t2_originaltype = self.fetch_originalsymtable_andtype(t2_identifier)

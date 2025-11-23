@@ -82,12 +82,12 @@ class ParseException(Exception):
 
 class AST:
     def __init__(self, token, parent, comment=""):
-        assert(isinstance(token, Token)), "AST.__init__: AST requires a token"
+        assert isinstance(token, Token), "AST.__init__: AST requires a token"
         self.token = token
         self.comment = comment  # will get put on the line emitted in the assembly code if populated.
         self.children = []
         if parent is not None:
-            assert(isinstance(parent, AST)), "AST.__init__:Parent of AST must be an AST"
+            assert isinstance(parent, AST), "AST.__init__:Parent of AST must be an AST"
         self.parent = parent  # pointer back to the parent node in the AST
         self.symboltable = None  # will only be defined for Procedure, Function, and Program tokens
         self.paramlist = None  # will only be defined for Procedure and Function tokens
@@ -175,7 +175,7 @@ class AST:
 # TODO - add a class for a parsewarning/parseerror - likely the same thing, a string, a location, maybe a level?
 class Parser:
     def __init__(self, tokenstream):
-        assert(isinstance(tokenstream, TokenStream)), "Parser.__init__: Can only parse TokenStreams"
+        assert isinstance(tokenstream, TokenStream), "Parser.__init__: Can only parse TokenStreams"
         self.tokenstream = tokenstream
         self.AST = None
         self.parseerrorlist = []
@@ -184,20 +184,22 @@ class Parser:
         self.anonymous_type_counter = 0
 
     def getexpectedtoken(self, tokentype):
-        assert isinstance(tokentype, TokenType), compiler_failstr("Parser.getexpectedtoken: Expected Token must be a token not {}".format(type(tokentype)))
+        assert isinstance(tokentype, TokenType), compiler_failstr(
+            "Parser.getexpectedtoken: Expected Token must be a token not {}".format(type(tokentype)))
 
         tmptok = self.tokenstream.peektoken()
         if tmptok.tokentype != tokentype:
             if tokentype == TokenType.SEMICOLON:
                 # TODO - insert a semicolon into the stream and allow parsing to continue
-                errstr = compiler_errstr("Semicolon expected",self.tokenstream.peekprevioustoken())
+                errstr = compiler_errstr("Semicolon expected", self.tokenstream.peekprevioustoken())
             else:
                 errstr = compiler_errstr("Expected '{0}' but saw '{1}'".format(str(tokentype), str(tmptok.value)),
                                          tmptok)
             raise ParseException(errstr)
 
         ret = self.tokenstream.eattoken()
-        assert isinstance(ret, Token), compiler_failstr("Parser.getexpectedtoken: attempt to return non-Token {}".format(type(ret)))
+        assert isinstance(ret, Token), compiler_failstr(
+            "Parser.getexpectedtoken: attempt to return non-Token {}".format(type(ret)))
         return ret
 
     def parse_labeldeclarationpart(self, parent_ast):
@@ -261,7 +263,7 @@ class Parser:
         elif self.tokenstream.peektokentype() == TokenType.CHARSTRING:
             charstrtok = self.getexpectedtoken(TokenType.CHARSTRING)
             if sawsign:
-                errstr = compiler_errstr("Cannot have a sign before a string constant",charstrtok)
+                errstr = compiler_errstr("Cannot have a sign before a string constant", charstrtok)
                 raise ParseException(errstr)
             if len(charstrtok.value) == 1:
                 self.literaltable.add(CharacterLiteral(charstrtok.value, charstrtok.location))
@@ -273,7 +275,8 @@ class Parser:
             ident_token = self.getexpectedtoken(TokenType.IDENTIFIER)
             if not parent_ast.symboltable.existsanywhere(ident_token.value):
                 if ident_token.value == optionalconstid:
-                    errstr = compiler_errstr("Self-referencing constant definition '{}'".format(ident_token.value), ident_token)
+                    errstr = compiler_errstr("Self-referencing constant definition '{}'".format(ident_token.value),
+                                             ident_token)
                 else:
                     errstr = compiler_errstr("Undefined Identifier: '{}'".format(ident_token.value), ident_token)
                 raise ParseException(errstr)
@@ -372,7 +375,9 @@ class Parser:
                                                             TokenType.DIVIDE, TokenType.LPAREN, TokenType.RPAREN,
                                                             TokenType.IDIV, TokenType.MOD):
                         # if the token is related to expressions, we will do a specific error for that.
-                        errstr = compiler_errstr("Semicolon expected, cannot define a constant in terms of an expression", self.tokenstream.peektoken())
+                        errstr = compiler_errstr(
+                            "Semicolon expected, cannot define a constant in terms of an expression",
+                            self.tokenstream.peektoken())
                         raise ParseException(errstr)
                     else:
                         raise e
@@ -672,7 +677,7 @@ class Parser:
         # 6.1.3 <identifier> ::= <letter> {<letter> | <digit>}
 
         if self.tokenstream.peektokentype() == TokenType.VAR:
-            assert isinstance(parent_ast.symboltable, SymbolTable),\
+            assert isinstance(parent_ast.symboltable, SymbolTable), \
                 "Parser.parse_variabledeclarationpart: missing symboltable"
             self.getexpectedtoken(TokenType.VAR)
             done = False
@@ -684,7 +689,7 @@ class Parser:
                 for identifier_token in identifier_list:
                     do_not_add = False
 
-                    # A bit hacky, but if we are declaring a variable and we are in the outermost scope
+                    # A bit hacky, but if we are declaring a variable, and we are in the outermost scope
                     # (which is only location where ProgramParameterSymbols can live) then instead of
                     # creating a new symbol, we update the existing with the correct type.  Note that
                     # error messages on duplicate symbols are handled in SymbolTable.add() so we do not
@@ -797,7 +802,7 @@ class Parser:
                 if not (isinstance(resulttype, pascaltypes.SimpleType) or
                         isinstance(resulttype, pascaltypes.PointerType)):
                     errstr = "Function {} has invalid return type: {}".format(tok_procfuncname.value,
-                                                                                    str(resulttype),)
+                                                                              str(resulttype))
                     raise ParseException(compiler_errstr(errstr, tok_procfunc))
                 ast_procfunc.symboltable.add(FunctionResultVariableSymbol(tok_procfuncname.value,
                                                                           tok_procfuncname.location,
@@ -882,7 +887,7 @@ class Parser:
         #
         # myarr[2,3].foobar.x[7][(x+2*9+i)].fizbuz[-apple]^
         #
-        # so we are going to just parse a token at a time until we lookahead and see something that would
+        # so we are going to just parse a token at a time until we look ahead and see something that would
         # cause the variable access to end, and we will iterate and create the ASTs as if we had called it
         # recursively.  This involves resetting the parents of the AST's as we go.
 
@@ -916,7 +921,6 @@ class Parser:
                 mainloopdone = True
 
         return ret
-
 
     def parse_factor(self, parent_ast):
         # 6.7.1 <factor> ::= <variable-access> | <unsigned-constant> | <function-designator> |
@@ -973,7 +977,7 @@ class Parser:
                         # we know it's supposed to be a function-designator.  But, it could be a
                         # procedure by mistake, which would be a compile error.  If it's a FunctionResultVariableSymbol
                         # it would be a recursive call, which is fine, but the nearest_symboldefinition would be
-                        # the FunctionResultVariableSymbol not the ActivationSymbol, and that's by design.  Hence
+                        # the FunctionResultVariableSymbol not the ActivationSymbol, and that's by design.  Hence,
                         # testing for isinstance(ActivationSymbol) in the next line before testing to see if it is
                         # a procedure call.
                         if isinstance(sym, ActivationSymbol) and sym.returntype is None:
@@ -1024,7 +1028,7 @@ class Parser:
                 ret = ret.children[1]
                 # if we just update ret.token, that is actually a reference to the original token
                 # in the tokenstream, which causes comments to get messed up.
-                newtok = Token(TokenType.SIGNED_INT, ret.token.location, str(-1*int(ret.token.value)))
+                newtok = Token(TokenType.SIGNED_INT, ret.token.location, str(-1 * int(ret.token.value)))
                 ret.token = newtok
             elif ret.children[1].token.tokentype == TokenType.UNSIGNED_REAL:
                 ret = ret.children[1]
@@ -1264,7 +1268,9 @@ class Parser:
             next_tokenname = self.tokenstream.peektoken().value
             tmpsym = parent_ast.nearest_symboldefinition(next_tokenname)
             if tmpsym is None:
-                raise ParseException(compiler_errstr("Identifier undefined '{}'".format(self.tokenstream.peektoken().value), self.tokenstream.peektoken()))
+                raise ParseException(
+                    compiler_errstr("Identifier undefined '{}'".format(self.tokenstream.peektoken().value),
+                                    self.tokenstream.peektoken()))
             elif isinstance(tmpsym, ActivationSymbol):
                 if tmpsym.returntype is not None:
                     tmptok = self.tokenstream.eattoken()
@@ -1277,7 +1283,7 @@ class Parser:
                 tmptok = self.tokenstream.eattoken()
                 errstr = "Cannot assign to constant '{}'".format(next_tokenname)
                 raise ParseException(compiler_errstr(errstr, tmptok))
-            else: # pragma: no cover
+            else:  # pragma: no cover
                 tok = self.tokenstream.eattoken()
                 errstr = compiler_errstr("Identifier '{}' seen, unclear how to parse".format(tok.value), tok)
                 raise ParseException(errstr)
@@ -1372,8 +1378,8 @@ class Parser:
         nexttwo = self.tokenstream.peekmultitokentype(2)
         if nexttwo[0] != TokenType.IDENTIFIER:
             tmptok = self.tokenstream.eattoken()
-            errstr = compiler_errstr("Identifier expected following 'for' statement, instead saw: '{}'".format(tmptok.value),
-                                     tmptok)
+            errstr = compiler_errstr(
+                "Identifier expected following 'for' statement, instead saw: '{}'".format(tmptok.value), tmptok)
             raise ParseException(errstr)
         if nexttwo[1] != TokenType.ASSIGNMENT:
             self.tokenstream.eattoken()  # eat the identifier
@@ -1475,7 +1481,7 @@ class Parser:
                 # TODO - insert a semicolon into the stream and allow parsing to continue
                 # special case error if we don't see the end token and don't see a semicolon
                 # TODO - for both Semicolon expected errors, need to show the previous line too.
-                raise ParseException(compiler_errstr ("Semicolon expected", self.tokenstream.peekprevioustoken()))
+                raise ParseException(compiler_errstr("Semicolon expected", self.tokenstream.peekprevioustoken()))
 
     def parse_compoundstatement(self, parent_ast):
         # 6.8.3.2 - <compound-statement> ::= "begin" <statement-sequence> "end"
@@ -1586,7 +1592,7 @@ class Parser:
     def parse(self):
         self.tokenstream.resetpos()
         self.AST = self.parse_program()
-        if len(self.parseerrorlist) > 0: # pragma: no cover
+        if len(self.parseerrorlist) > 0:  # pragma: no cover
             # We currently end on first parse error.  If we ever leverage parserrorlist then remove the pragma
             for e in self.parseerrorlist:
                 print(e)

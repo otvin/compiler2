@@ -170,7 +170,7 @@ class TokenType(Enum):
     def __str__(self):
         if self.value is not None:
             return self.value
-        else: # pragma: no cover
+        else:  # pragma: no cover
             return 'EMPTY TOKEN'
 
 
@@ -204,7 +204,6 @@ TOKENTYPE_LOOKUP = {
     'until': TokenType.UNTIL, 'var': TokenType.VAR, 'while': TokenType.WHILE, 'with': TokenType.WITH,
     'write': TokenType.WRITE, 'writeln': TokenType.WRITELN
 }
-
 
 # Similar lookup for symbols.  Note that there are alternate representations for brackets and
 # the pointer symbol defined in section 6.1.9 of the ISO Standard.
@@ -242,7 +241,7 @@ class Token:
         else:  # pragma: no cover
             raise TypeError("Invalid Token Type")
 
-    def __str__(self): # pragma: no cover
+    def __str__(self):  # pragma: no cover
         return 'type:{0:<18} val: {1:<15} loc: {2:<35}'.format(self.tokentype, self.value, str(self.location))
 
 
@@ -284,11 +283,11 @@ class TokenStream:
 
     # One can iterate over a TokenStream if desired, primarily for debugging purposes
     # (e.g. printing out all the tokens in the stream)
-    def __iter__(self): # pragma: no cover
+    def __iter__(self):  # pragma: no cover
         self.pos = 0
         return self
 
-    def __next__(self): # pragma: no cover
+    def __next__(self):  # pragma: no cover
         try:
             ret = self.tokenlist[self.pos]
             self.pos += 1
@@ -305,7 +304,8 @@ class TokenStream:
             ret = self.tokenlist[self.pos]
         except IndexError:
             if self.pos > 0:
-                raise LexerException(compiler_errstr("Missing 'end' statement or Unexpected end of file", self.tokenlist[self.pos - 1]))
+                raise LexerException(
+                    compiler_errstr("Missing 'end' statement or Unexpected end of file", self.tokenlist[self.pos - 1]))
             else:
                 raise LexerException(compiler_errstr("Cannot compile empty file"))
         self.pos += 1
@@ -314,7 +314,7 @@ class TokenStream:
     def peekprevioustoken(self):
         if self.pos > 0:
             return self.tokenlist[self.pos - 1]
-        else: # pragma: no cover
+        else:  # pragma: no cover
             return None
 
     def peektoken(self):
@@ -323,7 +323,8 @@ class TokenStream:
             ret = self.tokenlist[self.pos]
         except IndexError:
             if self.pos > 0:
-                raise LexerException(compiler_errstr("Missing 'end' statement or Unexpected end of file", self.tokenlist[self.pos - 1]))
+                raise LexerException(
+                    compiler_errstr("Missing 'end' statement or Unexpected end of file", self.tokenlist[self.pos - 1]))
             else:
                 raise LexerException(compiler_errstr("Cannot compile empty file"))
         assert isinstance(ret, Token)
@@ -351,7 +352,7 @@ class TokenStream:
             while i < self.pos + num:
                 ret.append(self.tokenlist[i].tokentype)
                 i += 1
-        except IndexError: # pragma: no cover
+        except IndexError:  # pragma: no cover
             pass
         return ret
 
@@ -380,7 +381,7 @@ class Lexer:
         pos = self.curpos + num
         if pos < self.length:
             return self.text[pos]
-        else: # pragma: no cover
+        else:  # pragma: no cover
             return ""
 
     def peekrestofcurrentline(self):
@@ -398,7 +399,7 @@ class Lexer:
         return self.text[self.curpos:self.curpos + num]
 
     def eat(self):
-        if self.at_eof(): # pragma: no cover
+        if self.at_eof():  # pragma: no cover
             raise IndexError("Length Exceeded")
         else:
             ret = self.text[self.curpos]
@@ -453,7 +454,7 @@ class Lexer:
             ret += self.eat()
         if self.peek() == '}':
             self.eat()
-        else:  # eat the *)
+        else:  # eat the "*)"
             self.eatmulti(2)
         return ret
 
@@ -470,7 +471,7 @@ class Lexer:
         #   digit-sequence = digit { digit } .
         #   digit = '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' .
         #
-        # As a note, the 'e' in the unsigned-real can be lower or upper case.
+        # As a note, the 'e' in the unsigned-real can be lower case or upper case.
         #
         # Returns empty string if the next character in the input stream is not numeric.
         from compiler_error import compiler_errstr
@@ -569,18 +570,19 @@ class Lexer:
                     lookahead = 1
                     while self.peekahead(lookahead).isnumeric():
                         lookahead += 1
-                    if ((self.peekahead(lookahead) == '.' and self.peekahead(lookahead+1).isnumeric()) or
+                    if ((self.peekahead(lookahead) == '.' and self.peekahead(lookahead + 1).isnumeric()) or
                             self.peekahead(lookahead).lower() == 'e'):
                         val = self.eatrealnumber()
                         self.tokenstream.addtoken(Token(TokenType.UNSIGNED_REAL, curlocation, val))
-                    elif (self.peekahead(lookahead) == '.' and self.peekahead(lookahead+1) != '.' and
-                          self.peekahead(lookahead+1) != ')'):
-                            # if we see two periods, it is a subrange token.  If we see a period followed by a paren,
-                            # it's a lexical alternative for right bracket.  If we see one period otherwise, it is invalid;
-                            # see definition of <unsigned-real>.  Without this special case, the error is
-                            # 'Expected 'end' but saw '.' which is unhelpful.
-                            errstr = compiler_errstr('Invalid real number format: "{}"'.format(self.peekmulti(lookahead+1)), None, curlocation)
-                            raise ValueError(errstr)
+                    elif (self.peekahead(lookahead) == '.' and self.peekahead(lookahead + 1) != '.' and
+                          self.peekahead(lookahead + 1) != ')'):
+                        # if we see two periods, it is a subrange token.  If we see a period followed by a paren,
+                        # it's a lexical alternative for right bracket.  If we see one period otherwise, it is invalid;
+                        # see definition of <unsigned-real>.  Without this special case, the error is
+                        # 'Expected 'end' but saw '.' which is unhelpful.
+                        errstr = compiler_errstr(
+                            'Invalid real number format: "{}"'.format(self.peekmulti(lookahead + 1)), None, curlocation)
+                        raise ValueError(errstr)
                     else:
                         val = ""
                         while self.peek().isnumeric():
@@ -600,7 +602,7 @@ class Lexer:
                     toktype = SYMBOL_LOOKUP[val]
                     self.tokenstream.addtoken(Token(toktype, curlocation, val))
                 else:
-                    #errstr = compiler_errstr('Unexpected character: {}'.format(self.peek()), None, curlocation)
+                    # errstr = compiler_errstr('Unexpected character: {}'.format(self.peek()), None, curlocation)
                     raise LexerException('Unexpected character: {}'.format(self.peek()))
             except Exception as e:
                 if isinstance(e, ValueError):
