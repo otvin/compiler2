@@ -473,41 +473,26 @@ class TACBlock:
         label = Label(ast.children[0].token.value)
         self.addnode(TACGotoNode(label))
 
-    def validate_function_returnsvalue(self, returnvaluesym, ast):
+
+    def track_function_returnval_assignments(self, returnvaluesym, retvalisassignedsym, ast):
         # 6.7.3 of the ISO standard states that it shall be an error if the result of a function is undefined
-        # upon completion of the algorithm.  The runtime check will be handled in track_function_returnval_assignments()
-        # similar to how we need a runtime check that a variable is assigned before it is used. We also validate
-        # at compile time that there is at least one assignment statement with the function-identifier is
-        # on the left side.
+        # upon completion of the algorithm.  This function inserts the runtime checks to varify the result
+        # is assigned.  We also validate at compile time that there is at least one assignment statement with the
+        # function-identifier is on the left side.  The return value of this proc is true if this ast is an assignment
+        # to the function result or if any of the ast's children are.
+        #
         # Per Cooper, p.77: "Every function must contain at least one assignment to its identifier."  Also,
         # "[T]he function-identifier alone ... represents a storage location ... that may only be assigned to."
         # I infer from this that you cannot set the return value of a function by passing the function-identifier
         # to a procedure as a byref argument or such.
-        assert isinstance(returnvaluesym, FunctionResultVariableSymbol), (
-            compiler_failstr("tac_ir.validate_function_returnsvalue: returnvaluesym is not a symbol"))
-        assert isinstance(ast, AST), compiler_failstr("tac_ir.validate_function_returnsvalue: ast is not an AST")
 
-        if ast.token.tokentype == TokenType.ASSIGNMENT:
-            if ast.nearest_symboltable().exists(ast.children[0].token.value.lower()):
-                lvalsym = ast.nearest_symboltable().fetch(ast.children[0].token.value.lower())
-                return lvalsym is returnvaluesym
-            else:
-                return False
-        else:
-            for child in ast.children:
-                tmp = self.validate_function_returnsvalue(returnvaluesym, child)
-                if tmp:
-                    return True
-            return False
-
-    def track_function_returnval_assignments(self, returnvaluesym, retvalisassignedsym, ast):
         assert isinstance(returnvaluesym, FunctionResultVariableSymbol), (
             compiler_failstr("tac_ir.track_function_returnval_assignment: returnvaluesym is not a symbol"))
         assert isinstance(retvalisassignedsym, VariableSymbol), (
             compiler_failstr("tac_ir.track_function_returnval_assignment: retvalisassignedsym is not a symbol"))
         assert isinstance(ast, AST), compiler_failstr("tac_ir.track_function_returnval_assignment: ast is not an AST")
 
-
+        retval = False
         if ast.token.tokentype == TokenType.ASSIGNMENT:
             if ast.nearest_symboltable().exists(ast.children[0].token.value.lower()):
                 lvalsym = ast.nearest_symboltable().fetch(ast.children[0].token.value.lower())
@@ -523,9 +508,12 @@ class TACBlock:
                     track_assignment_ast.children.append(AST(truetoken, track_assignment_ast))
                     newbegin.children.append(track_assignment_ast)
                     newbegin.parent.children[newbegin.parent.children.index(newbegin.children[0])] = newbegin
+                    retval = True
         else:
             for child in ast.children:
-                self.track_function_returnval_assignments(returnvaluesym, retvalisassignedsym, child)
+                if self.track_function_returnval_assignments(returnvaluesym, retvalisassignedsym, child):
+                    retval = True
+        return retval
 
     def processast_procedurefunction(self, ast):
         assert isinstance(ast, AST)
@@ -597,12 +585,13 @@ class TACBlock:
             # assignment we just inserted, and identify any assignments to the retval.  This requires matching on
             # the symbols themselves, not the names, as function declared inside a function could reuse a name.
             retvalsym = ast.symboltable.fetch(str_procname)
+            retvaleverset = False
             for child in ast.children[1].children[1:]:
-                self.track_function_returnval_assignments(retvalsym, retvalisassignedsym, child)
+                if self.track_function_returnval_assignments(retvalsym, retvalisassignedsym, child):
+                    retvaleverset = True
 
             # check if the return value is assigned to at least once in the ast.
-            function_has_returnvalue = self.validate_function_returnsvalue(retvalsym, ast)
-            if not function_has_returnvalue:
+            if not retvaleverset:
                 errstr = 'Error D.48: Function {} must have a return value'.format(str_procname)
                 raise TACException(compiler_errstr(errstr, tok))
 
