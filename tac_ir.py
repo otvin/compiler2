@@ -118,8 +118,8 @@ class TACOperator(Enum):
 def maptokentype_to_tacoperator(tokentype):
     # Token Types have equivalent TACOperators, this is a mapping
     assert isinstance(tokentype, TokenType)
-    assert tokentype in (TokenType.EQUALS, TokenType.NOTEQUAL, TokenType.LESS, TokenType.LESSEQ, TokenType.GREATER,
-                         TokenType.GREATEREQ, TokenType.IDIV, TokenType.MOD, TokenType.MULTIPLY, TokenType.PLUS,
+    assert tokentype in (TokenType.EQUALS, TokenType.NOTEQUAL, TokenType.LESS, TokenType.LESS_EQUAL, TokenType.GREATER,
+                         TokenType.GREATER_EQUAL, TokenType.IDIV, TokenType.MOD, TokenType.MULTIPLY, TokenType.PLUS,
                          TokenType.MINUS, TokenType.DIVIDE, TokenType.AND, TokenType.OR, TokenType.NOT)
     if tokentype == TokenType.EQUALS:
         ret = TACOperator.EQUALS
@@ -127,11 +127,11 @@ def maptokentype_to_tacoperator(tokentype):
         ret = TACOperator.NOTEQUAL
     elif tokentype == TokenType.LESS:
         ret = TACOperator.LESS
-    elif tokentype == TokenType.LESSEQ:
+    elif tokentype == TokenType.LESS_EQUAL:
         ret = TACOperator.LESSEQ
     elif tokentype == TokenType.GREATER:
         ret = TACOperator.GREATER
-    elif tokentype == TokenType.GREATEREQ:
+    elif tokentype == TokenType.GREATER_EQUAL:
         ret = TACOperator.GREATEREQ
     elif tokentype == TokenType.NOT:
         ret = TACOperator.NOT
@@ -1182,7 +1182,7 @@ class TACBlock:
 
     def processast_array(self, ast):
         assert isinstance(ast, AST)
-        assert ast.token.tokentype == TokenType.LBRACKET
+        assert ast.token.tokentype == TokenType.LEFT_BRACKET
         assert len(ast.children) == 2, "TACBlock.processast_array - Array ASTs must have 2 children."
 
         '''
@@ -1500,7 +1500,7 @@ class TACBlock:
             self.processast_repetitivestatement(ast)
         elif is_isorequiredfunction(tok.tokentype):
             ret = self.processast_isorequiredfunction(ast)
-        elif toktype == TokenType.LBRACKET:
+        elif toktype == TokenType.LEFT_BRACKET:
             ret = self.processast_array(ast)
         elif toktype == TokenType.ASSIGNMENT:
             ret = self.processast_assignment(ast)
@@ -1523,7 +1523,7 @@ class TACBlock:
             ret = self.processast_relationaloperator(ast)
         elif tok.tokentype in (TokenType.AND, TokenType.OR, TokenType.NOT):
             ret = self.processast_booleanoperator(ast)
-        elif tok.tokentype == TokenType.EMPTYTOKEN:
+        elif tok.tokentype == TokenType.EMPTY_TOKEN:
             self.addnode(TACNoOpNode())
         else:  # pragma: no cover
             raise TACException(compiler_errstr("TACBlock.processast - cannot process token:".format(str(tok)), tok))

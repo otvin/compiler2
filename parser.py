@@ -24,7 +24,7 @@ def isrelationaloperator(tokentype):
     # 6.7.2.1 <relational-operator> ::= "=" | "<>" | "<" | ">" | "<=" | ">=" | "in"
     assert isinstance(tokentype, TokenType)
     if tokentype in (TokenType.EQUALS, TokenType.NOTEQUAL, TokenType.LESS, TokenType.GREATER,
-                     TokenType.LESSEQ, TokenType.GREATEREQ, TokenType.IN):
+                     TokenType.LESS_EQUAL, TokenType.GREATER_EQUAL, TokenType.IN):
         return True
     else:
         return False
@@ -372,7 +372,7 @@ class Parser:
                     self.getexpectedtoken(TokenType.SEMICOLON)
                 except ParseException as e:
                     if self.tokenstream.peektokentype() in (TokenType.PLUS, TokenType.MINUS, TokenType.MULTIPLY,
-                                                            TokenType.DIVIDE, TokenType.LPAREN, TokenType.RPAREN,
+                                                            TokenType.DIVIDE, TokenType.LEFT_PAREN, TokenType.RIGHT_PAREN,
                                                             TokenType.IDIV, TokenType.MOD):
                         # if the token is related to expressions, we will do a specific error for that.
                         errstr = compiler_errstr(
@@ -501,7 +501,7 @@ class Parser:
         # If a <new-type> is created and the typename is blank, then the type name will be created
         # anonymously.  See page 69 of Cooper for discussion of anonymous types.
 
-        self.getexpectedtoken(TokenType.LPAREN)
+        self.getexpectedtoken(TokenType.LEFT_PAREN)
 
         if optionaltypenametok is None:
             typename = self.generate_anonymous_typeidentifier()
@@ -523,7 +523,7 @@ class Parser:
             ret = pascaltypes.EnumeratedType(typename, etvlist)
         except pascaltypes.PascalTypeException as e:
             raise ParseException(compiler_errstr(e, optionaltypenametok))
-        self.getexpectedtoken(TokenType.RPAREN)
+        self.getexpectedtoken(TokenType.RIGHT_PAREN)
 
         parent_ast.symboltable.add(ret)
         return ret
@@ -592,9 +592,9 @@ class Parser:
         if self.tokenstream.peektokentype() == TokenType.ARRAY:
 
             self.getexpectedtoken(TokenType.ARRAY)
-            self.getexpectedtoken(TokenType.LBRACKET)
+            self.getexpectedtoken(TokenType.LEFT_BRACKET)
             indextypelist = self.parse_indextype_list(parent_ast)
-            self.getexpectedtoken(TokenType.RBRACKET)
+            self.getexpectedtoken(TokenType.RIGHT_BRACKET)
             self.getexpectedtoken(TokenType.OF)
             component_type = self.parse_typedenoter(parent_ast)
 
@@ -638,7 +638,7 @@ class Parser:
 
         if self.next_three_tokens_contain_subrange():
             return self.parse_subrangetype(parent_ast, optionaltypeidentifiertok)
-        elif self.tokenstream.peektokentype() == TokenType.LPAREN:
+        elif self.tokenstream.peektokentype() == TokenType.LEFT_PAREN:
             return self.parse_enumeratedtype(parent_ast, optionaltypeidentifiertok)
         elif self.tokenstream.peektokentype() in (TokenType.PACKED, TokenType.ARRAY, TokenType.RECORD, TokenType.SET,
                                                   TokenType.FILE):
@@ -723,7 +723,7 @@ class Parser:
         # which we do not support now.
         assert isinstance(paramlist, ParameterList)
 
-        self.getexpectedtoken(TokenType.LPAREN)
+        self.getexpectedtoken(TokenType.LEFT_PAREN)
 
         done = False
         while not done:
@@ -743,7 +743,7 @@ class Parser:
                 self.getexpectedtoken(TokenType.SEMICOLON)
             else:
                 done = True
-        self.getexpectedtoken(TokenType.RPAREN)
+        self.getexpectedtoken(TokenType.RIGHT_PAREN)
 
     def parse_procedureandfunctiondeclarationpart(self, parent_ast):
         # returns a list of ASTs, each corresponding to a procedure or function.
@@ -777,7 +777,7 @@ class Parser:
             tok_procfuncname = self.getexpectedtoken(TokenType.IDENTIFIER)
             ast_procfunc.children.append(AST(tok_procfuncname, ast_procfunc))
             assert isinstance(tok_procfuncname, Token)
-            if self.tokenstream.peektokentype() == TokenType.LPAREN:
+            if self.tokenstream.peektokentype() == TokenType.LEFT_PAREN:
                 self.parse_formalparameterlist(ast_procfunc.paramlist, ast_procfunc)
 
             if tok_procfunc.tokentype == TokenType.FUNCTION:
@@ -901,19 +901,19 @@ class Parser:
             elif nexttok.tokentype == TokenType.PERIOD:
                 ret = self.insert_ast_between(parent_ast, ret, TokenType.PERIOD)
                 ret.children.append(AST(self.getexpectedtoken(TokenType.IDENTIFIER), ret))
-            elif nexttok.tokentype == TokenType.LBRACKET:
+            elif nexttok.tokentype == TokenType.LEFT_BRACKET:
                 arrayloopdone = False
-                ret = self.insert_ast_between(parent_ast, ret, TokenType.LBRACKET)
+                ret = self.insert_ast_between(parent_ast, ret, TokenType.LEFT_BRACKET)
                 while not arrayloopdone:
                     ret.children.append(self.parse_expression(ret))
                     nexttok = self.tokenstream.peektoken()
-                    if nexttok.tokentype == TokenType.RBRACKET:
-                        self.getexpectedtoken(TokenType.RBRACKET)
+                    if nexttok.tokentype == TokenType.RIGHT_BRACKET:
+                        self.getexpectedtoken(TokenType.RIGHT_BRACKET)
                         arrayloopdone = True
                     elif nexttok.tokentype == TokenType.COMMA:
                         ret = self.insert_ast_between(parent_ast, ret, TokenType.COMMA)
                         # change the tokentype to left bracket, because a[i,j] is shorthand for a[i][j]
-                        ret.token.tokentype = TokenType.LBRACKET
+                        ret.token.tokentype = TokenType.LEFT_BRACKET
                         # and now we go back to the arrayloop, parsing the expression
                     else:
                         raise ParseException(compiler_errstr("Invalid Token: '{}'".format(nexttok.value), nexttok))
@@ -932,10 +932,10 @@ class Parser:
         # 6.6.2 <function-identifier> ::= <identifier>
         # 6.7.3 <actual-parameter-list> ::= "(" <actual-parameter> {"," <actual-parameter>} ")"
 
-        if self.tokenstream.peektokentype() == TokenType.LPAREN:
-            self.getexpectedtoken(TokenType.LPAREN)
+        if self.tokenstream.peektokentype() == TokenType.LEFT_PAREN:
+            self.getexpectedtoken(TokenType.LEFT_PAREN)
             ret = self.parse_expression(parent_ast)
-            self.getexpectedtoken(TokenType.RPAREN)
+            self.getexpectedtoken(TokenType.RIGHT_PAREN)
         else:
             if self.tokenstream.peektokentype() == TokenType.UNSIGNED_REAL:
                 realtok = self.getexpectedtoken(TokenType.UNSIGNED_REAL)
@@ -961,9 +961,9 @@ class Parser:
                 # compile error with a right paren is expected instead of a comma, instead of number of
                 # parameters not matching the 1 that is expected.
                 ret = AST(self.tokenstream.eattoken(), parent_ast)
-                self.getexpectedtoken(TokenType.LPAREN)
+                self.getexpectedtoken(TokenType.LEFT_PAREN)
                 ret.children.append(self.parse_expression(ret))
-                self.getexpectedtoken(TokenType.RPAREN)
+                self.getexpectedtoken(TokenType.RIGHT_PAREN)
             elif self.tokenstream.peektokentype() == TokenType.IDENTIFIER:
                 nexttok = self.tokenstream.peektoken()
                 sym = parent_ast.nearest_symboldefinition(nexttok.value)
@@ -973,7 +973,7 @@ class Parser:
                     return AST(self.getexpectedtoken(TokenType.IDENTIFIER), parent_ast)
                 elif isinstance(sym, ActivationSymbol) or isinstance(sym, FunctionResultVariableSymbol):
                     ret = AST(self.getexpectedtoken(TokenType.IDENTIFIER), parent_ast)
-                    if self.tokenstream.peektokentype() == TokenType.LPAREN:
+                    if self.tokenstream.peektokentype() == TokenType.LEFT_PAREN:
                         # we know it's supposed to be a function-designator.  But, it could be a
                         # procedure by mistake, which would be a compile error.  If it's a FunctionResultVariableSymbol
                         # it would be a recursive call, which is fine, but the nearest_symboldefinition would be
@@ -1091,8 +1091,8 @@ class Parser:
         self.tokenstream.setstartpos()
 
         ret = AST(self.tokenstream.eattoken(), parent_ast)
-        if self.tokenstream.peektokentype() == TokenType.LPAREN:
-            self.getexpectedtoken(TokenType.LPAREN)
+        if self.tokenstream.peektokentype() == TokenType.LEFT_PAREN:
+            self.getexpectedtoken(TokenType.LEFT_PAREN)
             if self.tokenstream.peektokentype() == TokenType.OUTPUT:
                 ret.children.append(AST(self.getexpectedtoken(TokenType.OUTPUT), ret))
                 self.getexpectedtoken(TokenType.COMMA)
@@ -1109,7 +1109,7 @@ class Parser:
                     self.getexpectedtoken(TokenType.COMMA)
                 else:
                     done = True
-            self.getexpectedtoken(TokenType.RPAREN)
+            self.getexpectedtoken(TokenType.RIGHT_PAREN)
         self.tokenstream.setendpos()
         ret.comment = self.tokenstream.printstarttoend()
         return ret
@@ -1215,7 +1215,7 @@ class Parser:
         # been completed and all the symbol tables will have been built and can be queried.
         assert isinstance(parent_ast, AST)
 
-        self.getexpectedtoken(TokenType.LPAREN)
+        self.getexpectedtoken(TokenType.LEFT_PAREN)
         done = False
         while not done:
             parent_ast.children.append(self.parse_expression(parent_ast))
@@ -1223,7 +1223,7 @@ class Parser:
                 self.getexpectedtoken(TokenType.COMMA)
             else:
                 done = True
-        self.getexpectedtoken(TokenType.RPAREN)
+        self.getexpectedtoken(TokenType.RIGHT_PAREN)
 
     def parse_procedurestatement(self, parent_ast):
         # 6.8.2.3 - <procedure-statement> ::= procedure-identifier ([<actual-parameter-list>] | <read-parameter_list>
@@ -1236,7 +1236,7 @@ class Parser:
         curtok = self.getexpectedtoken(TokenType.IDENTIFIER)
         ret = AST(curtok, parent_ast)
         nexttok = self.tokenstream.peektoken()
-        if nexttok.tokentype == TokenType.LPAREN:
+        if nexttok.tokentype == TokenType.LEFT_PAREN:
             self.parse_actualparameterlist(ret)
         elif nexttok.tokentype == TokenType.ASSIGNMENT:
             errstr = compiler_errstr("Cannot assign to Procedure name '{}'".format(curtok.value), nexttok)
@@ -1333,7 +1333,7 @@ class Parser:
         ret.comment = self.tokenstream.printstarttoend()
         if self.tokenstream.peektokentype() == TokenType.SEMICOLON:
             # Special case <empty-statement>
-            nooptok = Token(TokenType.EMPTYTOKEN, self.tokenstream.peektoken().location, '')
+            nooptok = Token(TokenType.EMPTY_TOKEN, self.tokenstream.peektoken().location, '')
             ret.children.append(AST(nooptok, ret))
         else:
             ret.children.append(self.parse_statement(ret))
@@ -1407,7 +1407,7 @@ class Parser:
 
         if self.tokenstream.peektokentype() == TokenType.SEMICOLON:
             # Special case <empty-statement>
-            nooptok = Token(TokenType.EMPTYTOKEN, self.tokenstream.peektoken().location, '')
+            nooptok = Token(TokenType.EMPTY_TOKEN, self.tokenstream.peektoken().location, '')
             ret.children.append(AST(nooptok, ret))
         else:
             ret.children.append(self.parse_statement(ret))
@@ -1560,10 +1560,10 @@ class Parser:
         ret.initsymboltable()
         # currently we do not do anything with the program name, so no need to assign getexpectedtoken to a value
         self.getexpectedtoken(TokenType.IDENTIFIER)
-        if self.tokenstream.peektokentype() == TokenType.LPAREN:
+        if self.tokenstream.peektokentype() == TokenType.LEFT_PAREN:
             position = 1
-            self.getexpectedtoken(TokenType.LPAREN)
-            while self.tokenstream.peektokentype() != TokenType.RPAREN:
+            self.getexpectedtoken(TokenType.LEFT_PAREN)
+            while self.tokenstream.peektokentype() != TokenType.RIGHT_PAREN:
                 tok = self.tokenstream.eattoken()
                 if tok.tokentype == TokenType.INPUT:
                     # TODO - this adding the ProgramParameterSymbol separate from the type identifier into symboltable
@@ -1581,9 +1581,9 @@ class Parser:
                     position += 1
                 else:
                     raise ParseException(compiler_errstr("Invalid program parameter '{}'".format(tok.value), tok))
-                if self.tokenstream.peektokentype() != TokenType.RPAREN:
+                if self.tokenstream.peektokentype() != TokenType.RIGHT_PAREN:
                     self.getexpectedtoken(TokenType.COMMA)
-            self.getexpectedtoken(TokenType.RPAREN)
+            self.getexpectedtoken(TokenType.RIGHT_PAREN)
         self.getexpectedtoken(TokenType.SEMICOLON)
         ret.children = self.parse_block(ret)
         self.getexpectedtoken(TokenType.PERIOD)

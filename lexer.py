@@ -20,18 +20,18 @@ class TokenType(Enum):
     EQUALS = '='
     LESS = '<'
     GREATER = '>'
-    LBRACKET = '['
-    RBRACKET = ']'
+    LEFT_BRACKET = '['
+    RIGHT_BRACKET = ']'
     PERIOD = '.'
     COMMA = ','
     COLON = ':'
     SEMICOLON = ';'
     POINTER = '^'
-    LPAREN = '('
-    RPAREN = ')'
+    LEFT_PAREN = '('
+    RIGHT_PAREN = ')'
     NOTEQUAL = "<>"
-    LESSEQ = "<="
-    GREATEREQ = ">="
+    LESS_EQUAL = "<="
+    GREATER_EQUAL = ">="
     ASSIGNMENT = ":="
     SUBRANGE = ".."
 
@@ -86,7 +86,7 @@ class TokenType(Enum):
     UNSIGNED_INT = 'unsigned int'
 
     # Label is defined in 6.1.6 of the ISO Standard
-    LABELID = 'label identifier'
+    LABEL_IDENTIFIER = 'label identifier'
 
     # Character Strings are defined in 6.1.7 of the ISO Standard
     CHARSTRING = 'character string'
@@ -165,7 +165,7 @@ class TokenType(Enum):
     OUTPUT = 'output'
 
     # Empty Statements do not have a token, but for some special cases, I need an AST that is a NOOP.
-    EMPTYTOKEN = None
+    EMPTY_TOKEN = None
 
     def __str__(self):
         if self.value is not None:
@@ -211,14 +211,14 @@ SYMBOL_LOOKUP = {
     ':=': TokenType.ASSIGNMENT, ':': TokenType.COLON,
     ',': TokenType.COMMA, '/': TokenType.DIVIDE,
     '=': TokenType.EQUALS, '>': TokenType.GREATER,
-    '>=': TokenType.GREATEREQ, '[': TokenType.LBRACKET,
-    '(.': TokenType.LBRACKET, '<': TokenType.LESS,
-    '<=': TokenType.LESSEQ, '(': TokenType.LPAREN,
+    '>=': TokenType.GREATER_EQUAL, '[': TokenType.LEFT_BRACKET,
+    '(.': TokenType.LEFT_BRACKET, '<': TokenType.LESS,
+    '<=': TokenType.LESS_EQUAL, '(': TokenType.LEFT_PAREN,
     '-': TokenType.MINUS, '*': TokenType.MULTIPLY,
     '<>': TokenType.NOTEQUAL, '.': TokenType.PERIOD,
     '+': TokenType.PLUS, '^': TokenType.POINTER,
-    '@': TokenType.POINTER, ']': TokenType.RBRACKET,
-    '.)': TokenType.RBRACKET, ')': TokenType.RPAREN,
+    '@': TokenType.POINTER, ']': TokenType.RIGHT_BRACKET,
+    '.)': TokenType.RIGHT_BRACKET, ')': TokenType.RIGHT_PAREN,
     ';': TokenType.SEMICOLON, '..': TokenType.SUBRANGE
 }
 
