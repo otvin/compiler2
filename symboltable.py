@@ -20,22 +20,22 @@ class Literal:
 
     # TODO - now that Literals have "names," make Literal subclass from Symbol and instead of
     # name being the property for value, have value be the property for name.
-    def __init__(self, value, location, pascaltype):
+    def __init__(self, value, location, pascal_type):
         assert isinstance(location, FileLocation)
-        assert isinstance(pascaltype, pascaltypes.BaseType)
+        assert isinstance(pascal_type, pascaltypes.BaseType)
         assert isinstance(value, str)
         self.value = value
         self.location = location
-        self.pascaltype = pascaltype
-        self.memoryaddress = None
+        self.pascal_type = pascal_type
+        self.memory_address = None
 
     @property
-    def memoryaddress(self):
-        return self.__memoryaddress
+    def memory_address(self):
+        return self.__memory_address
 
-    @memoryaddress.setter
-    def memoryaddress(self, addr):
-        self.__memoryaddress = addr
+    @memory_address.setter
+    def memory_address(self, addr):
+        self.__memory_address = addr
 
     @property
     def name(self):
@@ -52,9 +52,9 @@ class StringLiteral(Literal):
 
 
 class OrdinalLiteral(Literal):
-    def __init__(self, value, location, pascaltype):
-        assert isinstance(pascaltype, pascaltypes.OrdinalType)
-        super().__init__(value, location, pascaltype)
+    def __init__(self, value, location, pascal_type):
+        assert isinstance(pascal_type, pascaltypes.OrdinalType)
+        super().__init__(value, location, pascal_type)
 
 
 class IntegerLiteral(OrdinalLiteral):
@@ -89,110 +89,110 @@ class RealLiteral(Literal):
 
 class LiteralTable:
     def __init__(self):
-        self.stringliterals = {}
-        self.numericliterals = {}
+        self.string_literals = {}
+        self.numeric_literals = {}
 
     def add(self, lit):
         assert isinstance(lit, Literal), "Can only add Literals to LiteralTables"
         # character literals are treated like numbers, not string literals
-        if isinstance(lit.pascaltype, pascaltypes.StringLiteralType):
-            if lit.value not in self.stringliterals.keys():
-                self.stringliterals[lit.value] = lit
+        if isinstance(lit.pascal_type, pascaltypes.StringLiteralType):
+            if lit.value not in self.string_literals.keys():
+                self.string_literals[lit.value] = lit
         else:
-            if lit.value not in self.numericliterals.keys():
-                self.numericliterals[lit.value] = lit
+            if lit.value not in self.numeric_literals.keys():
+                self.numeric_literals[lit.value] = lit
 
-    def fetch(self, value, pascaltype):
-        assert isinstance(pascaltype, pascaltypes.BaseType)
+    def fetch(self, value, pascal_type):
+        assert isinstance(pascal_type, pascaltypes.BaseType)
         try:
-            if isinstance(pascaltype, pascaltypes.StringLiteralType):
-                ret = self.stringliterals[value]
+            if isinstance(pascal_type, pascaltypes.StringLiteralType):
+                ret = self.string_literals[value]
             else:
-                ret = self.numericliterals[value]
+                ret = self.numeric_literals[value]
         except KeyError:  # pragma: no cover
-            errstr = "Literal not found: {}.{}".format(str(value), pascaltype)
-            raise SymbolException(errstr)
+            error_str = "Literal not found: {}.{}".format(str(value), pascal_type)
+            raise SymbolException(error_str)
         return ret
 
     def __len__(self):
-        return len(self.stringliterals.keys()) + len(self.numericliterals.keys())
+        return len(self.string_literals.keys()) + len(self.numeric_literals.keys())
 
     def __iter__(self):
-        for key in self.stringliterals.keys():
-            yield self.stringliterals[key]
-        for key in self.numericliterals.keys():
-            yield self.numericliterals[key]
+        for key in self.string_literals.keys():
+            yield self.string_literals[key]
+        for key in self.numeric_literals.keys():
+            yield self.numeric_literals[key]
 
 
 class Symbol:
-    def __init__(self, name, location, pascaltype):
-        assert isinstance(pascaltype, pascaltypes.BaseType)
+    def __init__(self, name, location, pascal_type):
+        assert isinstance(pascal_type, pascaltypes.BaseType)
         assert isinstance(location, FileLocation)
         self.name = name
         self.location = location
-        self.pascaltype = pascaltype
-        self.memoryaddress = None
-        self.__is_assignedto = False
-        # if a variable is used then undefined, is_assignedto will be False but __was_assignedto will be True
-        self.__was_assignedto = False
-        # TODO - look at removing symbol.is_byref - why do symbols and parameters both have is_byref set?
-        self.is_byref = False
+        self.pascal_type = pascal_type
+        self.memory_address = None
+        self.__is_assigned_to = False
+        # if a variable is used then undefined, is_assigned_to will be False but __was_assigned_to will be True
+        self.__was_assigned_to = False
+        # TODO - look at removing symbol.is_by_ref - why do symbols and parameters both have is_by_ref set?
+        self.is_by_ref = False
 
     @property
-    def memoryaddress(self):
-        return self.__memoryaddress
+    def memory_address(self):
+        return self.__memory_address
 
-    @memoryaddress.setter
-    def memoryaddress(self, addr):
-        self.__memoryaddress = addr
-
-    @property
-    def is_byref(self):
-        return self.__is_byref
-
-    @is_byref.setter
-    def is_byref(self, byref):
-        assert isinstance(byref, bool)
-        self.__is_byref = byref
+    @memory_address.setter
+    def memory_address(self, addr):
+        self.__memory_address = addr
 
     @property
-    def is_assignedto(self):
-        return self.__is_assignedto
+    def is_by_ref(self):
+        return self.__is_by_ref
 
-    @is_assignedto.setter
-    def is_assignedto(self, assignedto):
-        assert isinstance(assignedto, bool)
-        if self.__is_assignedto and (not assignedto):
-            self.__was_assignedto = True
-        self.__is_assignedto = assignedto
+    @is_by_ref.setter
+    def is_by_ref(self, by_ref):
+        assert isinstance(by_ref, bool)
+        self.__is_by_ref = by_ref
 
     @property
-    def was_assignedto(self):
-        return self.__was_assignedto
+    def is_assigned_to(self):
+        return self.__is_assigned_to
+
+    @is_assigned_to.setter
+    def is_assigned_to(self, assigned_to):
+        assert isinstance(assigned_to, bool)
+        if self.__is_assigned_to and (not assigned_to):
+            self.__was_assigned_to = True
+        self.__is_assigned_to = assigned_to
+
+    @property
+    def was_assigned_to(self):
+        return self.__was_assigned_to
 
     def __str__(self):
         return self.name
 
     def __repr__(self):  # pragma: no cover
-        return "{} ({}): {} @{}".format(self.name, self.location, str(self.pascaltype), self.memoryaddress)
+        return "{} ({}): {} @{}".format(self.name, self.location, str(self.pascal_type), self.memory_address)
 
 
 class VariableSymbol(Symbol):
-    def __init__(self, name, location, pascaltype):
-        super().__init__(name, location, pascaltype)
+    def __init__(self, name, location, pascal_type):
+        super().__init__(name, location, pascal_type)
 
 
 class FunctionResultVariableSymbol(VariableSymbol):
-    def __init__(self, name, location, pascaltype):
-        super().__init__(name, location, pascaltype)
+    def __init__(self, name, location, pascal_type):
+        super().__init__(name, location, pascal_type)
 
 
 class ConstantSymbol(Symbol):
-    def __init__(self, name, location, pascaltype, value):
-        assert (isinstance(pascaltype, pascaltypes.OrdinalType)
-                or isinstance(pascaltype, pascaltypes.RealType)
-                or isinstance(pascaltype, pascaltypes.StringLiteralType)), type(pascaltype)
-        super().__init__(name, location, pascaltype)
+    def __init__(self, name, location, pascal_type, value):
+        assert (isinstance(pascal_type, pascaltypes.OrdinalType)
+                or isinstance(pascal_type, pascaltypes.RealType)
+                or isinstance(pascal_type, pascaltypes.StringLiteralType)), type(pascal_type)
+        super().__init__(name, location, pascal_type)
         self.value = value
 
     def __repr__(self):  # pragma: no cover
@@ -202,18 +202,17 @@ class ConstantSymbol(Symbol):
 
 
 class ActivationSymbol(Symbol):
-    # TODO - rename returntype as resulttype to be consistent with 6.6.2 of the standard
-    def __init__(self, name, location, pascaltype, paramlist, returntype=None):
-        assert isinstance(pascaltype, pascaltypes.BaseType)
-        assert isinstance(paramlist, ParameterList)
+    def __init__(self, name, location, pascal_type, parameter_list, result_type=None):
+        assert isinstance(pascal_type, pascaltypes.BaseType)
+        assert isinstance(parameter_list, ParameterList)
         # per 6.6.2 of the standard, only value return types from Functions are simple types and pointers.
         # Procedures are ActivationSymbols with no return type, so None is valid as well.
-        assert (returntype is None
-                or isinstance(returntype, pascaltypes.SimpleType)
-                or isinstance(returntype, pascaltypes.PointerType))
-        super().__init__(name, location, pascaltype)
-        self.paramlist = paramlist
-        self.returntype = returntype
+        assert (result_type is None
+                or isinstance(result_type, pascaltypes.SimpleType)
+                or isinstance(result_type, pascaltypes.PointerType))
+        super().__init__(name, location, pascal_type)
+        self.parameter_list = parameter_list
+        self.result_type = result_type
         self.label = None
 
     @property
@@ -221,22 +220,22 @@ class ActivationSymbol(Symbol):
         return self.__label
 
     @label.setter
-    def label(self, lab):
-        if lab is None or isinstance(lab, Label):
-            self.__label = lab
+    def label(self, label):
+        if label is None or isinstance(label, Label):
+            self.__label = label
         else:  # pragma: no cover
             raise TypeError("Invalid label")
 
 
 class ProgramParameterSymbol(Symbol):
-    def __init__(self, name, location, pascaltype, position):
-        assert isinstance(pascaltype, pascaltypes.FileType)
+    def __init__(self, name, location, pascal_type, position):
+        assert isinstance(pascal_type, pascaltypes.FileType)
         # position is where in the parameter list this parameter falls.  Used for assigning the program parameters
         # that are neither input nor output.  Input and Output get None for position.
         assert position is None or (isinstance(position, int) and position >= 1)
-        super().__init__(name, location, pascaltype)
+        super().__init__(name, location, pascal_type)
         self.position = position
-        self.filenamememoryaddress = None
+        self.filename_memory_address = None
 
 
 class Label:
@@ -286,11 +285,12 @@ class Label:
         control to a label, then the label statement will need to store the machine state, and the effect
         of the goto will be to restore that saved state.
     """
+
     def __init__(self, name):
         self.name = name
-        self.localtransfer = False
-        self.remotetransfer = False
-        self.insidestructuredstatement = False
+        self.local_transfer = False
+        self.remote_transfer = False
+        self.inside_structured_statement = False
 
     def __str__(self):
         return self.name
@@ -302,43 +302,42 @@ class SymbolTable:
         self.parent = None
 
     def add(self, sym):
-        assert isinstance(sym, Symbol) or isinstance(sym, Label) or \
-               isinstance(sym, pascaltypes.BaseType) or isinstance(sym, pascaltypes.EnumeratedTypeValue), \
-               "Can only add Symbols, Labels, and types to SymbolTables"
+        assert isinstance(sym, Symbol) or isinstance(sym, Label) or isinstance(sym, pascaltypes.BaseType) or isinstance(
+            sym, pascaltypes.EnumeratedTypeValue), "Can only add Symbols, Labels, and types to SymbolTables"
         if sym.name in self.symbols.keys():
             current_sym = self.fetch(sym.name)
             if isinstance(sym, ConstantSymbol) and isinstance(current_sym, ConstantSymbol):
-                errstr = "Constant Redefined: {}".format(sym.name)
+                error_str = "Constant Redefined: {}".format(sym.name)
             else:
-                errstr = "Symbol Redefined: {}".format(sym.name)
+                error_str = "Symbol Redefined: {}".format(sym.name)
             if isinstance(sym, Symbol):
-                errstr = compiler_errstr(errstr, None, sym.location)
-            raise SymbolRedefinedException(errstr)
+                error_str = compiler_errstr(error_str, None, sym.location)
+            raise SymbolRedefinedException(error_str)
         # Unlike literals, where case matters ('abc' is different from 'aBc'), symbols in Pascal are
         # case-insensitive.  So, store them in our symbol table as lower-case.
         self.symbols[sym.name.lower()] = sym
 
     def fetch(self, name):
-        curtable = self
-        foundit = False
-        ret = None
-        while (not foundit) and (curtable is not None):
-            if name.lower() in curtable.symbols.keys():
-                ret = curtable.symbols[name.lower()]
-                foundit = True
+        current_table = self
+        found_it = False
+        return_obj = None
+        while (not found_it) and (current_table is not None):
+            if name.lower() in current_table.symbols.keys():
+                return_obj = current_table.symbols[name.lower()]
+                found_it = True
             else:
-                curtable = curtable.parent
-        assert foundit, "Identifier not found: '{}'".format(name)
-        assert isinstance(ret, Symbol) or isinstance(ret, Label) or \
-            isinstance(ret, pascaltypes.BaseType) or isinstance(ret, pascaltypes.EnumeratedTypeValue)
-        return ret
+                current_table = current_table.parent
+        assert found_it, "Identifier not found: '{}'".format(name)
+        assert isinstance(return_obj, Symbol) or isinstance(return_obj, Label) or \
+               isinstance(return_obj, pascaltypes.BaseType) or isinstance(return_obj, pascaltypes.EnumeratedTypeValue)
+        return return_obj
 
-    def fetch_originalsymtable_andtype(self, type_identifier):
+    def fetch_original_symbol_table_and_type(self, type_identifier):
         # Original typedef:
         #
         # type
-        #   a = integer;
-        #   b = a;
+        #   x = integer;
+        #   b = x;
         #   c = b;
         #
         # The original typedef for all of these is the integer definition.  However, c will be stored
@@ -350,11 +349,11 @@ class SymbolTable:
         # types being compared.
         #
         # Logic similar to fetch(), but returns a tuple containing the original typedef itself, as well as a
-        # reference to the symboltable that contains it.
+        # reference to the SymbolTable that contains it.
         #
 
-        ret_symtable = self
-        ret_type = None
+        return_symbol_table = self
+        return_type = None
 
         # HACK - due to the way I defined literals with type name "integer literal" "real literal" etc.,
         # I can find the type by removing the " literal" from the end.
@@ -365,37 +364,37 @@ class SymbolTable:
         # of which symbol table contains the record.
         done = False
         while not done:
-            if ret_symtable.exists(type_identifier):
-                ret_type = ret_symtable.symbols[type_identifier.lower()]
+            if return_symbol_table.exists(type_identifier):
+                return_type = return_symbol_table.symbols[type_identifier.lower()]
                 done = True
             else:
-                ret_symtable = ret_symtable.parent
-                assert ret_symtable is not None, "Cannot find {}".format(type_identifier)
+                return_symbol_table = return_symbol_table.parent
+                assert return_symbol_table is not None, "Cannot find {}".format(type_identifier)
 
         # Now we work through any aliases.  If we have the original type, which has None as
         # the denoter, then we stop.  Else, the denoter is another type, so we need to then find
-        # the symbol table in which that type's idenfifier was defined, and what the type corresponds to.
-        outerdone = False
-        innerdone = False
-        while not outerdone:
-            if ret_type.denoter is None:
-                outerdone = True
+        # the symbol table in which that type's identifier was defined, and what the type corresponds to.
+        outer_done = False
+        inner_done = False
+        while not outer_done:
+            if return_type.denoter is None:
+                outer_done = True
             else:
-                ret_type = ret_type.denoter
-                while not innerdone:
-                    if ret_symtable.exists(ret_type.identifier):
-                        ret_type = ret_symtable.symbols[ret_type.identifier.lower()]
-                        innerdone = True
+                return_type = return_type.denoter
+                while not inner_done:
+                    if return_symbol_table.exists(return_type.identifier):
+                        return_type = return_symbol_table.symbols[return_type.identifier.lower()]
+                        inner_done = True
                     else:
-                        ret_symtable = ret_symtable.parent
+                        return_symbol_table = return_symbol_table.parent
 
-        return ret_symtable, ret_type
+        return return_symbol_table, return_type
 
     def exists(self, name):
         # only looks in the current symbol table
         return name.lower() in self.symbols.keys()
 
-    def existsanywhere(self, name):
+    def exists_anywhere(self, name):
         # looks in current symbol table and parents
         ret = False
         ptr = self
@@ -404,23 +403,23 @@ class SymbolTable:
             ptr = ptr.parent
         return ret
 
-    def existspriortoglobalscope(self, name):
+    def exists_prior_to_global_scope(self, name):
         # Looks in current symbol table and parents EXCEPT the global scope
         # Used to check for variable unassigned before usage warning.
-        ret = False
+        return_bool = False
         ptr = self
-        while (not ret) and (ptr.parent is not None):
-            ret = ptr.exists(name)
+        while (not return_bool) and (ptr.parent is not None):
+            return_bool = ptr.exists(name)
             ptr = ptr.parent
-        return ret
+        return return_bool
 
-    def __str__(self):   # pragma: no cover
+    def __str__(self):  # pragma: no cover
         ret = ""
         for key in self.symbols.keys():
             ret += repr(self.symbols[key]) + "\n"
         return ret
 
-    def addsimpletypes(self):
+    def add_simple_types(self):
         # the root of the program has the required types in it
         self.add(pascaltypes.IntegerType())
         self.add(pascaltypes.BooleanType())
@@ -428,16 +427,16 @@ class SymbolTable:
         self.add(pascaltypes.CharacterType())
         self.add(pascaltypes.TextFileType())
         # TODO - this is a hack due to the combination of TypeDef and BaseType into BaseType
-        slt = pascaltypes.StringLiteralType()
-        slt.identifier = "_string"
-        self.add(slt)
+        string_literal_type = pascaltypes.StringLiteralType()
+        string_literal_type.identifier = "_string"
+        self.add(string_literal_type)
 
-    def are_same_type(self, t1_identifier, t2_identifier):
+    def are_same_type(self, type1_identifier, type2_identifier):
         # Most of the code that works with types only cares about the base type itself - how the type is laid out
         # in memory, what the identifiers are for enumerated types, etc.  However, the ISO standard is particular
         # about what types can be assigned to other types.
         #
-        # Two type defs are the same, if they can be traced back to the same type identifier.
+        # Two typedefs are the same, if they can be traced back to the same type identifier.
         # Per 6.4.7 of the ISO standard, 'integer,' 'count,' and 'range' in this example are the same type:
         #
         # type
@@ -451,20 +450,20 @@ class SymbolTable:
         #   Coordinates = record
         #       x,y: real
         #       end;
-        #   Coords = record
+        #   Coordinates2 = record
         #       x,y: real
         #       end;
-        #   MoreCoords = Coords
+        #   More_Coordinates = Coordinates2
         #
-        # Coordinates is not the same type as Coords, even though they share the same structure.  MoreCoords is the
-        # same type as MoreCoords because they share the same type identifier.
+        # Coordinates is not the same type as Coordinates2, even though they share the same structure.  More_Coordinates
+        # is the same type as Coordinates2 because they share the same type identifier.
         #
         # Additionally, the "same type identifier" has to take scope into account.  Consider the following:
         #
         # Program foo(output);
         # type
         #   z = integer;
-        #   i = z;
+        #   x = z;
         # procedure bar();
         #   type
         #       z = char;
@@ -473,18 +472,18 @@ class SymbolTable:
         #       type
         #           z = real
         #           r = z
-        #           i2 = i
+        #           i2 = x
         #
-        # i, c, and r are both defined in terms of 'z', but they are different z's.  However, i2 and i are both
+        # x, c, and r are both defined in terms of 'z', but they are different z's.  However, i2 and x are both
         # the same type.
         #
         # So, for the purpose of this function, we need to determine whether the types specified by the identifiers
         # passed into this function can be traced back to the same type identifier.  For this, we find not only the
         # original type identifier that defines each type, but if those are themselves identifiers and not type
         # definitions, then keep following back until we get to the identifier that is mapped to the base type.
-        # If both t1 and t2 map back to the same string identifier *in the same symboltable* then they are the same
+        # If both t1 and t2 map back to the same string identifier **in the same SymbolTable** then they are the same
         # type.  In the second example above, type r and type i both map to the string identifier z, but that's not
-        # a base type.  So one step further, and we find that r maps to real and i maps to integer, so they are not
+        # a base type.  So one step further, and we find that r maps to real and x maps to integer, so they are not
         # the same type.
         #
         # Program foo2(output);
@@ -508,228 +507,235 @@ class SymbolTable:
         # fields: x and y.  q2 is of type c2, which is also of a type named Coordinates, which is also a record
         # with two real fields x and y.  However, you can NOT assign q1 to q2 or vice versa.
 
-        t1_originalsymtable, t1_originaltype = self.fetch_originalsymtable_andtype(t1_identifier)
-        t2_originalsymtable, t2_originaltype = self.fetch_originalsymtable_andtype(t2_identifier)
+        type1_original_symbol_table, t1_original_type = self.fetch_original_symbol_table_and_type(type1_identifier)
+        type2_original_symbol_table, type2_original_type = self.fetch_original_symbol_table_and_type(type2_identifier)
 
-        # fetch_originalsymtable_andtypedef returns a tuple (symtable, typdef)
+        # fetch_original_symbol_table_and_type returns a tuple (SymbolTable, Type)
 
-        if t1_originalsymtable != t2_originalsymtable:
-            ret = False
+        if type1_original_symbol_table != type2_original_symbol_table:
+            return_bool = False
         else:
-            if t1_originaltype.identifier.lower() == t2_originaltype.identifier.lower():
-                if t1_originaltype.identifier.lower() == "array":
-                    assert isinstance(t1_originaltype, pascaltypes.ArrayType)
-                    assert isinstance(t2_originaltype, pascaltypes.ArrayType)
+            if t1_original_type.identifier.lower() == type2_original_type.identifier.lower():
+                if t1_original_type.identifier.lower() == "array":
+                    assert isinstance(t1_original_type, pascaltypes.ArrayType)
+                    assert isinstance(type2_original_type, pascaltypes.ArrayType)
                     # both t1 and t2 are arrays, need to see if they are in turn same type of array
-                    if t1_originalsymtable.are_same_type(t1_originaltype.index_type.identifier,
-                                                         t2_originaltype.index_type.identifier) \
-                            and t1_originalsymtable.are_same_type(t1_originaltype.component_type.identifier,
-                                                                  t2_originaltype.component_type.identifier) \
-                            and t1_originaltype.is_packed == t2_originaltype.is_packed:
-                        ret = True
+                    if type1_original_symbol_table.are_same_type(t1_original_type.index_type.identifier,
+                                                                 type2_original_type.index_type.identifier) \
+                            and type1_original_symbol_table.are_same_type(
+                        t1_original_type.component_type.identifier,
+                        type2_original_type.component_type.identifier) \
+                            and t1_original_type.is_packed == type2_original_type.is_packed:
+                        return_bool = True
                     else:
-                        ret = False
+                        return_bool = False
 
                 else:
-                    ret = True
+                    return_bool = True
             else:
-                ret = False
+                return_bool = False
 
-        return ret
+        return return_bool
 
-    def are_compatible(self, t1_identifier, t2_identifier, optional_t1_sym=None, optional_t2_sym=None):
+    def are_compatible(self, type1_identifier, type2_identifier, optional_type1_sym=None, optional_type2_sym=None):
         # per 6.4.5 of the ISO standard, as explained on p.10 of Cooper, two types are compatible if:
-        # 1) T1 and T2 are the same type
-        # 2) T1 and T2 are both Ordinal Types and one is subrange of the other, or both are subranges of the
+        # 1) Type1 and Type2 are the same type
+        # 2) Type1 and Type2 are both Ordinal Types and one is subrange of the other, or both are subranges of the
         #    same host type
-        # 3) T1 and T2 are sets, the base types of T1 and T2 are compatible, and either both T1 and T2 are packed
-        #    or neither are packed
-        # 4) T1 and T2 are string types with same number of components.
+        # 3) Type1 and Type2 are sets, the base types of Type1 and Type2 are compatible, and either both
+        #    Type1 and Type2 are packed or neither are packed
+        # 4) Type1 and Type2 are string types with same number of components.
 
         # Today we support the first, second, and fourth conditions.
+        # TODO Support the third condition when we support sets
 
-        if t1_identifier == "_string literal":
-            assert isinstance(optional_t1_sym, ConstantSymbol)
-        if t2_identifier == "_string literal":
-            assert isinstance(optional_t2_sym, ConstantSymbol)
+        if type1_identifier == "_string literal":
+            assert isinstance(optional_type1_sym, ConstantSymbol)
+        if type2_identifier == "_string literal":
+            assert isinstance(optional_type2_sym, ConstantSymbol)
 
-        if t1_identifier == "_string literal" and t2_identifier == "_string literal":
+        if type1_identifier == "_string literal" and type2_identifier == "_string literal":
             # need to do this before the are_same_type() else that will return true.
-            return len(optional_t1_sym.value) == len(optional_t2_sym.value)
-        elif self.are_same_type(t1_identifier, t2_identifier):
+            return len(optional_type1_sym.value) == len(optional_type2_sym.value)
+        elif self.are_same_type(type1_identifier, type2_identifier):
             return True
         else:
-            t1_symtab, t1_type = self.fetch_originalsymtable_andtype(t1_identifier)
-            t2_symtab, t2_type = self.fetch_originalsymtable_andtype(t2_identifier)
+            type1_symbol_table, type1_type = self.fetch_original_symbol_table_and_type(type1_identifier)
+            type2_symbol_table, type2_type = self.fetch_original_symbol_table_and_type(type2_identifier)
 
-            if isinstance(t1_type, pascaltypes.OrdinalType) and isinstance(t2_type, pascaltypes.OrdinalType):
+            if isinstance(type1_type, pascaltypes.OrdinalType) and isinstance(type2_type, pascaltypes.OrdinalType):
                 # return true if:
-                # t1 is a subrange of t2, t2 is a subrange of t1, or both are subranges of same host type
-                if isinstance(t1_type, pascaltypes.SubrangeType):
-                    if isinstance(t2_type, pascaltypes.SubrangeType):
-                        if self.are_same_type(t1_type.host_type.identifier, t2_type.host_type.identifier):
+                # type1 is a subrange of type2, type2 is a subrange of type1, or both are subranges of same host type
+                if isinstance(type1_type, pascaltypes.SubrangeType):
+                    if isinstance(type2_type, pascaltypes.SubrangeType):
+                        if self.are_same_type(type1_type.host_type.identifier, type2_type.host_type.identifier):
                             return True
                         else:
                             return False
                     else:
-                        if self.are_same_type(t1_type.host_type.identifier, t2_type.identifier):
+                        if self.are_same_type(type1_type.host_type.identifier, type2_type.identifier):
                             return True
                         else:
                             return False
                 else:
-                    if isinstance(t2_type, pascaltypes.SubrangeType):
-                        if self.are_same_type(t1_type.identifier, t2_type.host_type.identifier):
+                    if isinstance(type2_type, pascaltypes.SubrangeType):
+                        if self.are_same_type(type1_type.identifier, type2_type.host_type.identifier):
                             return True
                         else:
                             return False
                     else:
                         return False
-            elif t1_type.is_string_type() and t2_type.is_string_type() \
-                    and t1_type.num_items_in_array == t2_type.num_items_in_array:
+            elif type1_type.is_string_type() and type2_type.is_string_type() \
+                    and type1_type.num_items_in_array == type2_type.num_items_in_array:
                 return True
-            elif t1_type.is_string_type() and t2_identifier == "_string literal":
-                return t1_type.num_items_in_array == len(optional_t2_sym.value)
-            elif t1_identifier == "_string literal" and t2_type.is_string_type():
-                return len(optional_t1_sym.value) == t2_type.num_items_in_array
+            elif type1_type.is_string_type() and type2_identifier == "_string literal":
+                return type1_type.num_items_in_array == len(optional_type2_sym.value)
+            elif type1_identifier == "_string literal" and type2_type.is_string_type():
+                return len(optional_type1_sym.value) == type2_type.num_items_in_array
             else:
                 return False
 
-    def are_assignment_compatible(self, t1_identifier, t2_identifier, optional_t2_value=None):
-        # As explained on p10 of Cooper, 6.4.6 of the ISO Standard  states that type T2 is "assignment-compatible"
-        # with type T1 if :
-        # 1) T1 and T2 are the same type, but not a file type or type with file components
-        # 2) T1 is real and T2 is integer
-        # 3) T1 and T2 are compatible ordinal types, and the value with type T2 falls in the range of T1.  Note
-        #    the "value" piece is a run-time check, not a compile-time check.  At compile-time we can only check
-        #    that some piece of T2's range falls in the range of T1.
-        # 4) T1 and T2 are compatible set types, with all members of T2 belonging to the base type of T1.  Again
-        #    like condition 3, at compile type we can check that at least one member of T2 belongs in the base
-        #    type of T1, but the rest is a run-time check.
-        # 5) T1 and T2 are compatible string types
-        #
+    def are_assignment_compatible(self, type1_identifier, type2_identifier, optional_type2_value=None):
+        # As explained on p10 of Cooper, 6.4.6 of the ISO Standard  states that type Type2 is "assignment-compatible"
+        # with type Type1 if :
+        # 1) Type1 and Type2 are the same type, but not a file type or type with file components
+        # 2) Type1 is real and Type2 is integer
+        # 3) Type1 and Type2 are compatible ordinal types, and the value with type Type2 falls in the range of Type1.
+        #    Note the "value" piece is a run-time check, not a compile-time check.  At compile-time we can only check
+        #    that some piece of Type2's range falls in the range of Type1.
+        # 4) Type1 and Type2 are compatible set types, with all members of Type2 belonging to the base type of Type1.
+        #    Like condition 3, at compile type we can check that at least one member of Type2 belongs in the base
+        #    type of Type1, but the rest is a run-time check.
+        # 5) Type1 and Type2 are compatible string types
+        # TODO add condition 4 when we support sets
 
-        t1type = self.fetch_originalsymtable_andtype(t1_identifier)[1]
-        t2type = self.fetch_originalsymtable_andtype(t2_identifier)[1]
+        type1_type = self.fetch_original_symbol_table_and_type(type1_identifier)[1]
+        type2_type = self.fetch_original_symbol_table_and_type(type2_identifier)[1]
 
         # File Types, or types with file components are never assignment-compatible
-        if isinstance(t1type, pascaltypes.FileType) or isinstance(t2type, pascaltypes.FileType):
-            ret = False
-        elif self.are_same_type(t1_identifier, t2_identifier):
-            ret = True
-        elif isinstance(t1type, pascaltypes.OrdinalType) and isinstance(t2type, pascaltypes.OrdinalType) and \
-                self.are_compatible(t1_identifier, t2_identifier):
-            # "are compatible" means T1 and T2 are both Ordinal Types and one is subrange of the other,
+        if isinstance(type1_type, pascaltypes.FileType) or isinstance(type2_type, pascaltypes.FileType):
+            return_bool = False
+        elif self.are_same_type(type1_identifier, type2_identifier):
+            return_bool = True
+        elif isinstance(type1_type, pascaltypes.OrdinalType) and isinstance(type2_type, pascaltypes.OrdinalType) and \
+                self.are_compatible(type1_identifier, type2_identifier):
+            # "are compatible" means Type1 and Type2 are both Ordinal Types and one is subrange of the other,
             # or both are subranges of the same host type.
-            if isinstance(t1type, pascaltypes.SubrangeType) and optional_t2_value is not None:
-                # if t2 is a constant and falls in the range of t1 then rule 3 is true
-                # from definition of "are compatible" we know that at this point either t1 is a
-                # subrange of t2, or t1 and t2 are subranges of the same host type.
-                if t1type.isinrange(optional_t2_value):
-                    ret = True
+            if isinstance(type1_type, pascaltypes.SubrangeType) and optional_type2_value is not None:
+                # if Type2 is a constant and falls in the range of Type1 then rule 3 is true
+                # from definition of "are compatible" we know that at this point either Type1 is a
+                # subrange of Type2, or Type1 and Type2 are subranges of the same host type.
+                if type1_type.is_in_range(optional_type2_value):
+                    return_bool = True
                 else:
-                    ret = False
-            elif isinstance(t1type, pascaltypes.SubrangeType) and not isinstance(t2type, pascaltypes.SubrangeType):
-                # if t1 is a subrange type and t2 is not, and t2 is same type as t1's host type then at
+                    return_bool = False
+            elif isinstance(type1_type, pascaltypes.SubrangeType) and not isinstance(type2_type,
+                                                                                     pascaltypes.SubrangeType):
+                # if Type1 is a subrange type and Type2 is not, and Type2 is same type as Type1's host type then at
                 # compile time, it's ok, but we need to check at runtime too.
-                if self.are_same_type(t1type.host_type.identifier, t2_identifier):
-                    ret = True
+                if self.are_same_type(type1_type.host_type.identifier, type2_identifier):
+                    return_bool = True
                 else:
-                    ret = False
-            elif isinstance(t1type, pascaltypes.SubrangeType) and isinstance(t2type, pascaltypes.SubrangeType):
-                # if t1 and t2 are both subrange types and there is at least some overlap then rule 3 is true
-                # from definition of "are compatible" above, we know that t1 and t2 are subranges of the
+                    return_bool = False
+            elif isinstance(type1_type, pascaltypes.SubrangeType) and isinstance(type2_type, pascaltypes.SubrangeType):
+                # if Type1 and Type2 are both subrange types and there is at least some overlap then rule 3 is true
+                # from definition of "are compatible" above, we know that Type1 and Type2 are subranges of the
                 # same host type.
-                if t1type.range_min_int <= t2type.range_max_int and t1type.range_max_int >= t2type.range_min_int:
-                    ret = True
+                if type1_type.range_min_int <= type2_type.range_max_int and \
+                        type1_type.range_max_int >= type2_type.range_min_int:
+                    return_bool = True
                 else:
-                    ret = False
-            elif not isinstance(t1type, pascaltypes.SubrangeType) and isinstance(t2type, pascaltypes.SubrangeType):
-                # if t2 base type is a subrange and t1 is not and t1 is t2's host type then rule 3 is true:
-                # from definition of "are compatible" above, we know that t2 is a subtange of t1
-                ret = True
+                    return_bool = False
+            elif not isinstance(type1_type, pascaltypes.SubrangeType) and isinstance(type2_type,
+                                                                                     pascaltypes.SubrangeType):
+                # if Type2 base type is a subrange and Type1 is not and Type1 is Type2's host type then rule 3 is true:
+                # from definition of "are compatible" above, we know that Type2 is a subrange of Type1
+                return_bool = True
             else:
                 # if they are compatible ordinal types but none of the other tests above were true, then
                 # they must be non-overlapping subranges or such, so are not assignment compatible.
-                ret = False
-        elif isinstance(t1type, pascaltypes.RealType) and isinstance(t2type, pascaltypes.IntegerType):
-            ret = True
-        elif t1type.is_string_type() and t2type.is_string_type() and self.are_compatible(t1_identifier, t2_identifier):
-            ret = True
-        elif t1type.is_string_type() and isinstance(t2type, pascaltypes.StringLiteralType):
-            ret = (t1type.num_items_in_array == len(optional_t2_value))
+                return_bool = False
+        elif isinstance(type1_type, pascaltypes.RealType) and isinstance(type2_type, pascaltypes.IntegerType):
+            return_bool = True
+        elif type1_type.is_string_type() and type2_type.is_string_type() and self.are_compatible(type1_identifier,
+                                                                                                 type2_identifier):
+            return_bool = True
+        elif type1_type.is_string_type() and isinstance(type2_type, pascaltypes.StringLiteralType):
+            return_bool = (type1_type.num_items_in_array == len(optional_type2_value))
         else:
-            ret = False
+            return_bool = False
 
-        return ret
+        return return_bool
 
 
 class Parameter:
-    def __init__(self, symbol, is_byref):
+    def __init__(self, symbol, is_by_ref):
         assert isinstance(symbol, Symbol)
-        assert isinstance(is_byref, bool)
+        assert isinstance(is_by_ref, bool)
         self.symbol = symbol
-        self.is_byref = is_byref
-        assert self.symbol.is_byref == self.is_byref
+        self.is_by_ref = is_by_ref
+        assert self.symbol.is_by_ref == self.is_by_ref
 
     @property
-    def is_byref(self):
-        return self.__is_byref
+    def is_by_ref(self):
+        return self.__is_by_ref
 
-    @is_byref.setter
-    def is_byref(self, byref):
-        assert isinstance(byref, bool)
-        self.__is_byref = byref
+    @is_by_ref.setter
+    def is_by_ref(self, by_ref):
+        assert isinstance(by_ref, bool)
+        self.__is_by_ref = by_ref
 
     def __str__(self):
-        ret = str(self.symbol)
-        if self.is_byref:
-            ret = "VAR " + ret
-        return ret
+        return_str = str(self.symbol)
+        if self.is_by_ref:
+            return_str = "VAR " + return_str
+        return return_str
 
 
 class ParameterList:
     def __init__(self):
-        self.paramlist = []
+        self.parameter_list = []
 
-    def add(self, param):
-        assert isinstance(param, Parameter)
-        if self.fetch(param.symbol.name):
-            errstr = compiler_errstr("Parameter Redefined: {}".format(param.symbol.name), None, param.symbol.location)
-            raise SymbolException(errstr)
+    def add(self, parameter):
+        assert isinstance(parameter, Parameter)
+        if self.fetch(parameter.symbol.name):
+            error_str = compiler_errstr("Parameter Redefined: {}".format(parameter.symbol.name), None,
+                                        parameter.symbol.location)
+            raise SymbolException(error_str)
         else:
-            self.paramlist.append(param)
+            self.parameter_list.append(parameter)
 
-    def fetch(self, str_paramname):
+    def fetch(self, str_parameter_name):
         # returns None if not found
-        ret = None
-        for param in self.paramlist:
-            if param.symbol.name == str_paramname:
-                ret = param
+        return_parameter = None
+        for param in self.parameter_list:
+            if param.symbol.name == str_parameter_name:
+                return_parameter = param
                 break
-        return ret
+        return return_parameter
 
     def __iter__(self):
-        self.__pos = 0
+        self.__position = 0
         return self
 
     def __next__(self):
         try:
-            ret = self.paramlist[self.__pos]
-            self.__pos += 1
+            ret = self.parameter_list[self.__position]
+            self.__position += 1
         except IndexError:
             raise StopIteration
         return ret
 
     def __str__(self):
         ret = ""
-        if len(self.paramlist) > 0:
-            ret = "{}:{}".format(str(self.paramlist[0]), self.paramlist[0].symbol.pascaltype.identifier)
-        for param in self.paramlist[1:]:
-            ret += ", " + "{}:{}".format(str(param), param.symbol.pascaltype.identifier)
+        if len(self.parameter_list) > 0:
+            ret = "{}:{}".format(str(self.parameter_list[0]), self.parameter_list[0].symbol.pascal_type.identifier)
+        for param in self.parameter_list[1:]:
+            ret += ", " + "{}:{}".format(str(param), param.symbol.pascal_type.identifier)
         return ret
 
     def __len__(self):
-        return len(self.paramlist)
+        return len(self.parameter_list)
 
     def __getitem__(self, item):
-        return self.paramlist[item]
+        return self.parameter_list[item]

@@ -4,9 +4,9 @@ class PascalTypeException(Exception):
 
 # Note: if you change the size of integer from 4 bytes to something else, these constants need to change
 MAXINT = 2147483647
-NEGMAXINT = -1 * MAXINT
-STRMAXINT = str(MAXINT)
-STRNEGMAXINT = str(NEGMAXINT)
+NEGATIVE_MAXINT = -1 * MAXINT
+MAXINT_AS_STRING = str(MAXINT)
+NEGATIVE_MAXINT_AS_STRING = str(NEGATIVE_MAXINT)
 
 
 def is_integer_or_subrange_of_integer(pascal_type):
@@ -23,11 +23,11 @@ class BaseType:
         # denoter may be None but may also be a BaseType.  For example:
         #
         # type
-        #   i = integer;
-        #   c = i;
+        #   x = integer;
+        #   c = x;
         #
-        # type i would be an IntegerType() with identifier i and denoter None.
-        # type c would be an IntegerType() with identifier c and denoter the type object of i.
+        # type x would be an IntegerType() with identifier x and denoter None.
+        # type c would be an IntegerType() with identifier c and denoter the type object of x.
         assert isinstance(identifier, str)
         assert denoter is None or isinstance(denoter, BaseType)
 
@@ -39,8 +39,8 @@ class BaseType:
         return False
 
     def get_pointer_to(self):
-        # returns a new pointertype that is a pointer to the current type
-        return PointerType("_ptrto_{}".format(self.identifier), self)
+        # returns a new pointer type that is a pointer to the current type
+        return PointerType("_pointer_to_{}".format(self.identifier), self)
 
     def __str__(self):
         return self.identifier
@@ -92,7 +92,7 @@ class IntegerType(OrdinalType):
     def __getitem__(self, n):  # pragma: no cover
         assert isinstance(n, int)
         assert n <= MAXINT
-        assert n >= NEGMAXINT
+        assert n >= NEGATIVE_MAXINT
         return str(n)
 
     def position(self, s):
@@ -100,14 +100,14 @@ class IntegerType(OrdinalType):
             s = int(s)
         assert isinstance(s, int)
         assert s <= MAXINT
-        assert s >= NEGMAXINT
+        assert s >= NEGATIVE_MAXINT
         return s
 
     def min_item(self):
-        return STRNEGMAXINT
+        return NEGATIVE_MAXINT_AS_STRING
 
     def max_item(self):
-        return STRMAXINT
+        return MAXINT_AS_STRING
 
 
 class CharacterType(OrdinalType):
@@ -205,11 +205,11 @@ class EnumeratedType(OrdinalType):
         return "Enumerated type: {}".format(self.identifier)
 
     def __repr__(self):  # pragma: no cover
-        ret = "Enumerated type: {} with values (".format(self.identifier)
+        return_str = "Enumerated type: {} with values (".format(self.identifier)
         for i in self.value_list:
-            ret = ret + str(i) + ', '
-        ret = ret[:-2] + ')'
-        return ret
+            return_str = return_str + str(i) + ', '
+        return_str = return_str[:-2] + ')'
+        return return_str
 
     def __getitem__(self, n):  # pragma: no cover
         assert isinstance(n, int)
@@ -249,7 +249,7 @@ class SubrangeType(OrdinalType):
         self.host_type = host_type
         self.range_min = range_min  # these are always strings
         self.range_max = range_max
-        # need to convert the rangemin / rangemax to ints so we can compare them
+        # need to convert the range_min / range_max to ints so we can compare them
         self.range_min_int = self.host_type.position(self.range_min)
         self.range_max_int = self.host_type.position(self.range_max)
         if self.range_min_int > self.range_max_int:
@@ -263,11 +263,11 @@ class SubrangeType(OrdinalType):
         return self.host_type[n - self.range_min_int]
 
     def position(self, s):
-        assert self.isinrange(s)
+        assert self.is_in_range(s)
         host_position = self.host_type.position(s)
         return host_position - self.range_min_int
 
-    def isinrange(self, s):
+    def is_in_range(self, s):
         host_position = self.host_type.position(s)
         return self.range_min_int <= host_position <= self.range_max_int
 
@@ -275,10 +275,10 @@ class SubrangeType(OrdinalType):
         return "Subrange type: '{}'".format(self.identifier)
 
     def __repr__(self):  # pragma: no cover
-        retstr = "Subrange type: '{}'.  Host_typedef: {} \n range_min: {}  range_max: {}"
-        retstr = retstr.format(self.identifier, repr(self.host_type), self.range_min, self.range_max)
-        retstr += "\nrange_min_int: {}  range_max_int: {}".format(str(self.range_min_int), str(self.range_max_int))
-        return retstr
+        return_str = "Subrange type: '{}'.  Host_typedef: {} \n range_min: {}  range_max: {}"
+        return_str = return_str.format(self.identifier, repr(self.host_type), self.range_min, self.range_max)
+        return_str += "\nrange_min_int: {}  range_max_int: {}".format(str(self.range_min_int), str(self.range_max_int))
+        return return_str
 
     def min_item(self):
         return self.range_min
@@ -321,7 +321,7 @@ class ArrayType(StructuredType):
 
         self.index_min = self.index_type.min_item()  # just like Subranges, these are always strings
         self.index_max = self.index_type.max_item()
-        # need to convert the rangemin / rangemax to ints so we can compare them
+        # need to convert the range min / range max to ints so we can compare them
         self.index_min_int = self.index_type.position(self.index_min)
         self.index_max_int = self.index_type.position(self.index_max)
         self.num_items_in_array = (self.index_max_int - self.index_min_int) + 1
@@ -341,15 +341,15 @@ class ArrayType(StructuredType):
             return False
 
     def __repr__(self):  # pragma: no cover
-        ret = ""
+        return_str = ""
         if self.is_packed:
-            ret = "Packed "
-        ret += "Array [{}] of {} (size {} bytes)".format(repr(self.index_type), repr(self.component_type),
-                                                         self.size)
-        ret += "\n basetype size: {}".format(self.component_type.size)
+            return_str = "Packed "
+        return_str += "Array [{}] of {} (size {} bytes)".format(repr(self.index_type), repr(self.component_type),
+                                                                self.size)
+        return_str += "\n BaseType size: {}".format(self.component_type.size)
         if self.is_string_type():
-            ret += "\nString Type"
-        return ret
+            return_str += "\nString Type"
+        return return_str
 
 
 class RecordType(StructuredType):
@@ -367,7 +367,7 @@ class FileType(StructuredType):
         assert not isinstance(component_type, FileType)
         super().__init__(identifier, denoter)
         self.component_type = component_type
-        # FileType layout = 8 bytes for the FILE* followed by 1 byte for the mode-type
+        # FileType layout = 8 bytes for the FILE* followed by 1 byte for the "mode-type."
         # mode-type = 0 : file not initialized
         # mode-type = 1 : generation
         # mode-type = 2 : inspection
