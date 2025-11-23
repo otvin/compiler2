@@ -149,6 +149,8 @@ class AssemblyGenerator:
         self.pascalerrors[16] = PascalError("Error: insufficient number of command-line arguments.",
                                        "_PASCAL_INSUFFICIENT_ARGC_ERROR")
         self.pascalerrors[17] = PascalError("Error opening file.", "_PASCAL_FOPEN_ERROR")
+        self.pascalerrors[18] = PascalError("Error D.48: Activation of function is undefined upon function completion.",
+                                            "_PASCAL_NORETURNVAL_ERROR")
 
     def emit(self, s):
         self.asmfile.write(s)
@@ -561,6 +563,9 @@ class AssemblyGenerator:
 
         self.emitcode("call {}".format(node.label), "call {}()".format(node.funcname))
         if act_symbol.returntype is not None:
+            # Need to insert code for the runtime error for function with undefined returnval
+            self.pascalerrors[18].isused = True
+
             # return value is now in either RAX or XMM0 - need to store it in right place
             comment = "assign return value of function to {}".format(node.lval.name)
             if isinstance(act_symbol.returntype, pascaltypes.IntegerType):

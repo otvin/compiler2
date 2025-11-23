@@ -461,6 +461,18 @@ class TACBlock:
                             self.generator.warningslist.append(warnstr)
             return sym
 
+    def processast_goto(self, ast):
+        # Right now, this only handles system gotos (specifically for one type of runtime
+        # error.  When this is user-written gotos, then we need to add handling for
+        # user-defined labels.
+        assert isinstance(ast, AST), compiler_failstr("tac_ir.processast_goto: ast is not an AST")
+        assert ast.token.tokentype == TokenType.GOTO, compiler_failstr("tac_ir.processast_goto: cannot process non-goto")
+        assert len(ast.children) == 1, compiler_failstr("tac_ir.processast_goto: goto statements must have 1 child")
+        assert ast.children[0].token.tokentype == TokenType.LABEL, compiler_failstr("tac_ir.processast_goto: goto must have label destination")
+
+        label = Label(ast.children[0].token.value)
+        self.addnode(TACGotoNode(label))
+
     def validate_function_returnsvalue(self, returnvaluesym, ast):
         # 6.7.3 of the ISO standard states that it shall be an error if the result of a function is undefined
         # upon completion of the algorithm.  The runtime check will be handled in track_function_returnval_assignments()
@@ -495,33 +507,25 @@ class TACBlock:
             compiler_failstr("tac_ir.track_function_returnval_assignment: retvalisassignedsym is not a symbol"))
         assert isinstance(ast, AST), compiler_failstr("tac_ir.track_function_returnval_assignment: ast is not an AST")
 
-        # if we modify the ast while we are iterating through it, we can get an infinite loop
-        indexlist = []
-        for child in ast.children:
-            if child.token.tokentype == TokenType.ASSIGNMENT:
-                if child.nearest_symboltable().exists(child.children[0].token.value.lower()):
-                    lvalsym = child.nearest_symboltable().fetch(child.children[0].token.value.lower())
-                    if lvalsym is returnvaluesym:
-                        indexlist.append(ast.children.index(child))
-            self.track_function_returnval_assignments(returnvaluesym, retvalisassignedsym, child)
-        if len(indexlist) > 0:
-            # add from the end to the beginning, else the indexes get messed up
-            for index in reversed(indexlist):
-                child = ast.children[index]
-                newbegin = AST(Token(TokenType.BEGIN, child.token.location, "Begin"), ast, "Track assignment to {}".format(returnvaluesym.name))
-                child.parent = newbegin
-                newbegin.children.append(child)
 
-                track_assignment_ast = AST(Token(TokenType.ASSIGNMENT, child.token.location, ":="), newbegin, "Assign {} to true".format(retvalisassignedsym.name))
-                lvaltoken = Token(TokenType.IDENTIFIER, child.token.location, retvalisassignedsym.name)
-                truetoken = Token(TokenType.TRUE, child.token.location, 'true')
-                track_assignment_ast.children.append(AST(lvaltoken, track_assignment_ast))
-                track_assignment_ast.children.append(AST(truetoken, track_assignment_ast))
-                newbegin.children.append(track_assignment_ast)
-
-                ast.children[index] = newbegin
-            # TODO - am betting if we return true from here we can track whether an assignment existed
-            # and get rid of validate_function_returnsvalue.
+        if ast.token.tokentype == TokenType.ASSIGNMENT:
+            if ast.nearest_symboltable().exists(ast.children[0].token.value.lower()):
+                lvalsym = ast.nearest_symboltable().fetch(ast.children[0].token.value.lower())
+                if lvalsym is returnvaluesym:
+                    newbegin = AST(Token(TokenType.BEGIN, ast.token.location, "Begin"), ast.parent, "Track assignment to {}".format(returnvaluesym.name))
+                    ast.parent = newbegin
+                    newbegin.children.append(ast)
+                    track_assignment_ast = AST(Token(TokenType.ASSIGNMENT, ast.children[0].token.location, ":="), newbegin,
+                                               "Assign {} to true".format(retvalisassignedsym.name))
+                    lvaltoken = Token(TokenType.IDENTIFIER, ast.children[0].token.location, retvalisassignedsym.name)
+                    truetoken = Token(TokenType.TRUE, ast.children[0].token.location, 'true')
+                    track_assignment_ast.children.append(AST(lvaltoken, track_assignment_ast))
+                    track_assignment_ast.children.append(AST(truetoken, track_assignment_ast))
+                    newbegin.children.append(track_assignment_ast)
+                    newbegin.parent.children[newbegin.parent.children.index(newbegin.children[0])] = newbegin
+        else:
+            for child in ast.children:
+                self.track_function_returnval_assignments(returnvaluesym, retvalisassignedsym, child)
 
     def processast_procedurefunction(self, ast):
         assert isinstance(ast, AST)
@@ -603,6 +607,7 @@ class TACBlock:
                 raise TACException(compiler_errstr(errstr, tok))
 
             # now we need to test that the returnvalue was assigned
+            child = ast.children[1]  # only needed to anchor the locations for the AST's I'm creating below.
             testast = AST(Token(TokenType.IF, child.token.location, 'if'), ast, 'if {} = False, then error'.format(retvalisassigned_variablename))
             conditionast = AST(Token(TokenType.EQUALS, child.token.location, '='), testast, 'if {} = false'.format(retvalisassigned_variablename))
             # I could probably reuse these tokens but I'm very conservative
@@ -610,16 +615,12 @@ class TACBlock:
             conditionast.children.append(AST(deepcopy(falsetoken), conditionast))
             testast.children.append(conditionast)
 
+            gotoast = AST(Token(TokenType.GOTO, child.token.location, 'goto'), testast, 'goto _PASCAL_NORETURNVAL_ERROR')
+            labelast = AST(Token(TokenType.LABEL, child.token.location, '_PASCAL_NORETURNVAL_ERROR'), gotoast, '_PASCAL_NORETURNVAL_ERROR')
+            gotoast.children.append(labelast)
+            testast.children.append(gotoast)
 
-            '''
-            debugprintast = AST(Token(TokenType.WRITELN, child.token.location, 'writeln'), testast, "Debug print {}".format(retvalisassigned_variablename))
-            # debugprintast.children.append(AST(Token(TokenType.CHARSTRING, child.token.location, "RETURN VALUE NOT ASSIGNED ERROR"), debugprintast))
-            debugprintast.children.append(AST(Token(TokenType.IDENTIFIER, child.token.location, retvalisassigned_variablename), debugprintast))
-            testast.children.append(debugprintast)
             ast.children.append(testast)
-            # ast.children[1].children.append(debugprintast)
-            # print(ast.rpn_print(0))
-            '''
         else:
             comment = "Procedure {}({})".format(str_procname, str(self.paramlist))
         self.addnode(TACLabelNode(proclabel, comment))
@@ -1492,6 +1493,8 @@ class TACBlock:
             self.processast_fileprocedure(ast)
         elif toktype in (TokenType.WRITE, TokenType.WRITELN):
             self.processast_write(ast)
+        elif toktype == TokenType.GOTO:
+            self.processast_goto(ast)
         elif toktype == TokenType.IF:
             self.processast_conditionalstatement(ast)
         elif toktype in (TokenType.WHILE, TokenType.REPEAT, TokenType.FOR):
