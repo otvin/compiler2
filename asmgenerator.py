@@ -27,43 +27,43 @@ FILESTATE_INSPECTION = 2
 
 
 class PascalError:
-    def __init__(self, errorstr, label, isused=False):
+    def __init__(self, error_string, label, is_used=False):
         # we will only write the error information to the .asm file if it is invoked someplace
-        assert isinstance(errorstr, str)
+        assert isinstance(error_string, str)
         assert isinstance(label, str)
-        self.isused = isused
-        self.errorstr = errorstr
+        self.is_used = is_used
+        self.error_string = error_string
         self.label = label
 
 
-def get_register_slice_bybytes(register, numbytes):
-    assert numbytes in [1, 2, 4, 8]
+def get_register_slice_by_bytes(register, num_bytes):
+    assert num_bytes in [1, 2, 4, 8]
     assert register in VALID_REGISTER_LIST
 
     # TODO - https://stackoverflow.com/questions/41573502/why-doesnt-gcc-use-partial-registers - when we get to types
     # that are 1 or 2 bytes, need to make sure we don't get in trouble.
 
-    if numbytes == 8:
+    if num_bytes == 8:
         ret = register
     else:
         if register in ["RAX", "RBX", "RCX", "RDX"]:
-            if numbytes == 4:
+            if num_bytes == 4:
                 ret = "E" + register[-2:]
-            elif numbytes == 2:
+            elif num_bytes == 2:
                 ret = register[-2:]
             else:
                 ret = register[1] + "L"
         elif register in ["RSI", "RDI", "RBP", "RSP"]:
-            if numbytes == 4:
+            if num_bytes == 4:
                 ret = "E" + register[-2:]
-            elif numbytes == 2:
+            elif num_bytes == 2:
                 ret = register[-2:]
             else:
                 ret = register[-2:] + "L"
         else:
-            if numbytes == 4:
+            if num_bytes == 4:
                 ret = register + "D"
-            elif numbytes == 2:
+            elif num_bytes == 2:
                 ret = register + "W"
             else:
                 ret = register + "B"
@@ -92,13 +92,13 @@ def intparampos_to_register(pos):
     return ret
 
 
-def is_integerorboolean_subrangetype(basetype):
-    assert isinstance(basetype, pascaltypes.BaseType)
+def is_integer_or_boolean_subrange_type(base_type):
+    assert isinstance(base_type, pascaltypes.BaseType)
     ret = False
-    if isinstance(basetype, pascaltypes.SubrangeType):
-        if isinstance(basetype.hosttype, pascaltypes.IntegerType):
+    if isinstance(base_type, pascaltypes.SubrangeType):
+        if isinstance(base_type.hosttype, pascaltypes.IntegerType):
             ret = True
-        elif isinstance(basetype.hosttype, pascaltypes.BooleanType):
+        elif isinstance(base_type.hosttype, pascaltypes.BooleanType):
             ret = True
     return ret
 
@@ -270,7 +270,7 @@ class AssemblyGenerator:
         foundit = False
         for i in self.pascalerrors.keys():
             if self.pascalerrors[i].label == errorlabel:
-                self.pascalerrors[i].isused = True
+                self.pascalerrors[i].is_used = True
                 foundit = True
                 break
         assert foundit  # if it's not a valid error code we have a typo
@@ -343,7 +343,7 @@ class AssemblyGenerator:
             # TODO - we could iterate over all the TACBlocks, identify which errors we will need, then change
             # emit_jumptoerror to test whether or not we're invoking an error that we have marked as used.  That
             # would reduce the binary size.
-            self.emitcode('_pascalerr_{} db `{}`, 0'.format(str(i), self.pascalerrors[i].errorstr))
+            self.emitcode('_pascalerr_{} db `{}`, 0'.format(str(i), self.pascalerrors[i].error_string))
         self.emitcomment("support for write() commands")
         self.emitcode('_printf_intfmt db "%d",0')
         # TODO - this is not pascal-compliant, as should be fixed characters right-justified
@@ -460,7 +460,7 @@ class AssemblyGenerator:
                 # the param memory address is a register
                 numintparams += 1
                 paramreg = intparampos_to_register(numintparams)
-                regslice = get_register_slice_bybytes(paramreg, param.symbol.pascaltype.size)
+                regslice = get_register_slice_by_bytes(paramreg, param.symbol.pascaltype.size)
                 self.emitcode("mov [{}], {}".format(localsym.memoryaddress, regslice),
                               "Copy parameter {} to stack".format(param.symbol.name))
 
@@ -548,7 +548,7 @@ class AssemblyGenerator:
                 numintparams += 1
                 assert numintparams <= 6  # TODO - remove when we can handle more
                 fullreg = intparampos_to_register(numintparams)
-                reg = get_register_slice_bybytes(fullreg, paramdef.symbol.pascaltype.size)
+                reg = get_register_slice_by_bytes(fullreg, paramdef.symbol.pascaltype.size)
                 self.emit_movtoregister_fromstackorliteral(reg, actualparam.paramval, comment)
             elif isinstance(paramdef.symbol.pascaltype, pascaltypes.RealType):
                 reg = "xmm{}".format(numrealparams)
@@ -565,7 +565,7 @@ class AssemblyGenerator:
         self.emitcode("call {}".format(node.label), "call {}()".format(node.funcname))
         if act_symbol.returntype is not None:
             # Need to insert code for the runtime error for function with undefined returnval
-            self.pascalerrors[18].isused = True
+            self.pascalerrors[18].is_used = True
 
             # return value is now in either RAX or XMM0 - need to store it in right place
             comment = "assign return value of function to {}".format(node.lval.name)
@@ -767,7 +767,7 @@ class AssemblyGenerator:
                             comment = "Copy array {} into {}".format(node.arg1.name, node.lval.name)
                             self.emit_memcopy(node.lval, node.arg1, node.lval.pascaltype.size, comment, False)
                         else:
-                            reg = get_register_slice_bybytes("RAX", node.lval.pascaltype.size)
+                            reg = get_register_slice_by_bytes("RAX", node.lval.pascaltype.size)
                             # first, get the arg1 into reg.  If arg1 is a byref parameter, we need to
                             # dereference the pointer.
                             comment = "Move {} into {}".format(node.arg1.name, node.lval.name)
@@ -793,14 +793,14 @@ class AssemblyGenerator:
                             comment = "Mov {} to address contained in {}".format(node.arg1.name, node.lval.name)
                             # Note - this works with reals just fine, because we will movsd into an xmm register
                             # before doing anything with them.
-                            reg = get_register_slice_bybytes("R11", node.arg1.pascaltype.size)
+                            reg = get_register_slice_by_bytes("R11", node.arg1.pascaltype.size)
                             self.emit_movtoregister_fromstack(reg, node.arg1, comment)
                             self.emitcode("MOV R10, [{}]".format(node.lval.memoryaddress))
                             self.emitcode("MOV [R10], {}".format(reg))
                     elif node.operator == TACOperator.ASSIGNDEREFTO:
                         assert isinstance(node.arg1.pascaltype, pascaltypes.PointerType)
                         comment = "Mov deref of {} to {}".format(node.arg1.name, node.lval.name)
-                        destreg = get_register_slice_bybytes("RAX", node.lval.pascaltype.size)
+                        destreg = get_register_slice_by_bytes("RAX", node.lval.pascaltype.size)
                         self.emit_movdereftoregister_fromstack(destreg, node.arg1, comment)
                         self.emit_movtostack_fromregister(node.lval, destreg)
                     elif node.operator == TACOperator.NOT:
@@ -836,7 +836,7 @@ class AssemblyGenerator:
                                 val = ord(node.literal1.value)
                             else:
                                 val = node.literal1.value
-                            tmpreg = get_register_slice_bybytes("RAX", node.lval.pascaltype.size)
+                            tmpreg = get_register_slice_by_bytes("RAX", node.lval.pascaltype.size)
                             self.emitcode("mov {}, {}".format(tmpreg, val), comment)
                             self.emit_movtostack_fromregister(node.lval, tmpreg)
                         elif node.operator == TACOperator.INTTOREAL:
@@ -886,7 +886,7 @@ class AssemblyGenerator:
                             if node.label.name == "_WRITEI":
                                 self.emitcode("mov rdi, [{}]".format(outfilesym.memoryaddress))
                                 self.emitcode("lea rsi, [rel _printf_intfmt]")
-                                destregister = get_register_slice_bybytes("RDX", outparamsym.pascaltype.size)
+                                destregister = get_register_slice_by_bytes("RDX", outparamsym.pascaltype.size)
                                 self.emit_movtoregister_fromstackorliteral(destregister, outparamsym)
                                 # must pass 0 (in rax) as number of floating point args since fprintf is variadic
                                 self.emitcode("mov rax, 0")
@@ -1162,7 +1162,7 @@ class AssemblyGenerator:
                         assert params[-1].paramval.pascaltype.size in (1, 4)
                         assert node.lval.pascaltype.size == params[-1].paramval.pascaltype.size
                         comment = "parameter {} for succ()".format(str(params[-1].paramval))
-                        reg = get_register_slice_bybytes("RAX", node.lval.pascaltype.size)
+                        reg = get_register_slice_by_bytes("RAX", node.lval.pascaltype.size)
                         bt = params[-1].paramval.pascaltype
 
                         self.emit_movtoregister_fromstackorliteral(reg, params[-1].paramval, comment)
@@ -1192,7 +1192,7 @@ class AssemblyGenerator:
                         assert params[-1].paramval.pascaltype.size in (1, 4)
                         assert node.lval.pascaltype.size == params[-1].paramval.pascaltype.size
                         comment = "parameter {} for pred()".format(str(params[-1].paramval))
-                        reg = get_register_slice_bybytes("RAX", node.lval.pascaltype.size)
+                        reg = get_register_slice_by_bytes("RAX", node.lval.pascaltype.size)
 
                         self.emit_movtoregister_fromstackorliteral(reg, params[-1].paramval, comment)
                         self.emitcode("DEC {}".format(reg))
@@ -1210,7 +1210,7 @@ class AssemblyGenerator:
                         comment = "parameter {} for {}()".format(str(params[-1].paramval), node.label.name[1:6].lower())
                         self.emit_movtoxmmregister_fromstack("xmm0", params[-1].paramval, comment)
                         assert node.lval.pascaltype.size in (4, 8)  # can't round into 1 or 2 bytes
-                        destreg = get_register_slice_bybytes("RAX", node.lval.pascaltype.size)
+                        destreg = get_register_slice_by_bytes("RAX", node.lval.pascaltype.size)
                         if node.label.name == "_ROUNDR":
                             instruction = "CVTSD2SI"
                         else:
@@ -1374,7 +1374,7 @@ class AssemblyGenerator:
 
                             if isinstance(n1type, pascaltypes.BooleanType) or \
                                     isinstance(n1type, pascaltypes.IntegerType) or \
-                                    is_integerorboolean_subrangetype(n1type) or \
+                                    is_integer_or_boolean_subrange_type(n1type) or \
                                     n1type.is_string_type() or \
                                     isinstance(n1type, pascaltypes.StringLiteralType):
 
@@ -1478,10 +1478,10 @@ class AssemblyGenerator:
 
     def generate_errorhandlingcode(self):
         for i in self.pascalerrors.keys():
-            if self.pascalerrors[i].isused:
+            if self.pascalerrors[i].is_used:
                 self.emitlabel(self.pascalerrors[i].label)
                 self.emitcode("lea rsi, [rel _pascalerr_{}]".format(str(i)))
-                self.emitcode("mov rdx, {}".format(len(self.pascalerrors[i].errorstr)))
+                self.emitcode("mov rdx, {}".format(len(self.pascalerrors[i].error_string)))
                 self.emitcode("jmp _PASCAL_PRINT_ERROR")
 
         self.emitlabel("_PASCAL_PRINT_ERROR")

@@ -3,8 +3,8 @@ import sys
 import compiler
 import glob
 
-NUM_ATTEMPTS = 0
-NUM_SUCCESSES = 0
+num_attempts = 0
+num_successes = 0
 
 
 def list_files(directory, mask="*"):
@@ -41,10 +41,10 @@ def dotest(pascal_filename, numparamfiles=0, pipefile=False, paramfile_compareli
     assert isinstance(pipefile, bool)
     assert paramfile_comparelist is None or isinstance(paramfile_comparelist, list)
 
-    global NUM_ATTEMPTS
-    global NUM_SUCCESSES
+    global num_attempts
+    global num_successes
 
-    NUM_ATTEMPTS += 1
+    num_attempts += 1
 
     try:
         fileroot = pascal_filename[:-4]
@@ -113,7 +113,7 @@ def dotest(pascal_filename, numparamfiles=0, pipefile=False, paramfile_compareli
                     actualfilename = fileroot + "_paramfile" + str(i) + ".file"
                     os.system("rm {}".format(actualfilename))
 
-            NUM_SUCCESSES += 1
+            num_successes += 1
 
     except Exception as e:  # pragma: no cover
         print("FAIL: {}".format(pascal_filename))
@@ -124,10 +124,10 @@ def do_compilefailtest(infilename):
     # For testing situations where the file fails to compile
     assert infilename[-4:] == ".pas", "compiler_test.do_compilefailtest: invalid file name: {}".format(infilename)
 
-    global NUM_ATTEMPTS
-    global NUM_SUCCESSES
+    global num_attempts
+    global num_successes
 
-    NUM_ATTEMPTS += 1
+    num_attempts += 1
 
     try:
         # the carriage return is included in the output files to end the line
@@ -144,7 +144,7 @@ def do_compilefailtest(infilename):
 
         if resultvalue == comparestr:
             print("PASS: {0}".format(infilename))
-            NUM_SUCCESSES += 1
+            num_successes += 1
         else:
             print("FAIL: {0}".format(infilename))
             print("Actual: " + comparestr)
@@ -155,8 +155,8 @@ def do_compilefailtest(infilename):
 
 
 def main(onlytest=""):
-    global NUM_ATTEMPTS
-    global NUM_SUCCESSES
+    global num_attempts
+    global num_successes
 
     testfilelist = list_files("tests", "test{}*pas".format(onlytest))
     testfilelist.sort()
@@ -172,8 +172,8 @@ def main(onlytest=""):
         for filename in compilefaillist:
             do_compilefailtest(filename)
 
-    print("Tests Attempted: " + str(NUM_ATTEMPTS))
-    print("Tests Succeeded: " + str(NUM_SUCCESSES))
+    print("Tests Attempted: " + str(num_attempts))
+    print("Tests Succeeded: " + str(num_successes))
 
 
 if __name__ == '__main__':  # pragma: no cover

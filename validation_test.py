@@ -1,13 +1,13 @@
 import os
 import compiler
 
-NUM_ATTEMPTS = 0
-NUM_SUCCESSES = 0
+num_attempts = 0
+num_successes = 0
 
 
 def do_conform():
-    global NUM_ATTEMPTS
-    global NUM_SUCCESSES
+    global num_attempts
+    global num_successes
     testlist = []
     for i in range(1, 222):
         test = "CONF"
@@ -39,7 +39,7 @@ def do_conform():
                     testresult = " PASS...6.8.2.1 (CONF024)"
                 if testresult[:5] == " PASS":
                     print(testresult[1:])
-                    NUM_SUCCESSES += 1
+                    num_successes += 1
                     os.system("rm {}".format(asmfilename))
                     os.system("rm {}".format(objfilename))
                     os.system("rm {}".format(exefilename))
@@ -54,17 +54,17 @@ def do_conform():
         except Exception as e:
             print("FAIL: {}".format(pascal_filename))
             print(e)
-        NUM_ATTEMPTS += 1
+        num_attempts += 1
 
 
 def main():
-    global NUM_ATTEMPTS
-    global NUM_SUCCESSES
+    global num_attempts
+    global num_successes
 
     do_conform()
 
-    print("Tests Attempted: " + str(NUM_ATTEMPTS))
-    print("Tests Succeeded: " + str(NUM_SUCCESSES))
+    print("Tests Attempted: " + str(num_attempts))
+    print("Tests Succeeded: " + str(num_successes))
 
 
 # TODO: refactor validation_test and compiler_test to use shared library vs. copying code
