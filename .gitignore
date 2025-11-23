@@ -1,0 +1,13 @@
+/todo.txt
+/.coverage
+/compiler2_stringcompare.o
+/compiler2_system_io.o
+/compilewarn01.pas
+/COVERAGE_INSTRUCTIONS
+/helloworld
+/helloworld.asm
+/helloworld.o
+/docs/PVS pascalnews.pdf
+/tests/undefinedbehavior01
+/tests/undefinedbehavior01.asm
+/tests/undefinedbehavior01.o
