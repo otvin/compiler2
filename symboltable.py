@@ -521,11 +521,11 @@ class SymbolTable:
                     assert isinstance(t1_originaltype, pascaltypes.ArrayType)
                     assert isinstance(t2_originaltype, pascaltypes.ArrayType)
                     # both t1 and t2 are arrays, need to see if they are in turn same type of array
-                    if t1_originalsymtable.are_same_type(t1_originaltype.indextype.identifier,
-                                                         t2_originaltype.indextype.identifier) \
-                            and t1_originalsymtable.are_same_type(t1_originaltype.componenttype.identifier,
-                                                                  t2_originaltype.componenttype.identifier) \
-                            and t1_originaltype.ispacked == t2_originaltype.ispacked:
+                    if t1_originalsymtable.are_same_type(t1_originaltype.index_type.identifier,
+                                                         t2_originaltype.index_type.identifier) \
+                            and t1_originalsymtable.are_same_type(t1_originaltype.component_type.identifier,
+                                                                  t2_originaltype.component_type.identifier) \
+                            and t1_originaltype.is_packed == t2_originaltype.is_packed:
                         ret = True
                     else:
                         ret = False
@@ -567,30 +567,30 @@ class SymbolTable:
                 # t1 is a subrange of t2, t2 is a subrange of t1, or both are subranges of same host type
                 if isinstance(t1_type, pascaltypes.SubrangeType):
                     if isinstance(t2_type, pascaltypes.SubrangeType):
-                        if self.are_same_type(t1_type.hosttype.identifier, t2_type.hosttype.identifier):
+                        if self.are_same_type(t1_type.host_type.identifier, t2_type.host_type.identifier):
                             return True
                         else:
                             return False
                     else:
-                        if self.are_same_type(t1_type.hosttype.identifier, t2_type.identifier):
+                        if self.are_same_type(t1_type.host_type.identifier, t2_type.identifier):
                             return True
                         else:
                             return False
                 else:
                     if isinstance(t2_type, pascaltypes.SubrangeType):
-                        if self.are_same_type(t1_type.identifier, t2_type.hosttype.identifier):
+                        if self.are_same_type(t1_type.identifier, t2_type.host_type.identifier):
                             return True
                         else:
                             return False
                     else:
                         return False
             elif t1_type.is_string_type() and t2_type.is_string_type() \
-                    and t1_type.numitemsinarray == t2_type.numitemsinarray:
+                    and t1_type.num_items_in_array == t2_type.num_items_in_array:
                 return True
             elif t1_type.is_string_type() and t2_identifier == "_string literal":
-                return t1_type.numitemsinarray == len(optional_t2_sym.value)
+                return t1_type.num_items_in_array == len(optional_t2_sym.value)
             elif t1_identifier == "_string literal" and t2_type.is_string_type():
-                return len(optional_t1_sym.value) == t2_type.numitemsinarray
+                return len(optional_t1_sym.value) == t2_type.num_items_in_array
             else:
                 return False
 
@@ -631,7 +631,7 @@ class SymbolTable:
             elif isinstance(t1type, pascaltypes.SubrangeType) and not isinstance(t2type, pascaltypes.SubrangeType):
                 # if t1 is a subrange type and t2 is not, and t2 is same type as t1's host type then at
                 # compile time, it's ok, but we need to check at runtime too.
-                if self.are_same_type(t1type.hosttype.identifier, t2_identifier):
+                if self.are_same_type(t1type.host_type.identifier, t2_identifier):
                     ret = True
                 else:
                     ret = False
@@ -639,7 +639,7 @@ class SymbolTable:
                 # if t1 and t2 are both subrange types and there is at least some overlap then rule 3 is true
                 # from definition of "are compatible" above, we know that t1 and t2 are subranges of the
                 # same host type.
-                if t1type.rangemin_int <= t2type.rangemax_int and t1type.rangemax_int >= t2type.rangemin_int:
+                if t1type.range_min_int <= t2type.range_max_int and t1type.range_max_int >= t2type.range_min_int:
                     ret = True
                 else:
                     ret = False
@@ -656,7 +656,7 @@ class SymbolTable:
         elif t1type.is_string_type() and t2type.is_string_type() and self.are_compatible(t1_identifier, t2_identifier):
             ret = True
         elif t1type.is_string_type() and isinstance(t2type, pascaltypes.StringLiteralType):
-            ret = (t1type.numitemsinarray == len(optional_t2_value))
+            ret = (t1type.num_items_in_array == len(optional_t2_value))
         else:
             ret = False
 

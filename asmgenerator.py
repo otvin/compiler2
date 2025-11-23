@@ -96,9 +96,9 @@ def is_integer_or_boolean_subrange_type(base_type):
     assert isinstance(base_type, pascaltypes.BaseType)
     ret = False
     if isinstance(base_type, pascaltypes.SubrangeType):
-        if isinstance(base_type.hosttype, pascaltypes.IntegerType):
+        if isinstance(base_type.host_type, pascaltypes.IntegerType):
             ret = True
-        elif isinstance(base_type.hosttype, pascaltypes.BooleanType):
+        elif isinstance(base_type.host_type, pascaltypes.BooleanType):
             ret = True
     return ret
 
@@ -392,9 +392,9 @@ class AssemblyGenerator:
             jumpgreater = "JG"
 
         comment = "Validate we are within proper range"
-        self.emitcode("CMP {}, {}".format(reg, subrange_basetype.rangemin_int), comment)
+        self.emitcode("CMP {}, {}".format(reg, subrange_basetype.range_min_int), comment)
         self.emit_jumptoerror(jumpless, "_PASCAL_SUBRANGE_ERROR")
-        self.emitcode("CMP {}, {}".format(reg, subrange_basetype.rangemax_int))
+        self.emitcode("CMP {}, {}".format(reg, subrange_basetype.range_max_int))
         self.emit_jumptoerror(jumpgreater, "_PASCAL_SUBRANGE_ERROR")
 
     def generate_parameter_comments(self, block):
@@ -417,9 +417,9 @@ class AssemblyGenerator:
     def generate_array_variable_memory_allocation_code(self, sym):
         assert isinstance(sym, Symbol)
         assert isinstance(sym.pascaltype, pascaltypes.ArrayType)
-        self.emitcode("mov rdi, {}".format(sym.pascaltype.numitemsinarray),
+        self.emitcode("mov rdi, {}".format(sym.pascaltype.num_items_in_array),
                       'Allocate memory for array {}'.format(sym.name))
-        self.emitcode("mov rsi, {}".format(sym.pascaltype.componenttype.size))
+        self.emitcode("mov rsi, {}".format(sym.pascaltype.component_type.size))
         self.used_calloc = True
         self.emitcode("call _PASCAL_ALLOCATE_MEMORY")
         self.emitcode("mov [{}], rax".format(sym.memoryaddress))
@@ -523,8 +523,8 @@ class AssemblyGenerator:
                 assert isinstance(psp, pascaltypes.ArrayType)
                 self.emitcode("PUSH RDI", "create copy of array {}".format(actualparam.paramval.name))
                 self.emitcode("PUSH RSI")
-                self.emitcode("MOV RDI, {}".format(psp.numitemsinarray))
-                self.emitcode("MOV RSI, {}".format(psp.componenttype.size))
+                self.emitcode("MOV RDI, {}".format(psp.num_items_in_array))
+                self.emitcode("MOV RSI, {}".format(psp.component_type.size))
                 self.used_calloc = True
                 self.emitcode("call _PASCAL_ALLOCATE_MEMORY")
                 self.emitcode("POP RSI")
@@ -786,7 +786,7 @@ class AssemblyGenerator:
                     elif node.operator == TACOperator.ASSIGNTODEREF:
                         assert isinstance(node.lval.pascaltype, pascaltypes.PointerType)
                         if isinstance(node.arg1.pascaltype, pascaltypes.ArrayType):
-                            assert node.lval.pascaltype.pointstotype.size == node.arg1.pascaltype.size
+                            assert node.lval.pascaltype.points_to_type.size == node.arg1.pascaltype.size
                             comment = "Copy array {} into {}".format(node.arg1.name, node.lval.name)
                             self.emit_memcopy(node.lval, node.arg1, node.arg1.pascaltype.size, comment, False)
                         else:
@@ -850,7 +850,7 @@ class AssemblyGenerator:
                             self.emit_movtostack_fromxmmregister(node.lval, "xmm0")
                         elif node.operator == TACOperator.ASSIGNTODEREF:
                             assert isinstance(node.lval.pascaltype, pascaltypes.PointerType)
-                            assert isinstance(node.lval.pascaltype.pointstotype, pascaltypes.IntegerType)
+                            assert isinstance(node.lval.pascaltype.points_to_type, pascaltypes.IntegerType)
                             comment = "Move integer literal {} into address contained in {}"
                             comment = comment.format(node.literal1.value, node.lval.name)
                             self.emitcode("MOV R10, [{}]".format(node.lval.memoryaddress), comment)
@@ -908,7 +908,7 @@ class AssemblyGenerator:
                                 assert outparamsym.pascaltype.is_string_type()
                                 self.emitcode("mov rdi, [{}]".format(outfilesym.memoryaddress))
                                 self.emitcode("mov rsi, [{}]".format(outparamsym.memoryaddress))
-                                self.emitcode("mov edx, {}".format(outparamsym.pascaltype.numitemsinarray))
+                                self.emitcode("mov edx, {}".format(outparamsym.pascaltype.num_items_in_array))
                                 self.emitcode("call _PASCAL_PRINTSTRINGTYPE wrt ..plt", "in compiler2_system_io.asm")
                             elif node.label.name == "_WRITEC":
                                 self.emit_movtoregister_fromstack("RDI", outparamsym)
@@ -1345,7 +1345,7 @@ class AssemblyGenerator:
                                 self.emitcode("MOV RDI, [{}]".format(node.arg1.memoryaddress), comment)
                                 self.emitcode("MOV RSI, [{}]".format(node.arg2.memoryaddress))
                                 if n1type.is_string_type():
-                                    length = n1type.numitemsinarray
+                                    length = n1type.num_items_in_array
                                 else:
                                     assert isinstance(node.arg1, ConstantSymbol)
                                     length = len(node.arg1.value)
@@ -1354,7 +1354,7 @@ class AssemblyGenerator:
                                 self.emitcode("TEST AL, AL")
                             elif isinstance(n1type, pascaltypes.IntegerType) or \
                                     (isinstance(n1type, pascaltypes.SubrangeType) and
-                                     n1type.hosttype.size == 4):
+                                     n1type.host_type.size == 4):
                                 self.emit_movtoregister_fromstackorliteral("eax", node.arg1, comment)
                                 self.emit_movtoregister_fromstackorliteral("r11d", node.arg2)
                                 self.emitcode("cmp eax, r11d")
@@ -1362,7 +1362,7 @@ class AssemblyGenerator:
                                     isinstance(n1type, pascaltypes.CharacterType) or \
                                     isinstance(n1type, pascaltypes.EnumeratedType) or \
                                     (isinstance(n1type, pascaltypes.SubrangeType) and
-                                     n1type.hosttype.size == 1):
+                                     n1type.host_type.size == 1):
                                 self.emit_movtoregister_fromstack("al", node.arg1, comment)
                                 self.emit_movtoregister_fromstack("r11b", node.arg2)
                                 self.emitcode("cmp al, r11b")

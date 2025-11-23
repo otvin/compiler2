@@ -328,7 +328,7 @@ class Parser:
                     errstr = errstr.format(ident_token.value)
                     raise ParseException(compiler_errstr(errstr, ident_token))
             elif isinstance(sym, pascaltypes.EnumeratedTypeValue):
-                enumerated_type = parent_ast.symboltable.fetch_originalsymtable_andtype(sym.typeidentifier)[1]
+                enumerated_type = parent_ast.symboltable.fetch_originalsymtable_andtype(sym.type_identifier)[1]
                 ret = enumerated_type, ident_token.value
             else:
                 assert isinstance(sym, ConstantSymbol)

@@ -445,7 +445,7 @@ class TACBlock:
 
             # make a new symbol that has as its base type, the base type of the pointer
             # assign deref of the pointer to the new symbol.
-            basetypesym = Symbol(self.gettemporary(), sym.location, sym.pascaltype.pointstotype)
+            basetypesym = Symbol(self.gettemporary(), sym.location, sym.pascaltype.points_to_type)
             self.symboltable.add(basetypesym)
             self.addnode(TACUnaryNode(basetypesym, TACOperator.ASSIGNDEREFTO, sym))
             return basetypesym
@@ -689,7 +689,7 @@ class TACBlock:
         # display the string representation of the constant when trying to print it out, but we will
         # stick to Cooper for now.  The ISO standard is silent on the topic, per my reading.
         if isinstance(bt, pascaltypes.SubrangeType):
-            bt = bt.hosttype
+            bt = bt.host_type
 
         if not (isinstance(bt, pascaltypes.StringLiteralType) or isinstance(bt, pascaltypes.RealType) or
                 isinstance(bt, pascaltypes.BooleanType) or isinstance(bt, pascaltypes.IntegerType) or
@@ -1044,7 +1044,7 @@ class TACBlock:
             # TODO - return the enumerated type value so that we can make it a literal here instead of a symbol
             # assign.  Cannot return an IntegerLiteral here because then it will not assign properly to values
             # of the enumerated type.  Likely need an EnumeratedTypeLiteral
-            tmptype = self.symboltable.fetch(sym.typeidentifier)
+            tmptype = self.symboltable.fetch(sym.type_identifier)
             tmpsym = Symbol(self.gettemporary(), tok.location, tmptype)
             self.symboltable.add(tmpsym)
             comment = "Convert literal '{}' to integer value {}".format(sym.identifier, sym.value)
@@ -1210,18 +1210,18 @@ class TACBlock:
         step1 = self.processast(ast.children[0])
         assert isinstance(step1.pascaltype, pascaltypes.ArrayType) or \
             (isinstance(step1.pascaltype, pascaltypes.PointerType) and
-             isinstance(step1.pascaltype.pointstotype, pascaltypes.ArrayType))
+             isinstance(step1.pascaltype.points_to_type, pascaltypes.ArrayType))
         
         if isinstance(step1.pascaltype, pascaltypes.ArrayType):
             arraytype = step1.pascaltype
             assignop = TACOperator.ASSIGNADDRESSOF
         else:
-            arraytype = step1.pascaltype.pointstotype
+            arraytype = step1.pascaltype.points_to_type
             assert isinstance(arraytype, pascaltypes.ArrayType)
             assignop = TACOperator.ASSIGN
 
-        componenttype = arraytype.componenttype
-        indextype = arraytype.indextype
+        componenttype = arraytype.component_type
+        indextype = arraytype.index_type
 
         step2 = Symbol(self.gettemporary(), step1.location, componenttype.get_pointer_to())
         self.symboltable.add(step2)
@@ -1241,8 +1241,8 @@ class TACBlock:
         # TODO - if the array is an enumerated type (and possibly an ordinal type like char) it will not have
         # a subrange.
         if isinstance(indextype, pascaltypes.SubrangeType):
-            minrange = indextype.rangemin_int
-            maxrange = indextype.rangemax_int
+            minrange = indextype.range_min_int
+            maxrange = indextype.range_max_int
         else:
             assert isinstance(indextype, pascaltypes.OrdinalType)
             if isinstance(indextype, pascaltypes.IntegerType):
@@ -1283,7 +1283,7 @@ class TACBlock:
 
         lval = self.processast(ast.children[0])
         if isinstance(lval.pascaltype, pascaltypes.PointerType):
-            lval_reftype = lval.pascaltype.pointstotype
+            lval_reftype = lval.pascaltype.points_to_type
             assignop = TACOperator.ASSIGNTODEREF
         else:
             lval_reftype = lval.pascaltype
