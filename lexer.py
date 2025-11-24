@@ -178,7 +178,7 @@ class TokenType(Enum):
 # TokenTypes we just defined to eliminate the need for a long if/elif block testing for each word.
 # Note, not all TokenTypes map to reserved words.  Example: TokenType.IDENTIFIER or TokenType.SIGNED_REAL.
 
-TOKENTYPE_LOOKUP = {
+TOKEN_TYPE_LOOKUP = {
     'abs': TokenType.ABS, 'and': TokenType.AND,
     'arctan': TokenType.ARCTAN, 'array': TokenType.ARRAY, 'begin': TokenType.BEGIN,
     'boolean': TokenType.BOOLEAN, 'case': TokenType.CASE, 'chr': TokenType.CHR, 'char': TokenType.CHAR,
@@ -229,7 +229,7 @@ class Token:
         self.location = location
         self.value = value
 
-    # Use a property for tokentype so we can enforce that it is always a valid TokenType
+    # Use a property for token_type so we can enforce that it is always a valid TokenType
     @property
     def token_type(self):
         return self.__token_type
@@ -404,23 +404,23 @@ class Lexer:
         if self.at_eof():  # pragma: no cover
             raise IndexError("Length Exceeded")
         else:
-            ret = self.text[self.current_position]
+            return_str = self.text[self.current_position]
             self.current_position += 1
-            if ret == '\n':
+            if return_str == '\n':
                 self.location.line += 1
                 self.location.column = 1
-                self.location.curlinestr = self.peek_rest_of_current_line()
-            elif ret == '\t':
+                self.location.current_line_str = self.peek_rest_of_current_line()
+            elif return_str == '\t':
                 self.location.column += NUM_SPACES_IN_TAB
             else:
                 self.location.column += 1
-            return ret
+            return return_str
 
     def eat_multi(self, num):
-        ret = ""
+        return_str = ""
         for i in range(num):
-            ret += self.eat()
-        return ret
+            return_str += self.eat()
+        return return_str
 
     def eat_whitespace(self):
         while self.peek().isspace():
@@ -431,34 +431,34 @@ class Lexer:
         # This function validates that the next character in the input string is a letter, and if so,
         # returns the identifier.  Returns empty string if the next character in the input stream
         # is not alphabetic.
-        ret = ""
+        return_str = ""
         if self.peek().isalpha():
-            ret = self.eat()
+            return_str = self.eat()
             while self.peek().isalnum():
-                ret += self.eat()
-        return ret
+                return_str += self.eat()
+        return return_str
 
     def eat_comment(self):
         # Definition of commentary in section 6.1.8 of the ISO standard is
         # ( '{' | '(*' ) commentary ( '}' | '*)' ).  The actual commentary itself can be any arbitrary string of
         # characters, on multiple lines.  Comments do not nest, so the string "{ (* a comment *) }" is invalid, as the
-        # comment ends on the *), so the } would be flagged as an invalid token.
+        # comment ends on the "*)," so the "}" would be flagged as an invalid token.
         # Returns empty string if the next character(s) in the input stream is not a comment opening.
         assert self.peek() == '{' or self.peek_multi(2) == '(*'
 
-        ret = ""
+        return_str = ""
         if self.peek() == '{':
             self.eat()
         elif self.peek_multi(2) == '(*':
             self.eat_multi(2)
 
         while self.peek() != '}' and self.peek_multi(2) != '*)':
-            ret += self.eat()
+            return_str += self.eat()
         if self.peek() == '}':
             self.eat()
         else:  # eat the "*)"
             self.eat_multi(2)
-        return ret
+        return return_str
 
     def eat_real_number(self):
         # The lexer eats all signs as plus and minus tokens respectively, and relies on the parser to
@@ -473,37 +473,37 @@ class Lexer:
         #   digit-sequence = digit { digit } .
         #   digit = '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' .
         #
-        # As a note, the 'e' in the unsigned-real can be lower case or upper case.
+        # As a note, the 'e' in the unsigned-real can be lowercase or uppercase.
         #
         # Returns empty string if the next character in the input stream is not numeric.
         from compiler_error import compiler_error_str
-        ret = ""
+        return_str = ""
         while self.peek().isnumeric():
-            ret += self.eat()
+            return_str += self.eat()
             if self.peek() == '.':
                 if self.peek_ahead(1).isnumeric():
-                    ret += self.eat()  # grab the period
+                    return_str += self.eat()  # grab the period
                     while self.peek().isnumeric():
-                        ret += self.eat()
+                        return_str += self.eat()
                 else:
                     # Cannot end a real with a period and no digits following.
-                    errstr = compiler_error_str("Invalid character '.'", None, self.location)
-                    raise ValueError(errstr)
+                    error_str = compiler_error_str("Invalid character '.'", None, self.location)
+                    raise ValueError(error_str)
             if self.peek().lower() == 'e':
                 if self.peek_ahead(1) in ['+', '-'] and self.peek_ahead(2).isnumeric():
-                    ret += self.eat_multi(2)  # grab the 'e' and the sign
+                    return_str += self.eat_multi(2)  # grab the 'e' and the sign
                     while self.peek().isnumeric():
-                        ret += self.eat()
+                        return_str += self.eat()
                 elif self.peek_ahead(1).isnumeric():
-                    ret += self.eat()  # grab the 'e'
+                    return_str += self.eat()  # grab the 'e'
                     while self.peek().isnumeric():
-                        ret += self.eat()
+                        return_str += self.eat()
                 else:
-                    errstr = compiler_error_str("Invalid real number format: {}{}{}".format(ret, self.peek(),
-                                                                                            self.peek_ahead(1)), None,
-                                                self.location)
-                    raise ValueError(errstr)
-        return ret
+                    error_str = compiler_error_str(
+                        "Invalid real number format: {}{}{}".format(return_str, self.peek(), self.peek_ahead(1)), None,
+                        self.location)
+                    raise ValueError(error_str)
+        return return_str
 
     def eat_character_string(self):
         # Note that since apostrophe is part of the BNF here, I will use quotes to indicate specific characters
@@ -518,23 +518,23 @@ class Lexer:
         # returns empty string if this is not a character string.  Else, returns the value of the string excluding
         # the opening and closing apostrophes, as they are not part of the actual value of the string.
 
-        ret = ''
+        return_str = ''
         if self.peek() == "'":
             self.eat()  # remove the apostrophe
             done = False
             while not done:
                 if self.peek_multi(2) == "''":
-                    ret += "'"  # add the single apostrophe
+                    return_str += "'"  # add the single apostrophe
                     self.eat_multi(2)  # eat both apostrophes
                 elif self.peek() == "'":
                     self.eat()  # eat the closing apostrophe
                     done = True
                 else:
                     try:
-                        ret += self.eat()
+                        return_str += self.eat()
                     except IndexError:
                         raise LexerException("Unterminated character string")
-        return ret
+        return return_str
 
     def lex(self):
         from compiler_error import compiler_error_str
@@ -545,7 +545,7 @@ class Lexer:
             self.text = f.read()
             self.length = len(self.text)
             f.close()
-            self.location.curlinestr = self.peek_rest_of_current_line()
+            self.location.current_line_str = self.peek_rest_of_current_line()
         except FileNotFoundError:
             raise LexerException("Invalid filename: {}".format(self.location.filename))
 
@@ -554,18 +554,18 @@ class Lexer:
             # Remember where this next token starts, since that is the position a user would want to see in an error
             # It needs to be a copy, else every token we create in every iteration would share the same location
             # object.
-            curlocation = copy(self.location)
+            current_location = copy(self.location)
             try:
                 if self.peek() == "'":
                     val = self.eat_character_string()
-                    self.tokenstream.add_token(Token(TokenType.CHARSTRING, curlocation, val))
+                    self.tokenstream.add_token(Token(TokenType.CHARSTRING, current_location, val))
                 elif self.peek().isalpha():
                     val = self.eat_identifier()
-                    if val.lower() in TOKENTYPE_LOOKUP.keys():
-                        toktype = TOKENTYPE_LOOKUP[val.lower()]
+                    if val.lower() in TOKEN_TYPE_LOOKUP.keys():
+                        token_type = TOKEN_TYPE_LOOKUP[val.lower()]
                     else:
-                        toktype = TokenType.IDENTIFIER
-                    self.tokenstream.add_token(Token(toktype, curlocation, val))
+                        token_type = TokenType.IDENTIFIER
+                    self.tokenstream.add_token(Token(token_type, current_location, val))
                 elif self.peek().isnumeric():
                     # could be a real or an integer.  Read until the next non-numeric character.  If that character
                     # is an e, E, or a . followed by a digit then it is a real, else it is an integer.
@@ -575,21 +575,22 @@ class Lexer:
                     if ((self.peek_ahead(lookahead) == '.' and self.peek_ahead(lookahead + 1).isnumeric()) or
                             self.peek_ahead(lookahead).lower() == 'e'):
                         val = self.eat_real_number()
-                        self.tokenstream.add_token(Token(TokenType.UNSIGNED_REAL, curlocation, val))
+                        self.tokenstream.add_token(Token(TokenType.UNSIGNED_REAL, current_location, val))
                     elif (self.peek_ahead(lookahead) == '.' and self.peek_ahead(lookahead + 1) != '.' and
                           self.peek_ahead(lookahead + 1) != ')'):
                         # if we see two periods, it is a subrange token.  If we see a period followed by a paren,
                         # it's a lexical alternative for right bracket.  If we see one period otherwise, it is invalid;
                         # see definition of <unsigned-real>.  Without this special case, the error is
                         # 'Expected 'end' but saw '.' which is unhelpful.
-                        errstr = compiler_error_str(
-                            'Invalid real number format: "{}"'.format(self.peek_multi(lookahead + 1)), None, curlocation)
-                        raise ValueError(errstr)
+                        error_str = compiler_error_str(
+                            'Invalid real number format: "{}"'.format(self.peek_multi(lookahead + 1)), None,
+                            current_location)
+                        raise ValueError(error_str)
                     else:
                         val = ""
                         while self.peek().isnumeric():
                             val += self.eat()
-                        self.tokenstream.add_token(Token(TokenType.UNSIGNED_INT, curlocation, val))
+                        self.tokenstream.add_token(Token(TokenType.UNSIGNED_INT, current_location, val))
                 elif self.peek() == '{' or self.peek_multi(2) == '(*':
                     self.eat_comment()
                     # Comments are totally ignored from here forward, so we do not add those to the tokenstream.
@@ -601,15 +602,14 @@ class Lexer:
                         val = self.eat_multi(2)
                     else:
                         val = self.eat()
-                    toktype = SYMBOL_LOOKUP[val]
-                    self.tokenstream.add_token(Token(toktype, curlocation, val))
+                    token_type = SYMBOL_LOOKUP[val]
+                    self.tokenstream.add_token(Token(token_type, current_location, val))
                 else:
-                    # errstr = compiler_errstr('Unexpected character: {}'.format(self.peek()), None, curlocation)
                     raise LexerException('Unexpected character: {}'.format(self.peek()))
             except Exception as e:
                 if isinstance(e, ValueError):
                     raise e
                 else:
-                    raise LexerException(compiler_error_str(e, None, curlocation))
+                    raise LexerException(compiler_error_str(e, None, current_location))
 
             self.eat_whitespace()

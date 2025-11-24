@@ -49,8 +49,8 @@ def compiler_notify_str(notify_str, error_level, token=None, location=None):
     if token is not None:
         location = token.location
     if location is not None:
-        prolog = location.getprolog() + " "
-        current_line_str = '{:>6} | {}\n'.format(location.line, location.curlinestr)
+        prolog = location.get_prolog() + " "
+        current_line_str = '{:>6} | {}\n'.format(location.line, location.current_line_str)
     ret = '{}{}{}{} {}\n{}'.format(ANSI_BOLD, prolog, ANSI_ENDC, error_level_format_str(error_level), notify_str,
                                    current_line_str)
     return ret
