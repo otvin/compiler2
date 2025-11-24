@@ -881,7 +881,7 @@ class Parser:
         #
         # NOTE: if we see a function without an argument list, or a reference to a constant it will come here
         # and work fine, because we build the AST the same way for all those cases.  Same as if we are seeing
-        # the left val of the assignment statement to set the return value for a function.  It might be cleaner
+        # the left value of the assignment statement to set the return value for a function.  It might be cleaner
         # to explicitly handle those elsewhere but for now since the AST ends up the same, it's fine.
         assert self.tokenstream.peek_token_type() == TokenType.IDENTIFIER
 

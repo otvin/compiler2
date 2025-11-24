@@ -242,7 +242,7 @@ class Token:
             raise TypeError("Invalid Token Type")
 
     def __str__(self):  # pragma: no cover
-        return 'type:{0:<18} val: {1:<15} loc: {2:<35}'.format(self.token_type, self.value, str(self.location))
+        return 'type:{0:<18} value: {1:<15} loc: {2:<35}'.format(self.token_type, self.value, str(self.location))
 
 
 class TokenStream:
