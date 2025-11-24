@@ -150,7 +150,7 @@ class AssemblyGenerator:
                                             "_PASCAL_INSUFFICIENT_ARGC_ERROR")
         self.pascalerrors[17] = PascalError("Error opening file.", "_PASCAL_FOPEN_ERROR")
         self.pascalerrors[18] = PascalError("Error D.48: Activation of function is undefined upon function completion.",
-                                            "_PASCAL_NORETURNVAL_ERROR")
+                                            "_PASCAL_NO_RETURN_VALUE_ERROR")
 
     def emit(self, s):
         self.asmfile.write(s)
@@ -368,9 +368,9 @@ class AssemblyGenerator:
                     litname = 'stringlit_{}'.format(nextid)
                     nextid += 1
                     if len(lit.value) > 255:
-                        errstr = compiler_error_str(
+                        error_str = compiler_error_str(
                             "String literal '{}' exceeds 255 char max length.".format(lit.value), None, lit.location)
-                        raise ASMGeneratorError(errstr)
+                        raise ASMGeneratorError(error_str)
                     self.emitcode("{} db `{}`, 0".format(litname, lit.value.replace('`', '\\`')))
                     lit.memory_address = litname
                 elif isinstance(lit, RealLiteral):
@@ -866,7 +866,7 @@ class AssemblyGenerator:
 
                 elif isinstance(node, TACCallSystemFunctionNode):
                     if node.label.name[:6] == "_WRITE":
-                        if node.label.name == "_WRITECRLF":
+                        if node.label.name == "_WRITE_LINE_FEED":
                             outfilesym = params[-1].parameter_value
                             self.generate_filevariable_statevalidationcode(outfilesym, FILESTATE_GENERATION)
                             assert node.number_of_parameters == 1
@@ -883,7 +883,7 @@ class AssemblyGenerator:
                             outfilesym = params[-2].parameter_value
                             self.generate_filevariable_statevalidationcode(outfilesym, FILESTATE_GENERATION)
                             outparamsym = params[-1].parameter_value
-                            if node.label.name == "_WRITEI":
+                            if node.label.name == "_WRITE_INTEGER":
                                 self.emitcode("mov rdi, [{}]".format(outfilesym.memory_address))
                                 self.emitcode("lea rsi, [rel _printf_intfmt]")
                                 destregister = get_register_slice_by_bytes("RDX", outparamsym.pascal_type.size)
@@ -891,30 +891,30 @@ class AssemblyGenerator:
                                 # must pass 0 (in rax) as number of floating point args since fprintf is variadic
                                 self.emitcode("mov rax, 0")
                                 self.emitcode("call fprintf wrt ..plt")
-                            elif node.label.name == "_WRITER":
+                            elif node.label.name == "_WRITE_REAL":
                                 self.emitcode("mov rdi, [{}]".format(outfilesym.memory_address))
                                 self.emitcode("lea rsi, [rel _printf_realfmt]")
                                 self.emit_movtoxmmregister_fromstack("xmm0", outparamsym)
                                 self.emitcode("mov rax, 1", "1 floating point param")
                                 self.emitcode("call fprintf wrt ..plt")
-                            elif node.label.name == "_WRITESL":
+                            elif node.label.name == "_WRITE_STRING_LITERAL":
                                 assert isinstance(outparamsym, ConstantSymbol), type(outparamsym)
                                 self.emitcode("mov rdi, [{}]".format(outfilesym.memory_address))
                                 self.emitcode("mov rsi, [{}]".format(outparamsym.memory_address))
                                 self.emitcode("mov edx, {}".format(len(outparamsym.value)))
                                 self.emitcode("call _PASCAL_PRINTSTRINGTYPE wrt ..plt", "in compiler2_system_io.asm")
-                            elif node.label.name == "_WRITEST":
+                            elif node.label.name == "_WRITE_STRING":
                                 assert isinstance(outparamsym, Symbol)
                                 assert outparamsym.pascal_type.is_string_type()
                                 self.emitcode("mov rdi, [{}]".format(outfilesym.memory_address))
                                 self.emitcode("mov rsi, [{}]".format(outparamsym.memory_address))
                                 self.emitcode("mov edx, {}".format(outparamsym.pascal_type.num_items_in_array))
                                 self.emitcode("call _PASCAL_PRINTSTRINGTYPE wrt ..plt", "in compiler2_system_io.asm")
-                            elif node.label.name == "_WRITEC":
+                            elif node.label.name == "_WRITE_CHARACTER":
                                 self.emit_movtoregister_fromstack("RDI", outparamsym)
                                 self.emitcode("mov rsi, [{}]".format(outfilesym.memory_address))
                                 self.emitcode("call fputc wrt ..plt")
-                            elif node.label.name == "_WRITEB":
+                            elif node.label.name == "_WRITE_BOOLEAN":
                                 self.emit_movtoregister_fromstack("al", outparamsym)
                                 self.emitcode("test al, al")
                                 labelfalse = self.getnextlabel()
@@ -967,7 +967,7 @@ class AssemblyGenerator:
                         self.emitcode("add r11, 8")
                         self.emitcode("mov [r11], byte {}".format(FILESTATE_GENERATION))
                         del params[-1]
-                    elif node.label.name == "_SQRTR":
+                    elif node.label.name == "_SQRT_REAL":
                         comment = "parameter {} for sqrt()".format(str(params[-1].parameter_value))
                         self.emit_movtoxmmregister_fromstack("xmm0", params[-1].parameter_value, comment)
                         self.emitcode("xorps xmm8, xmm8", "validate parameter is >= 0")
@@ -980,7 +980,7 @@ class AssemblyGenerator:
                         # self.emitcode("MOVSD [{}], XMM0".format(node.left_value.memory_address), comment)
                         # however, to future-proof this for optimizations, I'll use the movtostack() functions
                         self.emit_movtostack_fromxmmregister(node.left_value, "XMM0", comment)
-                    elif node.label.name in ("_SINR", "_COSR"):
+                    elif node.label.name in ("_SIN_REAL", "_COS_REAL"):
                         self.used_x87_code = True
                         comment = "parameter {} for sin()".format(str(params[-1].parameter_value))
                         self.emit_movtoxmmregister_fromstack("xmm0", params[-1].parameter_value, comment)
@@ -999,7 +999,7 @@ class AssemblyGenerator:
                         # a local temporary, not a byref parameter, so this is safe.  I don't want to write
                         # a fstp equivalent for that function when I don't need it.
                         self.emitcode("fstp qword [{}]".format(node.left_value.memory_address), comment)
-                    elif node.label.name == "_ARCTANR":
+                    elif node.label.name == "_ARCTAN_REAL":
                         self.used_x87_code = True
                         comment = "parameter {} for arctan()".format(str(params[-1].parameter_value))
                         self.emit_movtoxmmregister_fromstack("xmm0", params[-1].parameter_value, comment)
@@ -1020,7 +1020,7 @@ class AssemblyGenerator:
                         # a local temporary, not a byref parameter, so this is safe.  I don't want to write
                         # a fstp equivalent for that function when I don't need it.
                         self.emitcode("fstp qword [{}]".format(node.left_value.memory_address), comment)
-                    elif node.label.name == '_LNR':
+                    elif node.label.name == '_LN_REAL':
                         self.used_x87_code = True
                         comment = "parameter {} for ln()".format(str(params[-1].parameter_value))
                         self.emit_movtoxmmregister_fromstack("xmm0", params[-1].parameter_value, comment)
@@ -1039,7 +1039,7 @@ class AssemblyGenerator:
                         self.emitcode("FYL2X")
                         comment = "assign return value of function to {}".format(node.left_value.name)
                         self.emitcode("fstp qword [{}]".format(node.left_value.memory_address), comment)
-                    elif node.label.name == '_EXPR':
+                    elif node.label.name == '_EXP_REAL':
                         self.used_x87_code = True
                         comment = "parameter {} for exp()".format(str(params[-1].parameter_value))
                         self.emit_movtoxmmregister_fromstack("xmm0", params[-1].parameter_value, comment)
@@ -1074,7 +1074,7 @@ class AssemblyGenerator:
                         self.emitcode("FSTP ST1")  # We need to clean up the stack, so this gets rid of ST1
                         comment = "assign return value of function to {}".format(node.left_value.name)
                         self.emitcode("fstp qword [{}]".format(node.left_value.memory_address), comment)
-                    elif node.label.name == "_ABSR":
+                    elif node.label.name == "_ABS_REAL":
                         # There is an X87 abs() call, but that is slow.  So here is the logic:
                         # To find abs(x) we take x, and compare it to 0-x (which is the negative of x) and then
                         # return whichever is the largest.
@@ -1085,7 +1085,7 @@ class AssemblyGenerator:
                         self.emitcode("maxsd xmm0, xmm8")
                         comment = "assign return value of function to {}".format(node.left_value.name)
                         self.emit_movtostack_fromxmmregister(node.left_value, "XMM0", comment)
-                    elif node.label.name == "_ABSI":
+                    elif node.label.name == "_ABS_INTEGER":
                         # There is no X86 ABS() call.  There is a slow way where you test the value, compare to zero
                         # then if it's >= than zero jump ahead, and if it's less than zero, negate it.  Jumps make
                         # code execution very slow.  This is the way CLang 7.0 handles abs() with -O3 enabled
@@ -1096,7 +1096,7 @@ class AssemblyGenerator:
                         self.emitcode("cmovl eax, r11d")  # if neg eax made eax less than zero, move r11d into eax
                         comment = "assign return value of function to {}".format(node.left_value.name)
                         self.emit_movtostack_fromregister(node.left_value, "EAX", comment)
-                    elif node.label.name == '_ODDI':
+                    elif node.label.name == '_ODD_INTEGER':
                         # per 6.6.6.5 of the ISO Standard, the ODD() function is defined as returning true
                         # if (abs(x) mod 2) = 1.  We could have the TAC simplify ODD into calling ABS but that would
                         # mean two function calls and they are slow.  So for now we will copy the logic for ABS and
@@ -1113,7 +1113,7 @@ class AssemblyGenerator:
                         self.emitcode("mov al, dl", "remainder of idiv is in edx; must be 0 or 1. Take lowest 8 bits")
                         comment = "assign return value of function to {}".format(node.left_value.name)
                         self.emit_movtostack_fromregister(node.left_value, "AL", comment)
-                    elif node.label.name == "_SQRR":
+                    elif node.label.name == "_SQR_REAL":
                         # easy - multiply the value by itself
                         # TODO - test for INF since that would be an error, and per ISO standard we need to exit
                         comment = "parameter {} for sqr()".format(str(params[-1].parameter_value))
@@ -1121,7 +1121,7 @@ class AssemblyGenerator:
                         self.emitcode("mulsd xmm0, xmm0")
                         comment = "assign return value of function to {}".format(node.left_value.name)
                         self.emit_movtostack_fromxmmregister(node.left_value, "XMM0", comment)
-                    elif node.label.name == "_SQRI":
+                    elif node.label.name == "_SQR_INTEGER":
                         # similarly easy - multiply the value by itself
                         comment = "parameter {} for sqr()".format(str(params[-1].parameter_value))
                         self.emit_movtoregister_fromstackorliteral("eax", params[-1].parameter_value, comment)
@@ -1129,7 +1129,7 @@ class AssemblyGenerator:
                         self.emit_jumptoerror("jo", "_PASCAL_OVERFLOW_ERROR")
                         comment = "assign return value of function to {}".format(node.left_value.name)
                         self.emit_movtostack_fromregister(node.left_value, "EAX", comment)
-                    elif node.label.name == "_CHRI":
+                    elif node.label.name == "_CHR_INTEGER":
                         comment = "parameter {} for chr()".format(str(params[-1].parameter_value))
                         self.emit_movtoregister_fromstackorliteral("R11D", params[-1].parameter_value, comment)
                         self.emitcode("CMP R11D, 0")
@@ -1139,7 +1139,7 @@ class AssemblyGenerator:
                         self.emitcode("MOV AL, R11B", "take least significant 8 bits")
                         comment = "assign return value of function to {}".format(node.left_value.name)
                         self.emit_movtostack_fromregister(node.left_value, "AL", comment)
-                    elif node.label.name == "_ORDO":
+                    elif node.label.name == "_ORD_ORDINAL":
                         # Returns the integer representation of the ordinal type.  Since under the covers,
                         # ordinal types are stored as integers, this is just returning itself.
                         # Trick is that the ordinal type may be 1 byte (boolean, character, or user-defined ordinal)
@@ -1158,7 +1158,7 @@ class AssemblyGenerator:
                             self.emit_movtoregister_fromstackorliteral("EAX", params[-1].parameter_value)
                         comment = "assign return value of function to {}".format(node.left_value.name)
                         self.emit_movtostack_fromregister(node.left_value, "EAX", comment)
-                    elif node.label.name == "_SUCCO":
+                    elif node.label.name == "_SUCC_ORDINAL":
                         assert params[-1].parameter_value.pascal_type.size in (1, 4)
                         assert node.left_value.pascal_type.size == params[-1].parameter_value.pascal_type.size
                         comment = "parameter {} for succ()".format(str(params[-1].parameter_value))
@@ -1188,7 +1188,7 @@ class AssemblyGenerator:
                             self.emit_jumptoerror("JGE", "_PASCAL_SUCC_PRED_ERROR")
                         comment = "assign return value of function to {}".format(node.left_value.name)
                         self.emit_movtostack_fromregister(node.left_value, reg, comment)
-                    elif node.label.name == "_PREDO":
+                    elif node.label.name == "_PRED_ORDINAL":
                         assert params[-1].parameter_value.pascal_type.size in (1, 4)
                         assert node.left_value.pascal_type.size == params[-1].parameter_value.pascal_type.size
                         comment = "parameter {} for pred()".format(str(params[-1].parameter_value))
@@ -1206,14 +1206,17 @@ class AssemblyGenerator:
                             self.emit_jumptoerror("JL", "_PASCAL_SUCC_PRED_ERROR")
                         comment = "assign return value of function to {}".format(node.left_value.name)
                         self.emit_movtostack_fromregister(node.left_value, reg, comment)
-                    elif node.label.name in ("_ROUNDR", "_TRUNCR"):
+                    elif node.label.name in ("_ROUND_REAL", "_TRUNC_REAL"):
                         comment = "parameter {} for {}()".format(str(params[-1].parameter_value), node.label.name[1:6].lower())
                         self.emit_movtoxmmregister_fromstack("xmm0", params[-1].parameter_value, comment)
                         assert node.left_value.pascal_type.size in (4, 8)  # can't round into 1 or 2 bytes
                         destreg = get_register_slice_by_bytes("RAX", node.left_value.pascal_type.size)
-                        if node.label.name == "_ROUNDR":
+                        if node.label.name == "_ROUND_REAL":
+                            # TODO: Possible bug here; CVTSD2SI uses MXCSR rounding mode, which defaults to "nearest"
+                            # but can be overridden.
                             instruction = "CVTSD2SI"
                         else:
+                            # CVTTSD2SI always truncates towards zero, regardless of MXCSR rounding mode.
                             instruction = "CVTTSD2SI"
                         # TODO - test for overflow here
                         self.emitcode("{} {}, XMM0".format(instruction, destreg))

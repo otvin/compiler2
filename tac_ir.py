@@ -221,7 +221,7 @@ def required_function_return_type(token_type, parameter_type):
 
 def map_token_to_system_function_name(token, type_str):
     assert isinstance(token, Token)
-    return "_{}{}".format(str(token.token_type).upper(), type_str.upper())
+    return "_{}_{}".format(str(token.token_type).upper(), type_str.upper())
 
 
 class TACNode:
@@ -581,59 +581,61 @@ class TACBlock:
             # underscore ensures it will not collide with any user-defined identifier.
 
             # create a variable to track that retval is assigned
-            retvalisassigned_variablename = '_{}_isassigned'.format(procedure_name)
-            retvalisassignedsym = VariableSymbol(retvalisassigned_variablename, token.location, pascaltypes.BooleanType())
-            self.symbol_table.add(retvalisassignedsym)
-            ast.symbol_table.add(retvalisassignedsym)
+            return_value_is_assigned_variable_name = '_{}_is_assigned'.format(procedure_name)
+            return_value_is_assigned_symbol = VariableSymbol(return_value_is_assigned_variable_name, token.location,
+                                                             pascaltypes.BooleanType())
+            self.symbol_table.add(return_value_is_assigned_symbol)
+            ast.symbol_table.add(return_value_is_assigned_symbol)
 
             # create an AST that initializes this variable to False, and make that the first statement executed
             # in the current AST.
-            retvalisassigned_initialize_ast = AST(Token(TokenType.ASSIGNMENT, None, ":="), ast,
-                                                  "initialize {} to false".format(retvalisassigned_variablename))
-            retvalisassignedtoken = Token(TokenType.IDENTIFIER, token.location, retvalisassigned_variablename)
-            falsetoken = Token(TokenType.FALSE, token.location, 'false')
-            retvalisassigned_initialize_ast.children.append(AST(retvalisassignedtoken, retvalisassigned_initialize_ast))
-            retvalisassigned_initialize_ast.children.append(AST(falsetoken, retvalisassigned_initialize_ast))
+            return_value_is_assigned_initialization_ast = AST(Token(TokenType.ASSIGNMENT, None, ":="), ast,
+                                                              "initialize {} to false".format(
+                                                                  return_value_is_assigned_variable_name))
+            return_value_is_assigned_token = Token(TokenType.IDENTIFIER, token.location,
+                                                   return_value_is_assigned_variable_name)
+            false_token = Token(TokenType.FALSE, token.location, 'false')
+            return_value_is_assigned_initialization_ast.children.append(
+                AST(return_value_is_assigned_token, return_value_is_assigned_initialization_ast))
+            return_value_is_assigned_initialization_ast.children.append(
+                AST(false_token, return_value_is_assigned_initialization_ast))
             # make this assignment become the first statement in the function
-            ast.children[1].children.insert(0, retvalisassigned_initialize_ast)
-            # debugprintast = AST(Token(TokenType.WRITELN, None, 'writeln'), ast, "Debug print {}".format(retvalisassigned_variablename))
-            # debugprintast.children.append(
-            #     AST(Token(TokenType.IDENTIFIER, None, retvalisassigned_variablename), ast))
-            # ast.children[1].children.insert(1, debugprintast)
+            ast.children[1].children.insert(0, return_value_is_assigned_initialization_ast)
 
             # recursively iterate through the children of the current AST, starting with the one following the
             # assignment we just inserted, and identify any assignments to the retval.  This requires matching on
             # the symbols themselves, not the names, as function declared inside a function could reuse a name.
-            retvalsym = ast.symbol_table.fetch(procedure_name)
-            retvaleverset = False
-            for child in ast.children[1].children[1:]:
-                if self.track_function_return_value_assignments(retvalsym, retvalisassignedsym, child):
-                    retvaleverset = True
+            return_value_symbol = ast.symbol_table.fetch(procedure_name)
+            is_return_value_ever_set = False
+            for grandchild in ast.children[1].children[1:]:
+                if self.track_function_return_value_assignments(return_value_symbol, return_value_is_assigned_symbol,
+                                                                grandchild):
+                    is_return_value_ever_set = True
 
             # check if the return value is assigned to at least once in the ast.
-            if not retvaleverset:
+            if not is_return_value_ever_set:
                 error_str = 'Error D.48: Function {} must have a return value'.format(procedure_name)
                 raise TACException(compiler_error_str(error_str, token))
 
-            # now we need to test that the returnvalue was assigned
+            # now we need to test that the return value was assigned
             child = ast.children[1]  # only needed to anchor the locations for the ASTs I'm creating below.
-            testast = AST(Token(TokenType.IF, child.token.location, 'if'), ast,
-                          'if {} = False, then error'.format(retvalisassigned_variablename))
-            conditionast = AST(Token(TokenType.EQUALS, child.token.location, '='), testast,
-                               'if {} = false'.format(retvalisassigned_variablename))
+            if_assigned_ast = AST(Token(TokenType.IF, child.token.location, 'if'), ast,
+                                  'if {} = False, then error'.format(return_value_is_assigned_variable_name))
+            equals_test_ast = AST(Token(TokenType.EQUALS, child.token.location, '='), if_assigned_ast,
+                                  'if {} = false'.format(return_value_is_assigned_variable_name))
             # I could probably reuse these tokens, but I'm very conservative
-            conditionast.children.append(AST(deepcopy(retvalisassignedtoken), conditionast))
-            conditionast.children.append(AST(deepcopy(falsetoken), conditionast))
-            testast.children.append(conditionast)
+            equals_test_ast.children.append(AST(deepcopy(return_value_is_assigned_token), equals_test_ast))
+            equals_test_ast.children.append(AST(deepcopy(false_token), equals_test_ast))
+            if_assigned_ast.children.append(equals_test_ast)
 
-            gotoast = AST(Token(TokenType.GOTO, child.token.location, 'goto'), testast,
-                          'goto _PASCAL_NORETURNVAL_ERROR')
-            labelast = AST(Token(TokenType.LABEL, child.token.location, '_PASCAL_NORETURNVAL_ERROR'), gotoast,
-                           '_PASCAL_NORETURNVAL_ERROR')
-            gotoast.children.append(labelast)
-            testast.children.append(gotoast)
+            goto_ast = AST(Token(TokenType.GOTO, child.token.location, 'goto'), if_assigned_ast,
+                           'goto _PASCAL_NO_RETURN_VALUE_ERROR')
+            label_ast = AST(Token(TokenType.LABEL, child.token.location, '_PASCAL_NO_RETURN_VALUE_ERROR'), goto_ast,
+                            '_PASCAL_NO_RETURN_VALUE_ERROR')
+            goto_ast.children.append(label_ast)
+            if_assigned_ast.children.append(goto_ast)
 
-            ast.children.append(testast)
+            ast.children.append(if_assigned_ast)
         else:
             comment = "Procedure {}({})".format(procedure_name, str(self.parameter_list))
         self.add_node(TACLabelNode(activation_label, comment))
@@ -646,163 +648,189 @@ class TACBlock:
         else:
             self.add_node(TACFunctionReturnNode(None))
 
-    def processast_isorequiredfunction(self, ast):
+    def process_ast_iso_required_function(self, ast):
         assert isinstance(ast, AST)
         assert is_iso_required_function(ast.token.token_type)
 
-        tok = ast.token
-        tmp = self.dereference_if_needed(self.processast(ast.children[0]), ast.children[0].token)
-        lval = Symbol(self.get_temporary(), tok.location,
-                      required_function_return_type(tok.token_type, tmp.pascal_type))
-        self.symbol_table.add(lval)
-        if required_function_accepts_ordinal(tok.token_type):
-            if isinstance(tmp.pascal_type, pascaltypes.OrdinalType):
-                self.add_node(TACParamNode(tmp))
-                self.add_node(TACCallSystemFunctionNode(Label(map_token_to_system_function_name(tok, "O")), 1, lval))
+        iso_function_token = ast.token
+        ast_left_value_symbol_or_literal = self.dereference_if_needed(self.processast(ast.children[0]),
+                                                                      ast.children[0].token)
+        tac_left_value_symbol = Symbol(self.get_temporary(), iso_function_token.location,
+                                       required_function_return_type(iso_function_token.token_type,
+                                                                     ast_left_value_symbol_or_literal.pascal_type))
+        self.symbol_table.add(tac_left_value_symbol)
+        if required_function_accepts_ordinal(iso_function_token.token_type):
+            if isinstance(ast_left_value_symbol_or_literal.pascal_type, pascaltypes.OrdinalType):
+                self.add_node(TACParamNode(ast_left_value_symbol_or_literal))
+                self.add_node(
+                    TACCallSystemFunctionNode(Label(map_token_to_system_function_name(iso_function_token, "ORDINAL")), 1,
+                                              tac_left_value_symbol))
             else:
                 raise TACException(
-                    compiler_error_str('Function {}() requires parameter of ordinal type'.format(tok.token_type), tok))
+                    compiler_error_str(
+                        'Function {}() requires parameter of ordinal type'.format(iso_function_token.token_type),
+                        iso_function_token))
 
-        elif required_function_accepts_integer_or_real(tok.token_type):
-            if pascaltypes.is_integer_or_subrange_of_integer(tmp.pascal_type):
-                self.add_node(TACParamNode(tmp))
-                self.add_node(TACCallSystemFunctionNode(Label(map_token_to_system_function_name(tok, "I")), 1, lval))
-            elif isinstance(tmp.pascal_type, pascaltypes.RealType):
-                self.add_node(TACParamNode(tmp))
-                self.add_node(TACCallSystemFunctionNode(Label(map_token_to_system_function_name(tok, "R")), 1, lval))
+        elif required_function_accepts_integer_or_real(iso_function_token.token_type):
+            if pascaltypes.is_integer_or_subrange_of_integer(ast_left_value_symbol_or_literal.pascal_type):
+                self.add_node(TACParamNode(ast_left_value_symbol_or_literal))
+                self.add_node(
+                    TACCallSystemFunctionNode(Label(map_token_to_system_function_name(iso_function_token, "INTEGER")), 1,
+                                              tac_left_value_symbol))
+            elif isinstance(ast_left_value_symbol_or_literal.pascal_type, pascaltypes.RealType):
+                self.add_node(TACParamNode(ast_left_value_symbol_or_literal))
+                self.add_node(
+                    TACCallSystemFunctionNode(Label(map_token_to_system_function_name(iso_function_token, "REAL")), 1,
+                                              tac_left_value_symbol))
             else:
                 raise TACException(compiler_error_str(
-                    'Function {}() requires parameter of integer or real type'.format(tok.token_type), tok))
-        elif required_function_accepts_integer(tok.token_type):
-            if pascaltypes.is_integer_or_subrange_of_integer(tmp.pascal_type):
-                self.add_node(TACParamNode(tmp))
-                self.add_node(TACCallSystemFunctionNode(Label(map_token_to_system_function_name(tok, "I")), 1, lval))
+                    'Function {}() requires parameter of integer or real type'.format(iso_function_token.token_type),
+                    iso_function_token))
+        elif required_function_accepts_integer(iso_function_token.token_type):
+            if pascaltypes.is_integer_or_subrange_of_integer(ast_left_value_symbol_or_literal.pascal_type):
+                self.add_node(TACParamNode(ast_left_value_symbol_or_literal))
+                self.add_node(
+                    TACCallSystemFunctionNode(Label(map_token_to_system_function_name(iso_function_token, "INTEGER")), 1,
+                                              tac_left_value_symbol))
             else:
                 raise TACException(
-                    compiler_error_str('Function {}() requires parameter of integer type'.format(tok.token_type), tok))
+                    compiler_error_str(
+                        'Function {}() requires parameter of integer type'.format(iso_function_token.token_type),
+                        iso_function_token))
         else:
-            assert required_function_accepts_real(tok.token_type)
-            if isinstance(tmp.pascal_type, pascaltypes.IntegerType):
-                tmp2 = self.process_sym_inttoreal(tmp)
+            assert required_function_accepts_real(iso_function_token.token_type)
+            if isinstance(ast_left_value_symbol_or_literal.pascal_type, pascaltypes.IntegerType):
+                tmp2 = self.process_sym_inttoreal(ast_left_value_symbol_or_literal)
                 self.add_node(TACParamNode(tmp2))
-                self.add_node(TACCallSystemFunctionNode(Label(map_token_to_system_function_name(tok, "R")), 1, lval))
-            elif isinstance(tmp.pascal_type, pascaltypes.RealType):
-                self.add_node(TACParamNode(tmp))
-                self.add_node(TACCallSystemFunctionNode(Label(map_token_to_system_function_name(tok, "R")), 1, lval))
+                self.add_node(
+                    TACCallSystemFunctionNode(Label(map_token_to_system_function_name(iso_function_token, "REAL")), 1,
+                                              tac_left_value_symbol))
+            elif isinstance(ast_left_value_symbol_or_literal.pascal_type, pascaltypes.RealType):
+                self.add_node(TACParamNode(ast_left_value_symbol_or_literal))
+                self.add_node(
+                    TACCallSystemFunctionNode(Label(map_token_to_system_function_name(iso_function_token, "REAL")), 1,
+                                              tac_left_value_symbol))
             else:
                 raise TACException(
-                    compiler_error_str('Function {}() requires parameter of real type'.format(tok.token_type), tok))
-        return lval
+                    compiler_error_str(
+                        'Function {}() requires parameter of real type'.format(iso_function_token.token_type),
+                        iso_function_token))
+        return tac_left_value_symbol
 
-    def process_write_parameter(self, outputfile, paramsym, writetoken):
-        assert isinstance(paramsym, Symbol) or isinstance(paramsym, Literal)
+    def process_write_parameter(self, output_file, parameter_symbol, write_token):
+        # write_token is only used for a compiler error message.
+        assert isinstance(write_token, Token)
+        assert write_token.token_type in [TokenType.WRITE, TokenType.WRITELN]
+        assert isinstance(parameter_symbol, Symbol) or isinstance(parameter_symbol, Literal)
 
-        bt = paramsym.pascal_type
+        base_type = parameter_symbol.pascal_type
 
         # p.98 of Cooper states that the constants of enumerated ordinal types (pascaltypes.EnumeratedType)
         # "don't have external character representations, and can't be read or written to or from
         # textfiles - in particular, from the standard input and output."  It would be very easy to
         # display the string representation of the constant when trying to print it out, but we will
         # stick to Cooper for now.  The ISO standard is silent on the topic, per my reading.
-        if isinstance(bt, pascaltypes.SubrangeType):
-            bt = bt.host_type
+        if isinstance(base_type, pascaltypes.SubrangeType):
+            base_type = base_type.host_type
 
-        if not (isinstance(bt, pascaltypes.StringLiteralType) or isinstance(bt, pascaltypes.RealType) or
-                isinstance(bt, pascaltypes.BooleanType) or isinstance(bt, pascaltypes.IntegerType) or
-                isinstance(bt, pascaltypes.CharacterType) or
-                bt.is_string_type()):
+        if not (isinstance(base_type, pascaltypes.StringLiteralType) or isinstance(base_type, pascaltypes.RealType) or
+                isinstance(base_type, pascaltypes.BooleanType) or isinstance(base_type, pascaltypes.IntegerType) or
+                isinstance(base_type, pascaltypes.CharacterType) or
+                base_type.is_string_type()):
             # TODO - this error string is ugly, but when we have files and can write arbitrary types, this
             # logic will need to change anyway.
-            error_str = "'{}' is of type that cannot be displayed by {}()".format(paramsym.name, writetoken.value)
-            raise TACException(compiler_error_str(error_str, writetoken))
+            error_str = "'{}' is of type that cannot be displayed by {}()".format(parameter_symbol.name,
+                                                                                  write_token.value)
+            raise TACException(compiler_error_str(error_str, write_token))
 
-        self.add_node(TACParamNode(outputfile))
-        self.add_node(TACParamNode(paramsym))
-        if isinstance(bt, pascaltypes.StringLiteralType):
-            self.add_node(TACCallSystemFunctionNode(Label("_WRITESL"), 2))
-        elif isinstance(bt, pascaltypes.RealType):
-            self.add_node(TACCallSystemFunctionNode(Label("_WRITER"), 2))
-        elif isinstance(bt, pascaltypes.BooleanType):
-            self.add_node(TACCallSystemFunctionNode(Label("_WRITEB"), 2))
-        elif isinstance(bt, pascaltypes.IntegerType):
-            self.add_node(TACCallSystemFunctionNode(Label("_WRITEI"), 2))
-        elif bt.is_string_type():
-            self.add_node(TACCallSystemFunctionNode(Label("_WRITEST"), 2))
+        self.add_node(TACParamNode(output_file))
+        self.add_node(TACParamNode(parameter_symbol))
+        if isinstance(base_type, pascaltypes.StringLiteralType):
+            self.add_node(TACCallSystemFunctionNode(Label("_WRITE_STRING_LITERAL"), 2))
+        elif isinstance(base_type, pascaltypes.RealType):
+            self.add_node(TACCallSystemFunctionNode(Label("_WRITE_REAL"), 2))
+        elif isinstance(base_type, pascaltypes.BooleanType):
+            self.add_node(TACCallSystemFunctionNode(Label("_WRITE_BOOLEAN"), 2))
+        elif isinstance(base_type, pascaltypes.IntegerType):
+            self.add_node(TACCallSystemFunctionNode(Label("_WRITE_INTEGER"), 2))
+        elif base_type.is_string_type():
+            self.add_node(TACCallSystemFunctionNode(Label("_WRITE_STRING"), 2))
         else:
-            self.add_node(TACCallSystemFunctionNode(Label("_WRITEC"), 2))
+            self.add_node(TACCallSystemFunctionNode(Label("_WRITE_CHARACTER"), 2))
 
-    def processast_fileprocedure(self, ast):
+    def process_ast_file_procedure(self, ast):
         assert isinstance(ast, AST)
         assert ast.token.token_type in (TokenType.RESET, TokenType.REWRITE)
         assert len(ast.children) == 1
 
-        tok = ast.token
-        paramsym = self.processast(ast.children[0])
-        if not isinstance(paramsym.pascal_type, pascaltypes.FileType):
-            error_str = "Function {}() requires parameter of file type".format(tok.token_type)
-            raise TACException(compiler_error_str(error_str, tok))
+        token = ast.token
+        parameter_symbol = self.processast(ast.children[0])
+        if not isinstance(parameter_symbol.pascal_type, pascaltypes.FileType):
+            error_str = "Function {}() requires parameter of file type".format(token.token_type)
+            raise TACException(compiler_error_str(error_str, token))
 
-        if paramsym.name in ("output", "input"):
-            error_str = "Cannot call {}() on built-in textfile {}".format(tok.token_type, paramsym.value)
-            raise TACException(compiler_error_str(error_str, tok))
+        if parameter_symbol.name in ("output", "input"):
+            error_str = "Cannot call {}() on built-in textfile {}".format(token.token_type, parameter_symbol.value)
+            raise TACException(compiler_error_str(error_str, token))
 
-        self.add_node(TACParamNode(paramsym))
+        self.add_node(TACParamNode(parameter_symbol))
 
-        if not isinstance(paramsym.pascal_type, pascaltypes.TextFileType):
+        if not isinstance(parameter_symbol.pascal_type, pascaltypes.TextFileType):
             suffix = "B"
         else:
             suffix = ""
 
-        sysfuncname = "_" + tok.value.upper() + suffix
-        self.add_node(TACCallSystemFunctionNode(Label(sysfuncname), 1))
+        system_function_name = "_" + token.value.upper() + suffix
+        self.add_node(TACCallSystemFunctionNode(Label(system_function_name), 1))
 
-    def processast_write(self, ast):
+    def process_ast_write(self, ast):
         assert isinstance(ast, AST)
         assert ast.token.token_type in (TokenType.WRITE, TokenType.WRITELN)
-        tok = ast.token
+        token = ast.token
 
         outputfile = self.symbol_table.fetch("output")
         if len(ast.children) > 0:
-            childsym = self.dereference_if_needed(self.processast(ast.children[0]), ast.children[0].token)
-            if isinstance(childsym.pascal_type, pascaltypes.FileType):
-                outputfile = childsym
+            child_symbol = self.dereference_if_needed(self.processast(ast.children[0]), ast.children[0].token)
+            if isinstance(child_symbol.pascal_type, pascaltypes.FileType):
+                outputfile = child_symbol
             else:
-                self.process_write_parameter(outputfile, childsym, tok)
+                self.process_write_parameter(outputfile, child_symbol, token)
 
         for child in ast.children[1:]:
-            childsym = self.dereference_if_needed(self.processast(child), child.token)
-            self.process_write_parameter(outputfile, childsym, tok)
+            child_symbol = self.dereference_if_needed(self.processast(child), child.token)
+            self.process_write_parameter(outputfile, child_symbol, token)
 
-        if tok.token_type == TokenType.WRITELN:
+        if token.token_type == TokenType.WRITELN:
             self.add_node(TACParamNode(outputfile))
-            self.add_node(TACCallSystemFunctionNode(Label("_WRITECRLF"), 1))
+            self.add_node(TACCallSystemFunctionNode(Label("_WRITE_LINE_FEED"), 1))
 
-    def processast_conditionalstatement(self, ast):
+    def process_ast_conditional_statement(self, ast):
         assert isinstance(ast, AST)
         assert ast.token.token_type == TokenType.IF
-        assert len(ast.children) in [2, 3], "TACBlock.processast - IF ASTs must have 2 or 3 children."
+        assert len(ast.children) in [2, 3], \
+            "TACBlock.process_ast_conditional_statement - IF ASTs must have 2 or 3 children."
 
-        tok = ast.token
-        labeldone = self.get_label()
+        token = ast.token
+        label_for_finished = self.get_label()
         condition = self.processast(ast.children[0])
         if not isinstance(condition.pascal_type, pascaltypes.BooleanType):
-            raise TACException(compiler_error_str("If statements must be followed by Boolean expressions", tok))
+            raise TACException(compiler_error_str("If statements must be followed by Boolean expressions", token))
 
         if len(ast.children) == 2:
-            self.add_node(TACIFZNode(condition, labeldone))
+            self.add_node(TACIFZNode(condition, label_for_finished))
             self.processast(ast.children[1])
-            self.add_node(TACLabelNode(labeldone))
+            self.add_node(TACLabelNode(label_for_finished))
         else:
-            labelelse = self.get_label()
-            self.add_node(TACIFZNode(condition, labelelse))
+            label_for_else = self.get_label()
+            self.add_node(TACIFZNode(condition, label_for_else))
             self.processast(ast.children[1])
-            self.add_node(TACGotoNode(labeldone))
+            self.add_node(TACGotoNode(label_for_finished))
             self.add_node(TACCommentNode("ELSE"))
-            self.add_node(TACLabelNode(labelelse))
+            self.add_node(TACLabelNode(label_for_else))
             self.processast(ast.children[2])
-            self.add_node(TACLabelNode(labeldone))
+            self.add_node(TACLabelNode(label_for_finished))
 
-    def validate_controlvariable_notthreatened(self, controlvariableidentifier, ast):
+    def validate_control_variable_not_threatened(self, control_variable_identifier, ast):
         #
         # No statement S in the ast can exist that threatens the control variable - which is defined as:
         #       a) control variable cannot be the left side (variable access) for an assignment statement
@@ -813,46 +841,47 @@ class TACBlock:
         assert isinstance(ast, AST)
 
         if ast.token.token_type == TokenType.ASSIGNMENT:
-            if ast.children[0].token.value.lower() == controlvariableidentifier.lower():
+            if ast.children[0].token.value.lower() == control_variable_identifier.lower():
                 error_str = "Cannot assign a value to the control variable '{}' of a 'for' statement"
-                error_str = error_str.format(controlvariableidentifier)
+                error_str = error_str.format(control_variable_identifier)
                 raise TACException(compiler_error_str(error_str, ast.children[0].token))
-            self.validate_controlvariable_notthreatened(controlvariableidentifier, ast.children[1])
+            self.validate_control_variable_not_threatened(control_variable_identifier, ast.children[1])
         elif ast.token.token_type == TokenType.IDENTIFIER:
-            sym = self.symbol_table.fetch(ast.token.value)
-            if isinstance(sym, ActivationSymbol):
+            symbol = self.symbol_table.fetch(ast.token.value)
+            if isinstance(symbol, ActivationSymbol):
                 # procedure or function call - check to see if any of the parameters are the control variable
                 for i in range(0, len(ast.children)):
                     child = ast.children[i]
-                    if child.token.value.lower() == controlvariableidentifier.lower():
-                        if sym.parameter_list[i].is_by_ref:
+                    if child.token.value.lower() == control_variable_identifier.lower():
+                        if symbol.parameter_list[i].is_by_ref:
                             error_str = "Cannot pass control variable '{}' of a 'for' statement as variable parameter "
                             error_str += "'{}' to '{}'"
-                            error_str = error_str.format(controlvariableidentifier, sym.parameter_list[i].symbol.name,
-                                                   sym.name)
+                            error_str = error_str.format(control_variable_identifier,
+                                                         symbol.parameter_list[i].symbol.name,
+                                                         symbol.name)
                             raise TACException(compiler_error_str(error_str, child.token))
         elif ast.token.token_type == TokenType.FOR:
-            if ast.children[0].children[0].token.value.lower() == controlvariableidentifier.lower():
-                error_str = "Cannot use control variable '{}' of a 'for' statement as a control variable of a nested 'for'"
-                error_str = error_str.format(controlvariableidentifier)
+            if ast.children[0].children[0].token.value.lower() == control_variable_identifier.lower():
+                error_str = "Cannot use control variable '{}' of a 'for' statement as control variable of nested 'for'"
+                error_str = error_str.format(control_variable_identifier)
                 raise TACException(compiler_error_str(error_str, ast.children[0].children[0].token))
             else:
-                self.validate_controlvariable_notthreatened(controlvariableidentifier, ast.children[0].children[1])
-                self.validate_controlvariable_notthreatened(controlvariableidentifier, ast.children[1])
-                self.validate_controlvariable_notthreatened(controlvariableidentifier, ast.children[2])
+                self.validate_control_variable_not_threatened(control_variable_identifier, ast.children[0].children[1])
+                self.validate_control_variable_not_threatened(control_variable_identifier, ast.children[1])
+                self.validate_control_variable_not_threatened(control_variable_identifier, ast.children[2])
         else:
             for child in ast.children:
-                self.validate_controlvariable_notthreatened(controlvariableidentifier, child)
+                self.validate_control_variable_not_threatened(control_variable_identifier, child)
 
         return True
 
-    def processast_repetitivestatement(self, ast):
+    def process_ast_repetitive_statement(self, ast):
         assert isinstance(ast, AST)
         assert ast.token.token_type in (TokenType.REPEAT, TokenType.WHILE, TokenType.FOR)
 
-        tok = ast.token
-        if tok.token_type == TokenType.FOR:
-            assert len(ast.children) == 3, "TACBlock.processast - For ASTs must have 3 children"
+        token = ast.token
+        if token.token_type == TokenType.FOR:
+            assert len(ast.children) == 3, "TACBlock.process_ast_repetitive_statement: 'for' ASTs must have 3 children"
 
             # We need to validate that this is a legal "for" statement.  Rules per section 6.8.3.9 include:
             #
@@ -888,105 +917,109 @@ class TACBlock:
             # We will build out the for statement, and then enforce the rules from above once we have
             # types for all the symbols.
 
-            assignmentast = ast.children[0]
-            assert len(assignmentast.children) == 2
-            todowntoast = ast.children[1]
-            assert todowntoast.token.token_type in (TokenType.TO, TokenType.DOWNTO)
-            assert len(todowntoast.children) == 1
-            bodyast = ast.children[2]
+            assignment_ast = ast.children[0]
+            assert len(assignment_ast.children) == 2
+            to_or_downto_ast = ast.children[1]
+            assert to_or_downto_ast.token.token_type in (TokenType.TO, TokenType.DOWNTO)
+            assert len(to_or_downto_ast.children) == 1
+            body_ast = ast.children[2]
 
             # need to assign the initial and final value to temp1 and temp2 so that any changes to variables
             # in the initial and final value have no impact on the for statement.  See Cooper p.28 and p.29
-            initialvalue = self.processast(assignmentast.children[1])
-            temp1 = Symbol(self.get_temporary(), initialvalue.location, initialvalue.pascal_type)
+            initial_value = self.processast(assignment_ast.children[1])
+            temp1 = Symbol(self.get_temporary(), initial_value.location, initial_value.pascal_type)
             self.symbol_table.add(temp1)
 
-            if isinstance(initialvalue, IntegerLiteral):
-                self.add_node(TACUnaryLiteralNode(temp1, TACOperator.ASSIGN, initialvalue))
+            if isinstance(initial_value, IntegerLiteral):
+                self.add_node(TACUnaryLiteralNode(temp1, TACOperator.ASSIGN, initial_value))
             else:
-                self.add_node(TACUnaryNode(temp1, TACOperator.ASSIGN, initialvalue))
+                self.add_node(TACUnaryNode(temp1, TACOperator.ASSIGN, initial_value))
 
-            finalvalue = self.processast(todowntoast.children[0])
-            temp2 = Symbol(self.get_temporary(), finalvalue.location, finalvalue.pascal_type)
+            final_value = self.processast(to_or_downto_ast.children[0])
+            temp2 = Symbol(self.get_temporary(), final_value.location, final_value.pascal_type)
             self.symbol_table.add(temp2)
-            if isinstance(finalvalue, IntegerLiteral):
-                self.add_node(TACUnaryLiteralNode(temp2, TACOperator.ASSIGN, finalvalue))
+            if isinstance(final_value, IntegerLiteral):
+                self.add_node(TACUnaryLiteralNode(temp2, TACOperator.ASSIGN, final_value))
             else:
-                self.add_node(TACUnaryNode(temp2, TACOperator.ASSIGN, finalvalue))
+                self.add_node(TACUnaryNode(temp2, TACOperator.ASSIGN, final_value))
 
-            controlvartoken = assignmentast.children[0].token
-            assert isinstance(controlvartoken, Token)
+            control_variable_token = assignment_ast.children[0].token
+            assert isinstance(control_variable_token, Token)
 
             # Enforce rule 1 from above
-            if not ast.nearest_symbol_table().exists(controlvartoken.value):
+            if not ast.nearest_symbol_table().exists(control_variable_token.value):
                 error_str = "Control variable '{}' must be declared in same block as the 'for'"
-                error_str = error_str.format(controlvartoken.value)
-                raise TACException(compiler_error_str(error_str, controlvartoken))
+                error_str = error_str.format(control_variable_token.value)
+                raise TACException(compiler_error_str(error_str, control_variable_token))
 
-            controlvarsym = self.symbol_table.fetch(controlvartoken.value)
-            controlvarsym.is_assigned_to = True
-            assert isinstance(controlvarsym, Symbol)
+            control_variable_symbol = self.symbol_table.fetch(control_variable_token.value)
+            control_variable_symbol.is_assigned_to = True
+            assert isinstance(control_variable_symbol, Symbol)
 
             # Enforce rule 2 from above
-            if not isinstance(controlvarsym.pascal_type, pascaltypes.OrdinalType):
+            if not isinstance(control_variable_symbol.pascal_type, pascaltypes.OrdinalType):
                 error_str = "'For' statements require control variables to be of ordinal type. "
-                error_str += "Variable '{}' is of type '{}'".format(controlvartoken.value,
-                                                                 controlvarsym.pascal_type.identifier)
-                raise TACException(compiler_error_str(error_str, controlvartoken))
+                error_str += "Variable '{}' is of type '{}'".format(control_variable_token.value,
+                                                                    control_variable_symbol.pascal_type.identifier)
+                raise TACException(compiler_error_str(error_str, control_variable_token))
 
-            if not ast.nearest_symbol_table().are_compatible(controlvarsym.pascal_type.identifier,
+            if not ast.nearest_symbol_table().are_compatible(control_variable_symbol.pascal_type.identifier,
                                                              temp1.pascal_type.identifier):
                 error_str = "Type {} not compatible with type {} in 'for' statement"
-                error_str = error_str.format(controlvarsym.pascal_type.identifier, temp1.pascal_type.identifier)
-                raise TACException(compiler_error_str(error_str, assignmentast.children[1].token))
+                error_str = error_str.format(control_variable_symbol.pascal_type.identifier,
+                                             temp1.pascal_type.identifier)
+                raise TACException(compiler_error_str(error_str, assignment_ast.children[1].token))
 
-            if not ast.nearest_symbol_table().are_compatible(controlvarsym.pascal_type.identifier,
+            if not ast.nearest_symbol_table().are_compatible(control_variable_symbol.pascal_type.identifier,
                                                              temp2.pascal_type.identifier):
                 error_str = "Type {} not compatible with type {} in 'for' statement"
-                error_str = error_str.format(controlvarsym.pascal_type.identifier, temp2.pascal_type.identifier)
-                raise TACException(compiler_error_str(error_str, todowntoast.children[0].token))
+                error_str = error_str.format(control_variable_symbol.pascal_type.identifier,
+                                             temp2.pascal_type.identifier)
+                raise TACException(compiler_error_str(error_str, to_or_downto_ast.children[0].token))
 
             # rule 3 will be a runtime check
 
             # Enforce rule 4 from above
-            self.validate_controlvariable_notthreatened(controlvartoken.value, bodyast)
+            self.validate_control_variable_not_threatened(control_variable_token.value, body_ast)
 
             # finish assembling the TAC
-            # TODO - refactor processast_conditionalstatement and the while from below so we don't have
+            # TODO - refactor process_ast_conditional_statement and the while from below so we don't have
             # to be repetitive
 
-            if todowntoast.token.token_type == TokenType.TO:
-                sysfunc = Label("_SUCCO")
-                compareop = TACOperator.LESS_EQUAL
+            if to_or_downto_ast.token.token_type == TokenType.TO:
+                system_function_label = Label("_SUCC_ORDINAL")
+                compare_operator = TACOperator.LESS_EQUAL
             else:
-                sysfunc = Label("_PREDO")
-                compareop = TACOperator.GREATER_EQUAL
+                system_function_label = Label("_PRED_ORDINAL")
+                compare_operator = TACOperator.GREATER_EQUAL
 
-            labeldoneif = self.get_label()
+            if_statement_is_done_label = self.get_label()
             self.add_node(TACCommentNode("If condition is true, we execute the body once."))
-            ifsym = Symbol(self.get_temporary(), assignmentast.children[1].token.location, pascaltypes.BooleanType())
-            self.symbol_table.add(ifsym)
-            self.add_node(TACBinaryNode(ifsym, compareop, temp1, temp2))
-            self.add_node(TACIFZNode(ifsym, labeldoneif))
-            self.add_node(TACUnaryNode(controlvarsym, TACOperator.ASSIGN, temp1))
-            self.processast(bodyast)
-            labelstartwhile = self.get_label()
+            if_condition_symbol = Symbol(self.get_temporary(), assignment_ast.children[1].token.location,
+                                         pascaltypes.BooleanType())
+            self.symbol_table.add(if_condition_symbol)
+            self.add_node(TACBinaryNode(if_condition_symbol, compare_operator, temp1, temp2))
+            self.add_node(TACIFZNode(if_condition_symbol, if_statement_is_done_label))
+            self.add_node(TACUnaryNode(control_variable_symbol, TACOperator.ASSIGN, temp1))
+            self.processast(body_ast)
+            while_start_label = self.get_label()
             self.add_node(TACCommentNode("The for statement now becomes a while statement"))
-            self.add_node(TACLabelNode(labelstartwhile))
-            whilesym = Symbol(self.get_temporary(), todowntoast.children[0].token.location, pascaltypes.BooleanType())
-            self.symbol_table.add(whilesym)
-            self.add_node(TACBinaryNode(whilesym, TACOperator.NOT_EQUAL, controlvarsym, temp2))
-            self.add_node(TACIFZNode(whilesym, labeldoneif))
-            self.add_node(TACParamNode(controlvarsym))
-            self.add_node(TACCallSystemFunctionNode(sysfunc, 1, controlvarsym))
-            self.processast(bodyast)
-            self.add_node(TACGotoNode(labelstartwhile))
-            self.add_node(TACLabelNode(labeldoneif))
+            self.add_node(TACLabelNode(while_start_label))
+            while_condition_symbol = Symbol(self.get_temporary(), to_or_downto_ast.children[0].token.location,
+                                            pascaltypes.BooleanType())
+            self.symbol_table.add(while_condition_symbol)
+            self.add_node(TACBinaryNode(while_condition_symbol, TACOperator.NOT_EQUAL, control_variable_symbol, temp2))
+            self.add_node(TACIFZNode(while_condition_symbol, if_statement_is_done_label))
+            self.add_node(TACParamNode(control_variable_symbol))
+            self.add_node(TACCallSystemFunctionNode(system_function_label, 1, control_variable_symbol))
+            self.processast(body_ast)
+            self.add_node(TACGotoNode(while_start_label))
+            self.add_node(TACLabelNode(if_statement_is_done_label))
             # 6.8.3.9 - "After a for-statement is executed,
             # other than being left by a goto-statement, the control-variable shall be undefined"
-            controlvarsym.is_assigned_to = False
+            control_variable_symbol.is_assigned_to = False
 
-        elif tok.token_type == TokenType.WHILE:
+        elif token.token_type == TokenType.WHILE:
             assert len(ast.children) == 2, "TACBlock.processast - While ASTs must have 2 children"
             labelstart = self.get_label()
             labeldone = self.get_label()
@@ -995,7 +1028,7 @@ class TACBlock:
             condition = self.processast(ast.children[0])
             if not isinstance(condition.pascal_type, pascaltypes.BooleanType):
                 raise TACException(
-                    compiler_error_str("While statements must be followed by Boolean Expressions: ", tok))
+                    compiler_error_str("While statements must be followed by Boolean Expressions: ", token))
             self.add_node(TACIFZNode(condition, labeldone))
             self.processast(ast.children[1])
             self.add_node(TACGotoNode(labelstart))
@@ -1103,7 +1136,7 @@ class TACBlock:
                                                                         i].symbol.pascal_type.identifier):
                         error_str = "Type Mismatch - parameter {} of {}() must be type {}"
                         error_str = error_str.format(sym.parameter_list[i].symbol.name, sym.name,
-                                               str(sym.parameter_list[i].symbol.pascal_type.identifier))
+                                                     str(sym.parameter_list[i].symbol.pascal_type.identifier))
                         raise TACException(compiler_error_str(error_str, child.token))
                 else:
                     # For value parameters, the actual parameter must be assignment compatible with the formal
@@ -1118,7 +1151,7 @@ class TACBlock:
                         error_str = "Error D.7: Type Mismatch - {} is not assignment compatible with parameter "
                         error_str += "{} of {}()"
                         error_str = error_str.format(str(tmp.pascal_type.identifier),
-                                               sym.parameter_list[i].symbol.name, sym.name)
+                                                     sym.parameter_list[i].symbol.name, sym.name)
                         raise TACException(compiler_error_str(error_str, child.token))
 
                 if isinstance(tmp.pascal_type, pascaltypes.IntegerType) and \
@@ -1274,7 +1307,8 @@ class TACBlock:
         if isinstance(step3, IntegerLiteral):
             # we can do the math in the compiler
             if int(step3.value) < minrange or int(step3.value) > maxrange:
-                error_str = compiler_error_str("Array Index '{}' out of range".format(step3.value), ast.children[1].token)
+                error_str = compiler_error_str("Array Index '{}' out of range".format(step3.value),
+                                               ast.children[1].token)
                 raise TACException(error_str)
 
             indexpos = (int(step3.value) - minrange)
@@ -1336,7 +1370,8 @@ class TACBlock:
                         error_str = "Error D.49: " + error_str
                     error_str = error_str.format(t2value, rval.pascal_type.identifier, lval_reftype.identifier)
                 else:
-                    error_str = "Cannot assign {} type to {}".format(rval.pascal_type.identifier, lval_reftype.identifier)
+                    error_str = "Cannot assign {} type to {}".format(rval.pascal_type.identifier,
+                                                                     lval_reftype.identifier)
                 raise TACException(compiler_error_str(error_str, ast.children[1].token))
             if isinstance(lval_reftype, pascaltypes.RealType) and \
                     isinstance(rval.pascal_type, pascaltypes.IntegerType):
@@ -1510,17 +1545,17 @@ class TACBlock:
         elif toktype in (TokenType.PROCEDURE, TokenType.FUNCTION):
             self.process_ast_procedure_or_function(ast)
         elif toktype in (TokenType.RESET, TokenType.REWRITE):
-            self.processast_fileprocedure(ast)
+            self.process_ast_file_procedure(ast)
         elif toktype in (TokenType.WRITE, TokenType.WRITELN):
-            self.processast_write(ast)
+            self.process_ast_write(ast)
         elif toktype == TokenType.GOTO:
             self.process_ast_goto(ast)
         elif toktype == TokenType.IF:
-            self.processast_conditionalstatement(ast)
+            self.process_ast_conditional_statement(ast)
         elif toktype in (TokenType.WHILE, TokenType.REPEAT, TokenType.FOR):
-            self.processast_repetitivestatement(ast)
+            self.process_ast_repetitive_statement(ast)
         elif is_iso_required_function(tok.token_type):
-            ret = self.processast_isorequiredfunction(ast)
+            ret = self.process_ast_iso_required_function(ast)
         elif toktype == TokenType.LEFT_BRACKET:
             ret = self.processast_array(ast)
         elif toktype == TokenType.ASSIGNMENT:
