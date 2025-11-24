@@ -4,7 +4,7 @@ from tac_ir import TACBlock, TACLabelNode, TACParamNode, TACCallSystemFunctionNo
     TACFunctionReturnNode, TACCallFunctionNode, TACBinaryNodeWithBoundsCheck
 from symboltable import StringLiteral, IntegerLiteral, Symbol, Parameter, ActivationSymbol, RealLiteral, \
     FunctionResultVariableSymbol, CharacterLiteral, ConstantSymbol, ProgramParameterSymbol
-from compiler_error import compiler_errstr, compiler_failstr
+from compiler_error import compiler_error_str, compiler_fail_str
 from editor_settings import NUM_SPACES_IN_TAB, NUM_TABS_FOR_COMMENT
 import pascaltypes
 
@@ -368,8 +368,8 @@ class AssemblyGenerator:
                     litname = 'stringlit_{}'.format(nextid)
                     nextid += 1
                     if len(lit.value) > 255:
-                        errstr = compiler_errstr("String literal '{}' exceeds 255 char max length.".format(lit.value),
-                                                 None, lit.location)
+                        errstr = compiler_error_str(
+                            "String literal '{}' exceeds 255 char max length.".format(lit.value), None, lit.location)
                         raise ASMGeneratorError(errstr)
                     self.emitcode("{} db `{}`, 0".format(litname, lit.value.replace('`', '\\`')))
                     lit.memory_address = litname
@@ -1220,7 +1220,8 @@ class AssemblyGenerator:
                         comment = "assign return value of function to {}".format(node.lval.name)
                         self.emit_movtostack_fromregister(node.lval, destreg, comment)
                     else:  # pragma: no cover
-                        raise ASMGeneratorError(compiler_failstr("Invalid System Function: {}".format(node.label.name)))
+                        raise ASMGeneratorError(compiler_fail_str(
+                            "Invalid System Function: {}".format(node.label.name)))
                 elif isinstance(node, TACBinaryNodeWithBoundsCheck):
                     # currently only used for math with structured types where we have pointers
                     assert isinstance(node.result.pascal_type, pascaltypes.PointerType)

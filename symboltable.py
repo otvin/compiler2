@@ -1,6 +1,6 @@
 import pascaltypes
 from filelocation import FileLocation
-from compiler_error import compiler_errstr
+from compiler_error import compiler_error_str
 
 
 class SymbolException(Exception):
@@ -311,7 +311,7 @@ class SymbolTable:
             else:
                 error_str = "Symbol Redefined: {}".format(sym.name)
             if isinstance(sym, Symbol):
-                error_str = compiler_errstr(error_str, None, sym.location)
+                error_str = compiler_error_str(error_str, None, sym.location)
             raise SymbolRedefinedException(error_str)
         # Unlike literals, where case matters ('abc' is different from 'aBc'), symbols in Pascal are
         # case-insensitive.  So, store them in our symbol table as lower-case.
@@ -699,8 +699,8 @@ class ParameterList:
     def add(self, parameter):
         assert isinstance(parameter, Parameter)
         if self.fetch(parameter.symbol.name):
-            error_str = compiler_errstr("Parameter Redefined: {}".format(parameter.symbol.name), None,
-                                        parameter.symbol.location)
+            error_str = compiler_error_str("Parameter Redefined: {}".format(parameter.symbol.name), None,
+                                           parameter.symbol.location)
             raise SymbolException(error_str)
         else:
             self.parameter_list.append(parameter)

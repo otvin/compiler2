@@ -224,137 +224,139 @@ SYMBOL_LOOKUP = {
 
 
 class Token:
-    def __init__(self, tokentype, location, value):
-        self.tokentype = tokentype
+    def __init__(self, token_type, location, value):
+        self.token_type = token_type
         self.location = location
         self.value = value
 
     # Use a property for tokentype so we can enforce that it is always a valid TokenType
     @property
-    def tokentype(self):
-        return self.__tokentype
+    def token_type(self):
+        return self.__token_type
 
-    @tokentype.setter
-    def tokentype(self, t):
-        if isinstance(t, TokenType):
-            self.__tokentype = t
+    @token_type.setter
+    def token_type(self, token_type):
+        if isinstance(token_type, TokenType):
+            self.__token_type = token_type
         else:  # pragma: no cover
             raise TypeError("Invalid Token Type")
 
     def __str__(self):  # pragma: no cover
-        return 'type:{0:<18} val: {1:<15} loc: {2:<35}'.format(self.tokentype, self.value, str(self.location))
+        return 'type:{0:<18} val: {1:<15} loc: {2:<35}'.format(self.token_type, self.value, str(self.location))
 
 
 class TokenStream:
     def __init__(self):
-        self.tokenlist = []
-        self.pos = 0
+        self.token_list = []
+        self.position = 0
         # TODO - see if we can do something with slices here.
-        self.printstartpos = []
-        self.printendpos = []
+        self.start_print_position = []
+        self.end_print_position = []
 
-    def setstartpos(self):
-        self.printstartpos.append(self.pos)
+    def set_start_print_position(self):
+        self.start_print_position.append(self.position)
 
-    def setendpos(self):
-        self.printendpos.append(self.pos)
+    def set_end_print_position(self):
+        self.end_print_position.append(self.position)
 
-    def printstarttoend(self):
+    def print_start_to_end(self):
         # TODO - there is a more pythonic way of doing this I am certain
-        ret = ""
-        start = self.printstartpos[-1]
-        end = self.printendpos[-1]
+        return_str = ""
+        start = self.start_print_position[-1]
+        end = self.end_print_position[-1]
 
         i = start
         while i < end:
-            if self.tokenlist[i].tokentype == TokenType.CHARSTRING:
-                ret += "'" + self.tokenlist[i].value + "'"
+            if self.token_list[i].token_type == TokenType.CHARSTRING:
+                return_str += "'" + self.token_list[i].value + "'"
             else:
-                ret += self.tokenlist[i].value
-            ret += " "
+                return_str += self.token_list[i].value
+            return_str += " "
             i += 1
-        del self.printstartpos[-1]
-        del self.printendpos[-1]
-        return ret
+        del self.start_print_position[-1]
+        del self.end_print_position[-1]
+        return return_str
 
-    def addtoken(self, token):
+    def add_token(self, token):
         assert isinstance(token, Token), "Only Tokens may be added to TokenStream"
-        self.tokenlist.append(token)
+        self.token_list.append(token)
 
     # One can iterate over a TokenStream if desired, primarily for debugging purposes
     # (e.g. printing out all the tokens in the stream)
     def __iter__(self):  # pragma: no cover
-        self.pos = 0
+        self.position = 0
         return self
 
     def __next__(self):  # pragma: no cover
         try:
-            ret = self.tokenlist[self.pos]
-            self.pos += 1
+            ret = self.token_list[self.position]
+            self.position += 1
         except IndexError:
             raise StopIteration
         return ret
 
-    def resetpos(self):
-        self.pos = 0
+    def reset_position(self):
+        self.position = 0
 
-    def eattoken(self):
-        from compiler_error import compiler_errstr
+    def eat_token(self):
+        from compiler_error import compiler_error_str
         try:
-            ret = self.tokenlist[self.pos]
+            ret = self.token_list[self.position]
         except IndexError:
-            if self.pos > 0:
+            if self.position > 0:
                 raise LexerException(
-                    compiler_errstr("Missing 'end' statement or Unexpected end of file", self.tokenlist[self.pos - 1]))
+                    compiler_error_str("Missing 'end' statement or Unexpected end of file",
+                                       self.token_list[self.position - 1]))
             else:
-                raise LexerException(compiler_errstr("Cannot compile empty file"))
-        self.pos += 1
+                raise LexerException(compiler_error_str("Cannot compile empty file"))
+        self.position += 1
         return ret
 
-    def peekprevioustoken(self):
-        if self.pos > 0:
-            return self.tokenlist[self.pos - 1]
+    def peek_previous_token(self):
+        if self.position > 0:
+            return self.token_list[self.position - 1]
         else:  # pragma: no cover
             return None
 
-    def peektoken(self):
-        from compiler_error import compiler_errstr
+    def peek_token(self):
+        from compiler_error import compiler_error_str
         try:
-            ret = self.tokenlist[self.pos]
+            return_token = self.token_list[self.position]
         except IndexError:
-            if self.pos > 0:
+            if self.position > 0:
                 raise LexerException(
-                    compiler_errstr("Missing 'end' statement or Unexpected end of file", self.tokenlist[self.pos - 1]))
+                    compiler_error_str("Missing 'end' statement or Unexpected end of file",
+                                       self.token_list[self.position - 1]))
             else:
-                raise LexerException(compiler_errstr("Cannot compile empty file"))
-        assert isinstance(ret, Token)
-        return ret
+                raise LexerException(compiler_error_str("Cannot compile empty file"))
+        assert isinstance(return_token, Token), "TokenStream.peek_token: Non-token found in stream"
+        return return_token
 
-    def peektokentype(self):
+    def peek_token_type(self):
         # returns the type of the next token in the token list, but does not advance the position.  Used
         # when interpretation of a token varies based on the token that follows.
         # returns None if we are past the end of the token list.
         try:
-            ret = self.tokenlist[self.pos].tokentype
+            return_token = self.token_list[self.position].token_type
         except IndexError:
-            ret = None
-        return ret
+            return_token = None
+        return return_token
 
-    def peekmultitokentype(self, num):
+    def peek_multi_token_type(self, num):
         # returns a list of the types of the next num tokens in the token list, but does not advance the position.
         # Used when interpretation of a token varies based on multiple tokens that follow.  Returns the empty
         # list if we are past the end of the token list.  If we are not past the end of the token list, but there
         # are fewer than num tokens left in the list, then will return all remaining tokens in the token list.
 
-        ret = []
-        i = self.pos
+        return_list_of_token_types = []
+        i = self.position
         try:
-            while i < self.pos + num:
-                ret.append(self.tokenlist[i].tokentype)
+            while i < self.position + num:
+                return_list_of_token_types.append(self.token_list[i].token_type)
                 i += 1
         except IndexError:  # pragma: no cover
             pass
-        return ret
+        return return_list_of_token_types
 
 
 class Lexer:
@@ -474,7 +476,7 @@ class Lexer:
         # As a note, the 'e' in the unsigned-real can be lower case or upper case.
         #
         # Returns empty string if the next character in the input stream is not numeric.
-        from compiler_error import compiler_errstr
+        from compiler_error import compiler_error_str
         ret = ""
         while self.peek().isnumeric():
             ret += self.eat()
@@ -485,7 +487,7 @@ class Lexer:
                         ret += self.eat()
                 else:
                     # Cannot end a real with a period and no digits following.
-                    errstr = compiler_errstr("Invalid character '.'", None, self.location)
+                    errstr = compiler_error_str("Invalid character '.'", None, self.location)
                     raise ValueError(errstr)
             if self.peek().lower() == 'e':
                 if self.peekahead(1) in ['+', '-'] and self.peekahead(2).isnumeric():
@@ -497,9 +499,9 @@ class Lexer:
                     while self.peek().isnumeric():
                         ret += self.eat()
                 else:
-                    errstr = compiler_errstr("Invalid real number format: {}{}{}".format(ret, self.peek(),
-                                                                                         self.peekahead(1)),
-                                             None, self.location)
+                    errstr = compiler_error_str("Invalid real number format: {}{}{}".format(ret, self.peek(),
+                                                                                            self.peekahead(1)), None,
+                                                self.location)
                     raise ValueError(errstr)
         return ret
 
@@ -535,7 +537,7 @@ class Lexer:
         return ret
 
     def lex(self):
-        from compiler_error import compiler_errstr
+        from compiler_error import compiler_error_str
 
         assert self.location.filename != "", "Filename not set, cannot Tokenize"
         try:
@@ -556,14 +558,14 @@ class Lexer:
             try:
                 if self.peek() == "'":
                     val = self.eatcharacterstring()
-                    self.tokenstream.addtoken(Token(TokenType.CHARSTRING, curlocation, val))
+                    self.tokenstream.add_token(Token(TokenType.CHARSTRING, curlocation, val))
                 elif self.peek().isalpha():
                     val = self.eatidentifier()
                     if val.lower() in TOKENTYPE_LOOKUP.keys():
                         toktype = TOKENTYPE_LOOKUP[val.lower()]
                     else:
                         toktype = TokenType.IDENTIFIER
-                    self.tokenstream.addtoken(Token(toktype, curlocation, val))
+                    self.tokenstream.add_token(Token(toktype, curlocation, val))
                 elif self.peek().isnumeric():
                     # could be a real or an integer.  Read until the next non-numeric character.  If that character
                     # is an e, E, or a . followed by a digit then it is a real, else it is an integer.
@@ -573,21 +575,21 @@ class Lexer:
                     if ((self.peekahead(lookahead) == '.' and self.peekahead(lookahead + 1).isnumeric()) or
                             self.peekahead(lookahead).lower() == 'e'):
                         val = self.eatrealnumber()
-                        self.tokenstream.addtoken(Token(TokenType.UNSIGNED_REAL, curlocation, val))
+                        self.tokenstream.add_token(Token(TokenType.UNSIGNED_REAL, curlocation, val))
                     elif (self.peekahead(lookahead) == '.' and self.peekahead(lookahead + 1) != '.' and
                           self.peekahead(lookahead + 1) != ')'):
                         # if we see two periods, it is a subrange token.  If we see a period followed by a paren,
                         # it's a lexical alternative for right bracket.  If we see one period otherwise, it is invalid;
                         # see definition of <unsigned-real>.  Without this special case, the error is
                         # 'Expected 'end' but saw '.' which is unhelpful.
-                        errstr = compiler_errstr(
+                        errstr = compiler_error_str(
                             'Invalid real number format: "{}"'.format(self.peekmulti(lookahead + 1)), None, curlocation)
                         raise ValueError(errstr)
                     else:
                         val = ""
                         while self.peek().isnumeric():
                             val += self.eat()
-                        self.tokenstream.addtoken(Token(TokenType.UNSIGNED_INT, curlocation, val))
+                        self.tokenstream.add_token(Token(TokenType.UNSIGNED_INT, curlocation, val))
                 elif self.peek() == '{' or self.peekmulti(2) == '(*':
                     self.eatcomment()
                     # Comments are totally ignored from here forward, so we do not add those to the tokenstream.
@@ -600,7 +602,7 @@ class Lexer:
                     else:
                         val = self.eat()
                     toktype = SYMBOL_LOOKUP[val]
-                    self.tokenstream.addtoken(Token(toktype, curlocation, val))
+                    self.tokenstream.add_token(Token(toktype, curlocation, val))
                 else:
                     # errstr = compiler_errstr('Unexpected character: {}'.format(self.peek()), None, curlocation)
                     raise LexerException('Unexpected character: {}'.format(self.peek()))
@@ -608,6 +610,6 @@ class Lexer:
                 if isinstance(e, ValueError):
                     raise e
                 else:
-                    raise LexerException(compiler_errstr(e, None, curlocation))
+                    raise LexerException(compiler_error_str(e, None, curlocation))
 
             self.eatwhitespace()
