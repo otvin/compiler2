@@ -364,69 +364,69 @@ class Lexer:
         self.tokenstream = TokenStream()
         self.text = ""
         self.length = 0
-        self.curpos = 0
+        self.current_position = 0
         self.location = FileLocation(filename, 1, 1, "")
 
     def at_eof(self):
-        return self.curpos >= self.length
+        return self.current_position >= self.length
 
     def peek(self):
         # returns the next character in the input text, or "" if we are past the end of the input.
         if self.at_eof():
             return ""
         else:
-            return self.text[self.curpos]
+            return self.text[self.current_position]
 
-    def peekahead(self, num):
+    def peek_ahead(self, num):
         # returns the character that is num characters ahead.  Passing 0 for num is synonymous with peek().
         assert (num >= 0), "Cannot peek behind current position"
-        pos = self.curpos + num
+        pos = self.current_position + num
         if pos < self.length:
             return self.text[pos]
         else:  # pragma: no cover
             return ""
 
-    def peekrestofcurrentline(self):
+    def peek_rest_of_current_line(self):
         # returns the text from the current position until the end of current line or end of file, whichever
         # comes first.
         i = 0
-        while not self.at_eof() and self.text[self.curpos + i] != "\n":
+        while not self.at_eof() and self.text[self.current_position + i] != "\n":
             i += 1
         if i == 0:
             return ""
         else:
-            return self.peekmulti(i)
+            return self.peek_multi(i)
 
-    def peekmulti(self, num):
-        return self.text[self.curpos:self.curpos + num]
+    def peek_multi(self, num):
+        return self.text[self.current_position:self.current_position + num]
 
     def eat(self):
         if self.at_eof():  # pragma: no cover
             raise IndexError("Length Exceeded")
         else:
-            ret = self.text[self.curpos]
-            self.curpos += 1
+            ret = self.text[self.current_position]
+            self.current_position += 1
             if ret == '\n':
                 self.location.line += 1
                 self.location.column = 1
-                self.location.curlinestr = self.peekrestofcurrentline()
+                self.location.curlinestr = self.peek_rest_of_current_line()
             elif ret == '\t':
                 self.location.column += NUM_SPACES_IN_TAB
             else:
                 self.location.column += 1
             return ret
 
-    def eatmulti(self, num):
+    def eat_multi(self, num):
         ret = ""
         for i in range(num):
             ret += self.eat()
         return ret
 
-    def eatwhitespace(self):
+    def eat_whitespace(self):
         while self.peek().isspace():
             self.eat()
 
-    def eatidentifier(self):
+    def eat_identifier(self):
         # Definition of identifier in section 6.1.3 of ISO Standard is letter { letter | digit } .
         # This function validates that the next character in the input string is a letter, and if so,
         # returns the identifier.  Returns empty string if the next character in the input stream
@@ -438,29 +438,29 @@ class Lexer:
                 ret += self.eat()
         return ret
 
-    def eatcomment(self):
+    def eat_comment(self):
         # Definition of commentary in section 6.1.8 of the ISO standard is
         # ( '{' | '(*' ) commentary ( '}' | '*)' ).  The actual commentary itself can be any arbitrary string of
         # characters, on multiple lines.  Comments do not nest, so the string "{ (* a comment *) }" is invalid, as the
         # comment ends on the *), so the } would be flagged as an invalid token.
         # Returns empty string if the next character(s) in the input stream is not a comment opening.
-        assert self.peek() == '{' or self.peekmulti(2) == '(*'
+        assert self.peek() == '{' or self.peek_multi(2) == '(*'
 
         ret = ""
         if self.peek() == '{':
             self.eat()
-        elif self.peekmulti(2) == '(*':
-            self.eatmulti(2)
+        elif self.peek_multi(2) == '(*':
+            self.eat_multi(2)
 
-        while self.peek() != '}' and self.peekmulti(2) != '*)':
+        while self.peek() != '}' and self.peek_multi(2) != '*)':
             ret += self.eat()
         if self.peek() == '}':
             self.eat()
         else:  # eat the "*)"
-            self.eatmulti(2)
+            self.eat_multi(2)
         return ret
 
-    def eatrealnumber(self):
+    def eat_real_number(self):
         # The lexer eats all signs as plus and minus tokens respectively, and relies on the parser to
         # transform into either a signed number or into another mathematical statement.  This function
         # reads any of the valid numerical forms and returns the string corresponding to them.
@@ -481,7 +481,7 @@ class Lexer:
         while self.peek().isnumeric():
             ret += self.eat()
             if self.peek() == '.':
-                if self.peekahead(1).isnumeric():
+                if self.peek_ahead(1).isnumeric():
                     ret += self.eat()  # grab the period
                     while self.peek().isnumeric():
                         ret += self.eat()
@@ -490,22 +490,22 @@ class Lexer:
                     errstr = compiler_error_str("Invalid character '.'", None, self.location)
                     raise ValueError(errstr)
             if self.peek().lower() == 'e':
-                if self.peekahead(1) in ['+', '-'] and self.peekahead(2).isnumeric():
-                    ret += self.eatmulti(2)  # grab the 'e' and the sign
+                if self.peek_ahead(1) in ['+', '-'] and self.peek_ahead(2).isnumeric():
+                    ret += self.eat_multi(2)  # grab the 'e' and the sign
                     while self.peek().isnumeric():
                         ret += self.eat()
-                elif self.peekahead(1).isnumeric():
+                elif self.peek_ahead(1).isnumeric():
                     ret += self.eat()  # grab the 'e'
                     while self.peek().isnumeric():
                         ret += self.eat()
                 else:
                     errstr = compiler_error_str("Invalid real number format: {}{}{}".format(ret, self.peek(),
-                                                                                            self.peekahead(1)), None,
+                                                                                            self.peek_ahead(1)), None,
                                                 self.location)
                     raise ValueError(errstr)
         return ret
 
-    def eatcharacterstring(self):
+    def eat_character_string(self):
         # Note that since apostrophe is part of the BNF here, I will use quotes to indicate specific characters
         # for ease of readability.
         #
@@ -523,9 +523,9 @@ class Lexer:
             self.eat()  # remove the apostrophe
             done = False
             while not done:
-                if self.peekmulti(2) == "''":
+                if self.peek_multi(2) == "''":
                     ret += "'"  # add the single apostrophe
-                    self.eatmulti(2)  # eat both apostrophes
+                    self.eat_multi(2)  # eat both apostrophes
                 elif self.peek() == "'":
                     self.eat()  # eat the closing apostrophe
                     done = True
@@ -545,11 +545,11 @@ class Lexer:
             self.text = f.read()
             self.length = len(self.text)
             f.close()
-            self.location.curlinestr = self.peekrestofcurrentline()
+            self.location.curlinestr = self.peek_rest_of_current_line()
         except FileNotFoundError:
             raise LexerException("Invalid filename: {}".format(self.location.filename))
 
-        self.eatwhitespace()
+        self.eat_whitespace()
         while not self.at_eof():
             # Remember where this next token starts, since that is the position a user would want to see in an error
             # It needs to be a copy, else every token we create in every iteration would share the same location
@@ -557,10 +557,10 @@ class Lexer:
             curlocation = copy(self.location)
             try:
                 if self.peek() == "'":
-                    val = self.eatcharacterstring()
+                    val = self.eat_character_string()
                     self.tokenstream.add_token(Token(TokenType.CHARSTRING, curlocation, val))
                 elif self.peek().isalpha():
-                    val = self.eatidentifier()
+                    val = self.eat_identifier()
                     if val.lower() in TOKENTYPE_LOOKUP.keys():
                         toktype = TOKENTYPE_LOOKUP[val.lower()]
                     else:
@@ -570,35 +570,35 @@ class Lexer:
                     # could be a real or an integer.  Read until the next non-numeric character.  If that character
                     # is an e, E, or a . followed by a digit then it is a real, else it is an integer.
                     lookahead = 1
-                    while self.peekahead(lookahead).isnumeric():
+                    while self.peek_ahead(lookahead).isnumeric():
                         lookahead += 1
-                    if ((self.peekahead(lookahead) == '.' and self.peekahead(lookahead + 1).isnumeric()) or
-                            self.peekahead(lookahead).lower() == 'e'):
-                        val = self.eatrealnumber()
+                    if ((self.peek_ahead(lookahead) == '.' and self.peek_ahead(lookahead + 1).isnumeric()) or
+                            self.peek_ahead(lookahead).lower() == 'e'):
+                        val = self.eat_real_number()
                         self.tokenstream.add_token(Token(TokenType.UNSIGNED_REAL, curlocation, val))
-                    elif (self.peekahead(lookahead) == '.' and self.peekahead(lookahead + 1) != '.' and
-                          self.peekahead(lookahead + 1) != ')'):
+                    elif (self.peek_ahead(lookahead) == '.' and self.peek_ahead(lookahead + 1) != '.' and
+                          self.peek_ahead(lookahead + 1) != ')'):
                         # if we see two periods, it is a subrange token.  If we see a period followed by a paren,
                         # it's a lexical alternative for right bracket.  If we see one period otherwise, it is invalid;
                         # see definition of <unsigned-real>.  Without this special case, the error is
                         # 'Expected 'end' but saw '.' which is unhelpful.
                         errstr = compiler_error_str(
-                            'Invalid real number format: "{}"'.format(self.peekmulti(lookahead + 1)), None, curlocation)
+                            'Invalid real number format: "{}"'.format(self.peek_multi(lookahead + 1)), None, curlocation)
                         raise ValueError(errstr)
                     else:
                         val = ""
                         while self.peek().isnumeric():
                             val += self.eat()
                         self.tokenstream.add_token(Token(TokenType.UNSIGNED_INT, curlocation, val))
-                elif self.peek() == '{' or self.peekmulti(2) == '(*':
-                    self.eatcomment()
+                elif self.peek() == '{' or self.peek_multi(2) == '(*':
+                    self.eat_comment()
                     # Comments are totally ignored from here forward, so we do not add those to the tokenstream.
                 elif self.peek() in ['+', '-', '*', '/', '=', '<', '>', '[', ']', '.', ',', ':', ';',
                                      '^', '(', ')', '@']:
                     # Test first for the 2-character symbols, and if none of those match, we know
                     # we have a single-character symbol.
-                    if self.peekmulti(2) in [':=', '>=', '<=', '<>', '(.', '.)', '..']:
-                        val = self.eatmulti(2)
+                    if self.peek_multi(2) in [':=', '>=', '<=', '<>', '(.', '.)', '..']:
+                        val = self.eat_multi(2)
                     else:
                         val = self.eat()
                     toktype = SYMBOL_LOOKUP[val]
@@ -612,4 +612,4 @@ class Lexer:
                 else:
                     raise LexerException(compiler_error_str(e, None, curlocation))
 
-            self.eatwhitespace()
+            self.eat_whitespace()
