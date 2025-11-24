@@ -68,7 +68,7 @@
 
 from enum import Enum, unique
 from copy import deepcopy
-from parser import AST, isrelationaloperator, is_isorequiredfunction
+from parser import AST, is_relational_operator, is_iso_required_function
 from symboltable import Symbol, Label, Literal, IntegerLiteral, RealLiteral, StringLiteral, BooleanLiteral, \
     SymbolTable, LiteralTable, ActivationSymbol, Parameter, VariableSymbol, \
     FunctionResultVariableSymbol, ConstantSymbol, CharacterLiteral
@@ -501,8 +501,8 @@ class TACBlock:
 
         retval = False
         if ast.token.token_type == TokenType.ASSIGNMENT:
-            if ast.nearest_symboltable().exists(ast.children[0].token.value.lower()):
-                lvalsym = ast.nearest_symboltable().fetch(ast.children[0].token.value.lower())
+            if ast.nearest_symbol_table().exists(ast.children[0].token.value.lower()):
+                lvalsym = ast.nearest_symbol_table().fetch(ast.children[0].token.value.lower())
                 if lvalsym is returnvaluesym:
                     newbegin = AST(Token(TokenType.BEGIN, ast.token.location, "Begin"), ast.parent,
                                    "Track assignment to {}".format(returnvaluesym.name))
@@ -545,7 +545,7 @@ class TACBlock:
         tok = ast.token
         str_procname = ast.children[0].token.value
 
-        self.paramlist = ast.paramlist
+        self.paramlist = ast.parameter_list
         # need to copy each parameter into the SymbolTable.  If the parameter is a variable parameter (ByRef),
         # the type of the symbol is a pointer to the type of the Parameter.  If the parameter is a value
         # parameter (ByVal) then the type of symbol is same as type of Parameter.
@@ -577,7 +577,7 @@ class TACBlock:
             retvalisassigned_variablename = '_{}_isassigned'.format(str_procname)
             retvalisassignedsym = VariableSymbol(retvalisassigned_variablename, tok.location, pascaltypes.BooleanType())
             self.symboltable.add(retvalisassignedsym)
-            ast.symboltable.add(retvalisassignedsym)
+            ast.symbol_table.add(retvalisassignedsym)
 
             # create an AST that initializes this variable to False, and make that the first statement executed
             # in the current AST.
@@ -596,7 +596,7 @@ class TACBlock:
             # recursively iterate through the children of the current AST, starting with the one following the
             # assignment we just inserted, and identify any assignments to the retval.  This requires matching on
             # the symbols themselves, not the names, as function declared inside a function could reuse a name.
-            retvalsym = ast.symboltable.fetch(str_procname)
+            retvalsym = ast.symbol_table.fetch(str_procname)
             retvaleverset = False
             for child in ast.children[1].children[1:]:
                 if self.track_function_returnval_assignments(retvalsym, retvalisassignedsym, child):
@@ -636,7 +636,7 @@ class TACBlock:
 
     def processast_isorequiredfunction(self, ast):
         assert isinstance(ast, AST)
-        assert is_isorequiredfunction(ast.token.token_type)
+        assert is_iso_required_function(ast.token.token_type)
 
         tok = ast.token
         tmp = self.deref_ifneeded(self.processast(ast.children[0]), ast.children[0].token)
@@ -904,7 +904,7 @@ class TACBlock:
             assert isinstance(controlvartoken, Token)
 
             # Enforce rule 1 from above
-            if not ast.nearest_symboltable().exists(controlvartoken.value):
+            if not ast.nearest_symbol_table().exists(controlvartoken.value):
                 errstr = "Control variable '{}' must be declared in same block as the 'for'"
                 errstr = errstr.format(controlvartoken.value)
                 raise TACException(compiler_error_str(errstr, controlvartoken))
@@ -920,14 +920,14 @@ class TACBlock:
                                                                  controlvarsym.pascal_type.identifier)
                 raise TACException(compiler_error_str(errstr, controlvartoken))
 
-            if not ast.nearest_symboltable().are_compatible(controlvarsym.pascal_type.identifier,
-                                                            temp1.pascal_type.identifier):
+            if not ast.nearest_symbol_table().are_compatible(controlvarsym.pascal_type.identifier,
+                                                             temp1.pascal_type.identifier):
                 errstr = "Type {} not compatible with type {} in 'for' statement"
                 errstr = errstr.format(controlvarsym.pascal_type.identifier, temp1.pascal_type.identifier)
                 raise TACException(compiler_error_str(errstr, assignmentast.children[1].token))
 
-            if not ast.nearest_symboltable().are_compatible(controlvarsym.pascal_type.identifier,
-                                                            temp2.pascal_type.identifier):
+            if not ast.nearest_symbol_table().are_compatible(controlvarsym.pascal_type.identifier,
+                                                             temp2.pascal_type.identifier):
                 errstr = "Type {} not compatible with type {} in 'for' statement"
                 errstr = errstr.format(controlvarsym.pascal_type.identifier, temp2.pascal_type.identifier)
                 raise TACException(compiler_error_str(errstr, todowntoast.children[0].token))
@@ -1083,8 +1083,8 @@ class TACBlock:
                         raise TACException(compiler_error_str(errstr, child.token))
 
                     # For variable parameters, the actual parameter must have same type as the formal parameter
-                    if not ast.nearest_symboltable().are_same_type(tmp.pascal_type.identifier,
-                                                                   sym.parameter_list[i].symbol.pascal_type.identifier):
+                    if not ast.nearest_symbol_table().are_same_type(tmp.pascal_type.identifier,
+                                                                    sym.parameter_list[i].symbol.pascal_type.identifier):
                         errstr = "Type Mismatch - parameter {} of {}() must be type {}"
                         errstr = errstr.format(sym.parameter_list[i].symbol.name, sym.name,
                                                str(sym.parameter_list[i].symbol.pascal_type.identifier))
@@ -1097,7 +1097,7 @@ class TACBlock:
                     else:
                         optval = None
 
-                    if not ast.nearest_symboltable().are_assignment_compatible(
+                    if not ast.nearest_symbol_table().are_assignment_compatible(
                             sym.parameter_list[i].symbol.pascal_type.identifier, tmp.pascal_type.identifier, optval):
                         errstr = "Error D.7: Type Mismatch - {} is not assignment compatible with parameter "
                         errstr += "{} of {}()"
@@ -1311,8 +1311,8 @@ class TACBlock:
             else:
                 t2value = None
 
-            if not ast.nearest_symboltable().are_assignment_compatible(lval_reftype.identifier,
-                                                                       rval.pascal_type.identifier, t2value):
+            if not ast.nearest_symbol_table().are_assignment_compatible(lval_reftype.identifier,
+                                                                        rval.pascal_type.identifier, t2value):
                 if t2value is not None:
                     errstr = "Cannot assign value '{}' of type {} to type {}"
                     if isinstance(rval.pascal_type, pascaltypes.OrdinalType):
@@ -1403,7 +1403,7 @@ class TACBlock:
 
     def processast_relationaloperator(self, ast):
         assert isinstance(ast, AST)
-        assert isrelationaloperator(ast.token.token_type)
+        assert is_relational_operator(ast.token.token_type)
 
         tok = ast.token
         op = maptokentype_to_tacoperator(tok.token_type)
@@ -1417,7 +1417,7 @@ class TACBlock:
         # types, or one operand shall be of real-type and the other of integer-type.  Table 6, has
         # simple-types, pointer-types, and string-types allowed in the comparisons.
 
-        # special case for string literals - symboltable.are_compatible() just looks at the identifiers,
+        # special case for string literals - symbol_table.are_compatible() just looks at the identifiers,
         # which works fine for every time other than string literals doing relational comparisons.  For
         # string literals we need to look at the length to know if they are compatible.
 
@@ -1503,7 +1503,7 @@ class TACBlock:
             self.processast_conditionalstatement(ast)
         elif toktype in (TokenType.WHILE, TokenType.REPEAT, TokenType.FOR):
             self.processast_repetitivestatement(ast)
-        elif is_isorequiredfunction(tok.token_type):
+        elif is_iso_required_function(tok.token_type):
             ret = self.processast_isorequiredfunction(ast)
         elif toktype == TokenType.LEFT_BRACKET:
             ret = self.processast_array(ast)
@@ -1524,7 +1524,7 @@ class TACBlock:
         elif tok.token_type in (TokenType.MULTIPLY, TokenType.PLUS, TokenType.MINUS, TokenType.DIVIDE,
                                 TokenType.IDIV, TokenType.MOD):
             ret = self.processast_arithmeticoperator(ast)
-        elif isrelationaloperator(tok.token_type):
+        elif is_relational_operator(tok.token_type):
             ret = self.processast_relationaloperator(ast)
         elif tok.token_type in (TokenType.AND, TokenType.OR, TokenType.NOT):
             ret = self.processast_booleanoperator(ast)
@@ -1559,7 +1559,7 @@ class TACGenerator:
             newblock = TACBlock(True, self)
         else:
             newblock = TACBlock(False, self)
-            newblock.symboltable = deepcopy(ast.symboltable)
+            newblock.symboltable = deepcopy(ast.symbol_table)
         newblock.symboltable.parent = self.globalsymboltable
         newblock.processast(ast)
         return newblock
@@ -1567,7 +1567,7 @@ class TACGenerator:
     def generate(self, ast):
         assert isinstance(ast, AST)
         assert ast.token.token_type == TokenType.PROGRAM
-        self.globalsymboltable = deepcopy(ast.symboltable)
+        self.globalsymboltable = deepcopy(ast.symbol_table)
 
         for child in ast.children:
             self.addblock(self.generateblock(child))

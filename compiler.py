@@ -46,18 +46,18 @@ def compile(infilename, asmfilename=None, objfilename=None, exefilename=None,
         print("\n\nPARSER OUTPUT")
         print(p.AST.rpn_print(0))
 
-    if len(p.parseerrorlist) > 0:
+    if len(p.parse_error_list) > 0:
         raise Exception("I need to display the compiler errors")
 
     if verbose:
         print("LITERALS:")
-        for q in p.literaltable:
+        for q in p.literal_table:
             print(q)
         print("\n\n")
         print("symbols")
-        p.AST.dump_symboltables()
+        p.AST.dump_symbol_tables()
 
-    g = TACGenerator(p.literaltable)
+    g = TACGenerator(p.literal_table)
 
     if verbose:
         print("Literals again:")
