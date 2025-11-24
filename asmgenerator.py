@@ -744,7 +744,7 @@ class AssemblyGenerator:
                         else:
                             self.emitcode("movsd XMM0, [{}]".format(node.returnval.memory_address), "set up return val")
                 elif isinstance(node, TACUnaryNode):
-                    if node.operator == TACOperator.INTTOREAL:
+                    if node.operator == TACOperator.INT_TO_REAL:
                         assert node.arg1.pascal_type.size in [1, 2, 4, 8]
                         if node.arg1.pascal_type.size in (1, 2):
                             raise ASMGeneratorError("Cannot handle 8- or 16-bit int convert to real")
@@ -778,12 +778,12 @@ class AssemblyGenerator:
                             # now, get the value from reg into lval.  If lval is a byref parameter, we
                             # need to dereference the pointer.
                             self.emit_movtostack_fromregister(node.lval, reg)
-                    elif node.operator == TACOperator.ASSIGNADDRESSOF:
+                    elif node.operator == TACOperator.ASSIGN_ADDRESS_OF:
                         assert isinstance(node.lval.pascal_type, pascaltypes.PointerType)
                         comment = "Move address of {} into {}".format(node.arg1.name, node.lval.name)
                         self.emit_movaddresstoregister_fromstack("RAX", node.arg1, comment)
                         self.emit_movtostack_fromregister(node.lval, "RAX")
-                    elif node.operator == TACOperator.ASSIGNTODEREF:
+                    elif node.operator == TACOperator.ASSIGN_TO_DEREFERENCE:
                         assert isinstance(node.lval.pascal_type, pascaltypes.PointerType)
                         if isinstance(node.arg1.pascal_type, pascaltypes.ArrayType):
                             assert node.lval.pascal_type.points_to_type.size == node.arg1.pascal_type.size
@@ -797,7 +797,7 @@ class AssemblyGenerator:
                             self.emit_movtoregister_fromstack(reg, node.arg1, comment)
                             self.emitcode("MOV R10, [{}]".format(node.lval.memory_address))
                             self.emitcode("MOV [R10], {}".format(reg))
-                    elif node.operator == TACOperator.ASSIGNDEREFTO:
+                    elif node.operator == TACOperator.ASSIGN_DEREFERENCE_TO:
                         assert isinstance(node.arg1.pascal_type, pascaltypes.PointerType)
                         comment = "Mov deref of {} to {}".format(node.arg1.name, node.lval.name)
                         destreg = get_register_slice_by_bytes("RAX", node.lval.pascal_type.size)
@@ -839,7 +839,7 @@ class AssemblyGenerator:
                             tmpreg = get_register_slice_by_bytes("RAX", node.lval.pascal_type.size)
                             self.emitcode("mov {}, {}".format(tmpreg, val), comment)
                             self.emit_movtostack_fromregister(node.lval, tmpreg)
-                        elif node.operator == TACOperator.INTTOREAL:
+                        elif node.operator == TACOperator.INT_TO_REAL:
                             assert isinstance(node.literal1, IntegerLiteral)
                             comment = "Move integer literal {} into real symbol {}".format(node.literal1.value,
                                                                                            node.lval.name)
@@ -848,7 +848,7 @@ class AssemblyGenerator:
                             self.emitcode("cvtsi2sd xmm0, rax")
                             # now save the float into its location
                             self.emit_movtostack_fromxmmregister(node.lval, "xmm0")
-                        elif node.operator == TACOperator.ASSIGNTODEREF:
+                        elif node.operator == TACOperator.ASSIGN_TO_DEREFERENCE:
                             assert isinstance(node.lval.pascal_type, pascaltypes.PointerType)
                             assert isinstance(node.lval.pascal_type.points_to_type, pascaltypes.IntegerType)
                             comment = "Move integer literal {} into address contained in {}"
@@ -1282,7 +1282,7 @@ class AssemblyGenerator:
                             self.emit_jumptoerror("jo", "_PASCAL_OVERFLOW_ERROR")
                             self.emit_movtostack_fromregister(node.result, "eax")
 
-                        elif node.operator in (TACOperator.IDIV, TACOperator.MOD):
+                        elif node.operator in (TACOperator.INTEGER_DIV, TACOperator.MOD):
                             self.emit_movtoregister_fromstackorliteral("eax", node.arg1, comment)
                             self.emit_movtoregister_fromstackorliteral("r11d", node.arg2)
 
@@ -1291,14 +1291,14 @@ class AssemblyGenerator:
                             # 6.7.2.2 also says that the result of the mod operation must be greater than or
                             # equal to zero, and less than the divisor.
                             self.emitcode("test r11d, r11d", "check for division by zero")
-                            if node.operator == TACOperator.IDIV:
+                            if node.operator == TACOperator.INTEGER_DIV:
                                 self.emit_jumptoerror("je", "_PASCAL_DIVZERO_ERROR")
                             else:
                                 self.emit_jumptoerror("jle", "_PASCAL_MOD_ERROR")
                             self.emitcode("cdq", "sign extend eax -> edx:eax")
                             self.emitcode("idiv r11d")
                             if node.operator == TACOperator.MOD:
-                                self.emitcode("MOV EAX, EDX", "Remainder of IDIV is in EDX")
+                                self.emitcode("MOV EAX, EDX", "Remainder of INTEGER_DIV is in EDX")
                                 posmodlabel = self.getnextlabel()
                                 self.emitcode("CMP EAX, 0")
                                 self.emitcode("JGE {}".format(posmodlabel))
@@ -1383,15 +1383,15 @@ class AssemblyGenerator:
                                 # are set up to do an integer comparison by this point
                                 if node.operator == TACOperator.EQUALS:
                                     jumpinstr = "JE"
-                                elif node.operator == TACOperator.NOTEQUAL:
+                                elif node.operator == TACOperator.NOT_EQUAL:
                                     jumpinstr = "JNE"
                                 elif node.operator == TACOperator.GREATER:
                                     jumpinstr = "JG"
-                                elif node.operator == TACOperator.GREATEREQ:
+                                elif node.operator == TACOperator.GREATER_EQUAL:
                                     jumpinstr = "JGE"
                                 elif node.operator == TACOperator.LESS:
                                     jumpinstr = "JL"
-                                elif node.operator == TACOperator.LESSEQ:
+                                elif node.operator == TACOperator.LESS_EQUAL:
                                     jumpinstr = "JLE"
                                 else:  # pragma: no cover
                                     raise ASMGeneratorError("Invalid Relational Operator {}".format(node.operator))
@@ -1402,15 +1402,15 @@ class AssemblyGenerator:
                                        isinstance(n1type, pascaltypes.SubrangeType)
                                 if node.operator == TACOperator.EQUALS:
                                     jumpinstr = "JE"
-                                elif node.operator == TACOperator.NOTEQUAL:
+                                elif node.operator == TACOperator.NOT_EQUAL:
                                     jumpinstr = "JNE"
                                 elif node.operator == TACOperator.GREATER:
                                     jumpinstr = "JA"
-                                elif node.operator == TACOperator.GREATEREQ:
+                                elif node.operator == TACOperator.GREATER_EQUAL:
                                     jumpinstr = "JAE"
                                 elif node.operator == TACOperator.LESS:
                                     jumpinstr = "JB"
-                                elif node.operator == TACOperator.LESSEQ:
+                                elif node.operator == TACOperator.LESS_EQUAL:
                                     jumpinstr = "JBE"
                                 else:  # pragma: no cover
                                     raise ASMGeneratorError("Invalid Relational Operator {}".format(node.operator))

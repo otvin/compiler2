@@ -41,7 +41,7 @@ class TokenType(Enum):
     BEGIN = 'begin'
     CASE = 'case'
     CONST = 'const'
-    IDIV = 'div'  # named IDIV to avoid confusion with DIVIDE
+    INTEGER_DIV = 'div'  # named INTEGER_DIV to avoid confusion with DIVIDE
     DO = 'do'
     DOWNTO = 'downto'
     ELSE = 'else'
@@ -183,7 +183,7 @@ TOKEN_TYPE_LOOKUP = {
     'arctan': TokenType.ARCTAN, 'array': TokenType.ARRAY, 'begin': TokenType.BEGIN,
     'boolean': TokenType.BOOLEAN, 'case': TokenType.CASE, 'chr': TokenType.CHR, 'char': TokenType.CHAR,
     'const': TokenType.CONST, 'cos': TokenType.COS,
-    'dispose': TokenType.DISPOSE, 'div': TokenType.IDIV, 'do': TokenType.DO, 'downto': TokenType.DOWNTO,
+    'dispose': TokenType.DISPOSE, 'div': TokenType.INTEGER_DIV, 'do': TokenType.DO, 'downto': TokenType.DOWNTO,
     'else': TokenType.ELSE, 'end': TokenType.END, 'eof': TokenType.EOF, 'eoln': TokenType.EOLN,
     'exp': TokenType.EXP, 'false': TokenType.FALSE, 'file': TokenType.FILE, 'for': TokenType.FOR,
     'forward': TokenType.FORWARD, 'function': TokenType.FUNCTION,

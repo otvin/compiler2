@@ -33,7 +33,7 @@ def is_relational_operator(token_type):
 def is_multiplying_operator(token_type):
     # 6.7.2.1 <multiplying-operator> ::= "*" | "/" | "div" | "mod" | "and"
     assert isinstance(token_type, TokenType)
-    if token_type in (TokenType.MULTIPLY, TokenType.DIVIDE, TokenType.IDIV, TokenType.MOD, TokenType.AND):
+    if token_type in (TokenType.MULTIPLY, TokenType.DIVIDE, TokenType.INTEGER_DIV, TokenType.MOD, TokenType.AND):
         return True
     else:
         return False
@@ -383,7 +383,7 @@ class Parser:
                     if self.tokenstream.peek_token_type() in (TokenType.PLUS, TokenType.MINUS, TokenType.MULTIPLY,
                                                               TokenType.DIVIDE, TokenType.LEFT_PAREN,
                                                               TokenType.RIGHT_PAREN,
-                                                              TokenType.IDIV, TokenType.MOD):
+                                                              TokenType.INTEGER_DIV, TokenType.MOD):
                         # if the token is related to expressions, we will do a specific error for that.
                         error_str = compiler_error_str(
                             "Semicolon expected, cannot define a constant in terms of an expression",

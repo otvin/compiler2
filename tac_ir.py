@@ -89,24 +89,24 @@ class TACOperator(Enum):
     SUBTRACT = "-"
     MULTIPLY = "*"
     DIVIDE = "/"
-    IDIV = "div"
+    INTEGER_DIV = "div"
     MOD = "mod"
     EQUALS = "="
-    NOTEQUAL = "<>"
+    NOT_EQUAL = "<>"
     LESS = "<"
-    LESSEQ = "<="
+    LESS_EQUAL = "<="
     GREATER = ">"
-    GREATEREQ = ">="
-    ASSIGNADDRESSOF = ":= &"
-    ASSIGNTODEREF = "* :="
-    ASSIGNDEREFTO = ":= *"
+    GREATER_EQUAL = ">="
+    ASSIGN_ADDRESS_OF = ":= &"
+    ASSIGN_TO_DEREFERENCE = "* :="
+    ASSIGN_DEREFERENCE_TO = ":= *"
     AND = "and"
     OR = "or"
     NOT = "not"
     PARAM = "param"
     CALL = "call"
     COMMENT = "comment"
-    INTTOREAL = "is int_to_real"
+    INT_TO_REAL = "is int_to_real"
     IFZ = "ifz"
     GOTO = "goto"
     RETURN = "return"
@@ -119,28 +119,28 @@ def maptokentype_to_tacoperator(tokentype):
     # Token Types have equivalent TACOperators, this is a mapping
     assert isinstance(tokentype, TokenType)
     assert tokentype in (TokenType.EQUALS, TokenType.NOTEQUAL, TokenType.LESS, TokenType.LESS_EQUAL, TokenType.GREATER,
-                         TokenType.GREATER_EQUAL, TokenType.IDIV, TokenType.MOD, TokenType.MULTIPLY, TokenType.PLUS,
-                         TokenType.MINUS, TokenType.DIVIDE, TokenType.AND, TokenType.OR, TokenType.NOT)
+                         TokenType.GREATER_EQUAL, TokenType.INTEGER_DIV, TokenType.MOD, TokenType.MULTIPLY,
+                         TokenType.PLUS, TokenType.MINUS, TokenType.DIVIDE, TokenType.AND, TokenType.OR, TokenType.NOT)
     if tokentype == TokenType.EQUALS:
         ret = TACOperator.EQUALS
     elif tokentype == TokenType.NOTEQUAL:
-        ret = TACOperator.NOTEQUAL
+        ret = TACOperator.NOT_EQUAL
     elif tokentype == TokenType.LESS:
         ret = TACOperator.LESS
     elif tokentype == TokenType.LESS_EQUAL:
-        ret = TACOperator.LESSEQ
+        ret = TACOperator.LESS_EQUAL
     elif tokentype == TokenType.GREATER:
         ret = TACOperator.GREATER
     elif tokentype == TokenType.GREATER_EQUAL:
-        ret = TACOperator.GREATEREQ
+        ret = TACOperator.GREATER_EQUAL
     elif tokentype == TokenType.NOT:
         ret = TACOperator.NOT
     elif tokentype == TokenType.AND:
         ret = TACOperator.AND
     elif tokentype == TokenType.OR:
         ret = TACOperator.OR
-    elif tokentype == TokenType.IDIV:
-        ret = TACOperator.IDIV
+    elif tokentype == TokenType.INTEGER_DIV:
+        ret = TACOperator.INTEGER_DIV
     elif tokentype == TokenType.MOD:
         ret = TACOperator.MOD
     elif tokentype == TokenType.MULTIPLY:
@@ -447,7 +447,7 @@ class TACBlock:
             # assign deref of the pointer to the new symbol.
             basetypesym = Symbol(self.gettemporary(), sym.location, sym.pascal_type.points_to_type)
             self.symboltable.add(basetypesym)
-            self.addnode(TACUnaryNode(basetypesym, TACOperator.ASSIGNDEREFTO, sym))
+            self.addnode(TACUnaryNode(basetypesym, TACOperator.ASSIGN_DEREFERENCE_TO, sym))
             return basetypesym
         else:
             if isinstance(sym, VariableSymbol) and not sym.is_assigned_to:
@@ -943,10 +943,10 @@ class TACBlock:
 
             if todowntoast.token.token_type == TokenType.TO:
                 sysfunc = Label("_SUCCO")
-                compareop = TACOperator.LESSEQ
+                compareop = TACOperator.LESS_EQUAL
             else:
                 sysfunc = Label("_PREDO")
-                compareop = TACOperator.GREATEREQ
+                compareop = TACOperator.GREATER_EQUAL
 
             labeldoneif = self.getlabel()
             self.addnode(TACCommentNode("If condition is true, we execute the body once."))
@@ -961,7 +961,7 @@ class TACBlock:
             self.addnode(TACLabelNode(labelstartwhile))
             whilesym = Symbol(self.gettemporary(), todowntoast.children[0].token.location, pascaltypes.BooleanType())
             self.symboltable.add(whilesym)
-            self.addnode(TACBinaryNode(whilesym, TACOperator.NOTEQUAL, controlvarsym, temp2))
+            self.addnode(TACBinaryNode(whilesym, TACOperator.NOT_EQUAL, controlvarsym, temp2))
             self.addnode(TACIFZNode(whilesym, labeldoneif))
             self.addnode(TACParamNode(controlvarsym))
             self.addnode(TACCallSystemFunctionNode(sysfunc, 1, controlvarsym))
@@ -1218,7 +1218,7 @@ class TACBlock:
         
         if isinstance(step1.pascal_type, pascaltypes.ArrayType):
             arraytype = step1.pascal_type
-            assignop = TACOperator.ASSIGNADDRESSOF
+            assignop = TACOperator.ASSIGN_ADDRESS_OF
         else:
             arraytype = step1.pascal_type.points_to_type
             assert isinstance(arraytype, pascaltypes.ArrayType)
@@ -1288,7 +1288,7 @@ class TACBlock:
         lval = self.processast(ast.children[0])
         if isinstance(lval.pascal_type, pascaltypes.PointerType):
             lval_reftype = lval.pascal_type.points_to_type
-            assignop = TACOperator.ASSIGNTODEREF
+            assignop = TACOperator.ASSIGN_TO_DEREFERENCE
         else:
             lval_reftype = lval.pascal_type
             assignop = TACOperator.ASSIGN
@@ -1344,15 +1344,15 @@ class TACBlock:
         ret = Symbol(self.gettemporary(), sym.location, pascaltypes.RealType())
         self.symboltable.add(ret)
         if isinstance(sym, Symbol):
-            self.addnode(TACUnaryNode(ret, TACOperator.INTTOREAL, sym))
+            self.addnode(TACUnaryNode(ret, TACOperator.INT_TO_REAL, sym))
         else:
-            self.addnode(TACUnaryLiteralNode(ret, TACOperator.INTTOREAL, sym))
+            self.addnode(TACUnaryLiteralNode(ret, TACOperator.INT_TO_REAL, sym))
         return ret
 
     def processast_arithmeticoperator(self, ast):
         assert isinstance(ast, AST)
         assert ast.token.token_type in (TokenType.MULTIPLY, TokenType.PLUS, TokenType.MINUS, TokenType.DIVIDE,
-                                        TokenType.IDIV, TokenType.MOD)
+                                        TokenType.INTEGER_DIV, TokenType.MOD)
         assert len(ast.children) == 2
 
         tok = ast.token
@@ -1364,7 +1364,7 @@ class TACBlock:
                 isinstance(child2.pascal_type, pascaltypes.BooleanType):
             raise TACException(compiler_error_str("Cannot use boolean type with math operators", tok))
 
-        if tok.token_type in (TokenType.IDIV, TokenType.MOD) and \
+        if tok.token_type in (TokenType.INTEGER_DIV, TokenType.MOD) and \
                 (isinstance(child1.pascal_type, pascaltypes.RealType) or
                  isinstance(child2.pascal_type, pascaltypes.RealType)):
             raise TACException(compiler_error_str("Cannot use integer division with real values.", tok))
@@ -1522,7 +1522,7 @@ class TACBlock:
         elif tok.token_type == TokenType.CHARSTRING:
             ret = self.processast_characterstring(ast)
         elif tok.token_type in (TokenType.MULTIPLY, TokenType.PLUS, TokenType.MINUS, TokenType.DIVIDE,
-                                TokenType.IDIV, TokenType.MOD):
+                                TokenType.INTEGER_DIV, TokenType.MOD):
             ret = self.processast_arithmeticoperator(ast)
         elif is_relational_operator(tok.token_type):
             ret = self.processast_relationaloperator(ast)
