@@ -63,7 +63,6 @@ class IntegerLiteral(OrdinalLiteral):
 
 
 class BooleanLiteral(OrdinalLiteral):
-    # TODO - check why these values are strings instead of integers?
     def __init__(self, value, location):
         assert value in ('0', '1')
         super().__init__(value, location, pascaltypes.BooleanType())

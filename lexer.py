@@ -225,6 +225,8 @@ SYMBOL_LOOKUP = {
 
 class Token:
     def __init__(self, token_type, location, value):
+        assert isinstance(value, str), "Token values must be strings."
+        assert location is None or isinstance(location, FileLocation), "Token locations must be FileLocations"
         self.token_type = token_type
         self.location = location
         self.value = value

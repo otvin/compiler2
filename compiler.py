@@ -61,26 +61,26 @@ def compile(infilename, asmfilename=None, objfilename=None, exefilename=None,
 
     if verbose:
         print("Literals again:")
-        for q in g.globalliteraltable:
+        for q in g.global_literal_table:
             print(q)
 
     try:
         g.generate(p.AST)
     except Exception as err:
         if verbose:  # set to True to debug
-            g.printblocks()
+            g.print_blocks()
             traceback.print_exc()
-        for warnstr in g.warningslist:
+        for warnstr in g.warnings_list:
             retstr += warnstr
         retstr += str(err)
         return retstr
 
-    for warnstr in g.warningslist:
+    for warnstr in g.warnings_list:
         retstr += warnstr
 
     if verbose:
         print("\n\nTHREE-ADDRESS CODE")
-        g.printblocks()
+        g.print_blocks()
 
     ag = AssemblyGenerator(asmfilename, g)
     try:

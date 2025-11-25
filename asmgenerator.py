@@ -358,9 +358,9 @@ class AssemblyGenerator:
         self.emitcode('_filemode_read db "r",0')
         self.emitcode('_filemode_readbinary db "rb",0')
 
-        if len(self.tacgenerator.globalliteraltable) > 0:
+        if len(self.tacgenerator.global_literal_table) > 0:
             nextid = 0
-            for lit in self.tacgenerator.globalliteraltable:
+            for lit in self.tacgenerator.global_literal_table:
                 if isinstance(lit, IntegerLiteral) or isinstance(lit, CharacterLiteral):
                     # these can be defined as part of the instruction where they are loaded
                     pass
@@ -611,8 +611,8 @@ class AssemblyGenerator:
 
         symlist = []
 
-        for symname in self.tacgenerator.globalsymboltable.symbols.keys():
-            sym = self.tacgenerator.globalsymboltable.fetch(symname)
+        for symname in self.tacgenerator.global_symbol_table.symbols.keys():
+            sym = self.tacgenerator.global_symbol_table.fetch(symname)
             if isinstance(sym, ProgramParameterSymbol) and sym.name not in ("input", "output"):
                 symlist.append((sym.position, sym.filename_memory_address, sym.name))
 
@@ -627,8 +627,8 @@ class AssemblyGenerator:
 
     def generate_globalfile_initializationcode(self):
         # set up stdin and stdout if needed
-        for symname in self.tacgenerator.globalsymboltable.symbols.keys():
-            sym = self.tacgenerator.globalsymboltable.fetch(symname)
+        for symname in self.tacgenerator.global_symbol_table.symbols.keys():
+            sym = self.tacgenerator.global_symbol_table.fetch(symname)
             if isinstance(sym, ProgramParameterSymbol):
 
                 if sym.name == "output":
@@ -656,7 +656,7 @@ class AssemblyGenerator:
     def generate_code(self):
         params = []  # this is a stack of parameters
 
-        for block in self.tacgenerator.tacblocks:
+        for block in self.tacgenerator.tac_blocks_list:
             assert isinstance(block, TACBlock)
 
             if block.is_main:
@@ -712,8 +712,8 @@ class AssemblyGenerator:
                     if self.used_x87_code:
                         self.emitcode("finit")
                     # need to init any global variables that are arrays
-                    for symname in self.tacgenerator.globalsymboltable.symbols.keys():
-                        sym = self.tacgenerator.globalsymboltable.fetch(symname)
+                    for symname in self.tacgenerator.global_symbol_table.symbols.keys():
+                        sym = self.tacgenerator.global_symbol_table.fetch(symname)
                         if isinstance(sym, Symbol) and isinstance(sym.pascal_type, pascaltypes.ArrayType):
                             self.generate_array_variable_memory_allocation_code(sym)
 
@@ -816,13 +816,13 @@ class AssemblyGenerator:
                 elif isinstance(node, TACUnaryLiteralNode):
                     if isinstance(node.literal, StringLiteral):
                         # dealing with PEP8 line length
-                        glt = self.tacgenerator.globalliteraltable
+                        glt = self.tacgenerator.global_literal_table
                         litaddress = glt.fetch(node.literal.value, pascaltypes.StringLiteralType()).memory_address
                         comment = "Move literal '{}' into {}".format(node.literal.value, node.left_value.name)
                         self.emitcode("lea rax, [rel {}]".format(litaddress), comment)
                         self.emit_movtostack_fromregister(node.left_value, "rax")
                     elif isinstance(node.literal, RealLiteral):
-                        glt = self.tacgenerator.globalliteraltable
+                        glt = self.tacgenerator.global_literal_table
                         litaddress = glt.fetch(node.literal.value, pascaltypes.RealType()).memory_address
                         comment = "Move literal {} into {}".format(node.literal.value, node.left_value.name)
                         self.emitcode("movsd xmm0, [rel {}]".format(litaddress), comment)
@@ -1433,8 +1433,8 @@ class AssemblyGenerator:
             if block.is_main:
                 # deallocate global arrays
                 # TODO: refactor this loop to be something like "get global array symbols" or something
-                for symname in self.tacgenerator.globalsymboltable.symbols.keys():
-                    sym = self.tacgenerator.globalsymboltable.fetch(symname)
+                for symname in self.tacgenerator.global_symbol_table.symbols.keys():
+                    sym = self.tacgenerator.global_symbol_table.fetch(symname)
                     if isinstance(sym, Symbol) and isinstance(sym.pascal_type, pascaltypes.ArrayType):
                         self.emitcode("mov rdi, [{}]".format(sym.memory_address),
                                       "Free memory for global array {}".format(symname))
@@ -1525,11 +1525,11 @@ class AssemblyGenerator:
         self.emitsection("note.GNU-stack noalloc noexec nowrite progbits")
 
     def generate_bsssection(self):
-        if len(self.tacgenerator.globalsymboltable.symbols.keys()) > 0:
+        if len(self.tacgenerator.global_symbol_table.symbols.keys()) > 0:
             self.emitsection("bss")
             varseq = 0
-            for symname in self.tacgenerator.globalsymboltable.symbols.keys():
-                sym = self.tacgenerator.globalsymboltable.fetch(symname)
+            for symname in self.tacgenerator.global_symbol_table.symbols.keys():
+                sym = self.tacgenerator.global_symbol_table.fetch(symname)
                 if isinstance(sym, Symbol) and not isinstance(sym, ActivationSymbol):
                     if isinstance(sym, ProgramParameterSymbol):
                         if sym.name not in ("input", "output"):
