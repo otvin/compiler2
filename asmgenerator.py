@@ -21,12 +21,12 @@ VALID_DWORD_REGISTER_LIST = ["EAX", "EBX", "ECX", "EDX", "ESI", "EDI", "EBP", "E
 
 VALID_SCRATCH_REGISTER_LIST = ["R11", "R10", "R15", "R16"]  # TODO - Validate this list with the ABI
 
-FILESTATE_NOTINITIALIZED = 0
-FILESTATE_GENERATION = 1
-FILESTATE_INSPECTION = 2
+FILE_STATE_NOT_INITIALIZED = 0
+FILE_STATE_GENERATION = 1
+FILE_STATE_INSPECTION = 2
 
 
-class PascalError:
+class RuntimeError:
     def __init__(self, error_string, label, is_used=False):
         # we will only write the error information to the .asm file if it is invoked someplace
         assert isinstance(error_string, str)
@@ -44,33 +44,33 @@ def get_register_slice_by_bytes(register, num_bytes):
     # that are 1 or 2 bytes, need to make sure we don't get in trouble.
 
     if num_bytes == 8:
-        ret = register
+        return_register = register
     else:
         if register in ["RAX", "RBX", "RCX", "RDX"]:
             if num_bytes == 4:
-                ret = "E" + register[-2:]
+                return_register = "E" + register[-2:]
             elif num_bytes == 2:
-                ret = register[-2:]
+                return_register = register[-2:]
             else:
-                ret = register[1] + "L"
+                return_register = register[1] + "L"
         elif register in ["RSI", "RDI", "RBP", "RSP"]:
             if num_bytes == 4:
-                ret = "E" + register[-2:]
+                return_register = "E" + register[-2:]
             elif num_bytes == 2:
-                ret = register[-2:]
+                return_register = register[-2:]
             else:
-                ret = register[-2:] + "L"
+                return_register = register[-2:] + "L"
         else:
             if num_bytes == 4:
-                ret = register + "D"
+                return_register = register + "D"
             elif num_bytes == 2:
-                ret = register + "W"
+                return_register = register + "W"
             else:
-                ret = register + "B"
-    return ret
+                return_register = register + "B"
+    return return_register
 
 
-def intparampos_to_register(pos):
+def integer_parameter_position_to_register(pos):
     # First six integer parameters to functions are stored in registers.
     # This function converts the position in the function parameter list to a register
     # once we get > 6 parameters it will be stack pointer offsets
@@ -94,66 +94,66 @@ def intparampos_to_register(pos):
 
 def is_integer_or_boolean_subrange_type(base_type):
     assert isinstance(base_type, pascaltypes.BaseType)
-    ret = False
+    return_bool = False
     if isinstance(base_type, pascaltypes.SubrangeType):
         if isinstance(base_type.host_type, pascaltypes.IntegerType):
-            ret = True
+            return_bool = True
         elif isinstance(base_type.host_type, pascaltypes.BooleanType):
-            ret = True
-    return ret
+            return_bool = True
+    return return_bool
 
 
 class AssemblyGenerator:
-    def __init__(self, asmfilename, tacgenerator):
-        assert isinstance(tacgenerator, TACGenerator)
-        self.asmfilename = asmfilename
-        self.asmfile = open(asmfilename, 'w')
-        self.tacgenerator = tacgenerator
-        self.maxlabelnum = 0
-        self.pascalerrors = {}
-        self.init_pascalerrors()
+    def __init__(self, assembly_file_name, tac_generator):
+        assert isinstance(tac_generator, TACGenerator)
+        self.assembly_file_name = assembly_file_name
+        self.assembly_file = open(assembly_file_name, 'w')
+        self.tac_generator = tac_generator
+        self.maximum_label_number = 0
+        self.runtime_errors = {}
+        self.init_runtime_errors()
         self.used_x87_code = False
         self.used_calloc = False
         self.used_dispose = False
 
-    def init_pascalerrors(self):
+    def init_runtime_errors(self):
 
         # Overflow error is referenced in compiler2_system_io.asm and compiler2_stringcompare.asm
-        self.pascalerrors[0] = PascalError("Overflow error", "_PASCAL_OVERFLOW_ERROR", True)
-        self.pascalerrors[1] = PascalError("Error D.44 or D.45: Division by zero error", "_PASCAL_DIVZERO_ERROR")
-        self.pascalerrors[2] = PascalError("Error D.46: Divisor in Mod must be positive", "_PASCAL_MOD_ERROR")
-        self.pascalerrors[3] = PascalError("Error D.34: Cannot take sqrt() of negative number", "_PASCAL_SQRT_ERROR")
-        self.pascalerrors[4] = PascalError("Error D.33: Cannot take ln() of number less than or equal to zero",
+        self.runtime_errors[0] = RuntimeError("Overflow error", "_PASCAL_OVERFLOW_ERROR", True)
+        self.runtime_errors[1] = RuntimeError("Error D.44 or D.45: Division by zero error", "_PASCAL_DIVZERO_ERROR")
+        self.runtime_errors[2] = RuntimeError("Error D.46: Divisor in Mod must be positive", "_PASCAL_MOD_ERROR")
+        self.runtime_errors[3] = RuntimeError("Error D.34: Cannot take sqrt() of negative number", "_PASCAL_SQRT_ERROR")
+        self.runtime_errors[4] = RuntimeError("Error D.33: Cannot take ln() of number less than or equal to zero",
                                            "_PASCAL_LN_ERROR")
-        self.pascalerrors[5] = PascalError("Error D.37: value to chr() exceeds 0-255 range for Char type",
+        self.runtime_errors[5] = RuntimeError("Error D.37: value to chr() exceeds 0-255 range for Char type",
                                            "_PASCAL_CHR_ERROR")
-        self.pascalerrors[6] = PascalError("Error D.38 or D.39: succ() or pred() exceeds range for enumerated type",
+        self.runtime_errors[6] = RuntimeError("Error D.38 or D.39: succ() or pred() exceeds range for enumerated type",
                                            "_PASCAL_SUCC_PRED_ERROR")
-        self.pascalerrors[7] = PascalError("Error: value exceeds range for subrange type", "_PASCAL_SUBRANGE_ERROR")
-        self.pascalerrors[8] = PascalError("Error: array index out of range.", "_PASCAL_ARRAYINDEX_ERROR")
-        self.pascalerrors[9] = PascalError("Error: dynamic memory allocation failed.", "_PASCAL_CALLOC_ERROR")
-        self.pascalerrors[10] = PascalError("Error: unable to de-allocate dynamic memory.", "_PASCAL_DISPOSE_ERROR")
+        self.runtime_errors[7] = RuntimeError("Error: value exceeds range for subrange type", "_PASCAL_SUBRANGE_ERROR")
+        self.runtime_errors[8] = RuntimeError("Error: array index out of range.", "_PASCAL_ARRAYINDEX_ERROR")
+        self.runtime_errors[9] = RuntimeError("Error: dynamic memory allocation failed.", "_PASCAL_CALLOC_ERROR")
+        self.runtime_errors[10] = RuntimeError("Error: unable to de-allocate dynamic memory.", "_PASCAL_DISPOSE_ERROR")
         # D.14 is referenced in compiler2_system_io.asm
-        self.pascalerrors[11] = PascalError("Error D.14: file not in inspection mode prior to get() or read().",
+        self.runtime_errors[11] = RuntimeError("Error D.14: file not in inspection mode prior to get() or read().",
                                             "_PASCAL_WRONGMODE_GET_ERROR", True)
         # D.16 is referenced in compiler2_system_io.asm
-        self.pascalerrors[12] = PascalError("Error D.16: EOF encountered during get() or read().",
+        self.runtime_errors[12] = RuntimeError("Error D.16: EOF encountered during get() or read().",
                                             "_PASCAL_EOF_GET_ERROR", True)
-        self.pascalerrors[13] = PascalError(
+        self.runtime_errors[13] = RuntimeError(
             "Error D.9: File not in generation mode prior to put(), write(), writeln(), or page().",
             "_PASCAL_FILENOTGENERATION_ERROR")
-        self.pascalerrors[14] = PascalError("Error D.14: File not in inspection mode prior to get() or read().",
+        self.runtime_errors[14] = RuntimeError("Error D.14: File not in inspection mode prior to get() or read().",
                                             "_PASCAL_FILENOTINSPECTION_ERROR")
-        self.pascalerrors[15] = PascalError("Error D.10 or D.15: File undefined prior to access.",
+        self.runtime_errors[15] = RuntimeError("Error D.10 or D.15: File undefined prior to access.",
                                             "_PASCAL_UNDEFINEDFILE_ERROR")
-        self.pascalerrors[16] = PascalError("Error: insufficient number of command-line arguments.",
+        self.runtime_errors[16] = RuntimeError("Error: insufficient number of command-line arguments.",
                                             "_PASCAL_INSUFFICIENT_ARGC_ERROR")
-        self.pascalerrors[17] = PascalError("Error opening file.", "_PASCAL_FOPEN_ERROR")
-        self.pascalerrors[18] = PascalError("Error D.48: Activation of function is undefined upon function completion.",
+        self.runtime_errors[17] = RuntimeError("Error opening file.", "_PASCAL_FOPEN_ERROR")
+        self.runtime_errors[18] = RuntimeError("Error D.48: Activation of function is undefined upon function completion.",
                                             "_PASCAL_NO_RETURN_VALUE_ERROR")
 
     def emit(self, s):
-        self.asmfile.write(s)
+        self.assembly_file.write(s)
 
     def emitln(self, s):
         self.emit(s + '\n')
@@ -268,9 +268,9 @@ class AssemblyGenerator:
         assert isinstance(errorlabel, str)
 
         foundit = False
-        for i in self.pascalerrors.keys():
-            if self.pascalerrors[i].label == errorlabel:
-                self.pascalerrors[i].is_used = True
+        for i in self.runtime_errors.keys():
+            if self.runtime_errors[i].label == errorlabel:
+                self.runtime_errors[i].is_used = True
                 foundit = True
                 break
         assert foundit  # if it's not a valid error code we have a typo
@@ -314,8 +314,8 @@ class AssemblyGenerator:
             self.emitcode("pop rcx")
 
     def getnextlabel(self):
-        ret = "_L" + str(self.maxlabelnum)
-        self.maxlabelnum += 1
+        ret = "_L" + str(self.maximum_label_number)
+        self.maximum_label_number += 1
         return ret
 
     def generate_externs(self):
@@ -339,11 +339,11 @@ class AssemblyGenerator:
     def generate_datasection(self):
         self.emitsection("data")
         self.emitcomment("error handling strings")
-        for i in self.pascalerrors.keys():
+        for i in self.runtime_errors.keys():
             # TODO - we could iterate over all the TACBlocks, identify which errors we will need, then change
             # emit_jumptoerror to test whether or not we're invoking an error that we have marked as used.  That
             # would reduce the binary size.
-            self.emitcode('_pascalerr_{} db `{}`, 0'.format(str(i), self.pascalerrors[i].error_string))
+            self.emitcode('_pascalerr_{} db `{}`, 0'.format(str(i), self.runtime_errors[i].error_string))
         self.emitcomment("support for write() commands")
         self.emitcode('_printf_intfmt db "%d",0')
         # TODO - this is not pascal-compliant, as should be fixed characters right-justified
@@ -358,9 +358,9 @@ class AssemblyGenerator:
         self.emitcode('_filemode_read db "r",0')
         self.emitcode('_filemode_readbinary db "rb",0')
 
-        if len(self.tacgenerator.global_literal_table) > 0:
+        if len(self.tac_generator.global_literal_table) > 0:
             nextid = 0
-            for lit in self.tacgenerator.global_literal_table:
+            for lit in self.tac_generator.global_literal_table:
                 if isinstance(lit, IntegerLiteral) or isinstance(lit, CharacterLiteral):
                     # these can be defined as part of the instruction where they are loaded
                     pass
@@ -438,7 +438,7 @@ class AssemblyGenerator:
                 # the array and provide the address of the copy.  In either case, we just move the
                 # parameter to the stack as-is.
                 numintparams += 1
-                paramreg = intparampos_to_register(numintparams)
+                paramreg = integer_parameter_position_to_register(numintparams)
                 if param.is_by_ref:
                     comment = "Copy address of variable array parameter {} to stack"
                 else:
@@ -447,7 +447,7 @@ class AssemblyGenerator:
                 self.emitcode("mov [{}], {}".format(localsym.memory_address, paramreg, comment))
             elif param.is_by_ref:
                 numintparams += 1
-                paramreg = intparampos_to_register(numintparams)
+                paramreg = integer_parameter_position_to_register(numintparams)
                 self.emitcode("mov [{}], {}".format(localsym.memory_address, paramreg),
                               "Copy variable parameter {} to stack".format(param.symbol.name))
             elif isinstance(param.symbol.pascal_type, pascaltypes.RealType):
@@ -459,7 +459,7 @@ class AssemblyGenerator:
             else:
                 # the param memory address is a register
                 numintparams += 1
-                paramreg = intparampos_to_register(numintparams)
+                paramreg = integer_parameter_position_to_register(numintparams)
                 regslice = get_register_slice_by_bytes(paramreg, param.symbol.pascal_type.size)
                 self.emitcode("mov [{}], {}".format(localsym.memory_address, regslice),
                               "Copy parameter {} to stack".format(param.symbol.name))
@@ -502,19 +502,19 @@ class AssemblyGenerator:
                 # value of the actual parameter on through, as that value is a memory address.
                 numintparams += 1
                 assert numintparams <= 6
-                reg = intparampos_to_register(numintparams)
+                reg = integer_parameter_position_to_register(numintparams)
                 self.emitcode("mov {}, [{}]".format(reg, actualparam.parameter_value.memory_address), comment)
             elif paramdef.is_by_ref and isinstance(paramdef.symbol.pascal_type, pascaltypes.ArrayType):
                 # arrays are already references, so just pass the value of the actual parameter
                 # on through, exactly same as the case above.
                 numintparams += 1
                 assert numintparams <= 6
-                reg = intparampos_to_register(numintparams)
+                reg = integer_parameter_position_to_register(numintparams)
                 self.emitcode("mov {}, [{}]".format(reg, actualparam.parameter_value.memory_address), comment)
             elif paramdef.is_by_ref:
                 numintparams += 1
                 assert numintparams <= 6
-                reg = intparampos_to_register(numintparams)  # we use all 64 bytes for pointers
+                reg = integer_parameter_position_to_register(numintparams)  # we use all 64 bytes for pointers
                 self.emitcode("LEA {}, [{}]".format(reg, actualparam.parameter_value.memory_address), comment)
             elif isinstance(paramdef.symbol.pascal_type, pascaltypes.ArrayType):
                 # need to create a copy of the array and pass that in.
@@ -536,7 +536,7 @@ class AssemblyGenerator:
 
                 numintparams += 1
                 assert numintparams <= 6
-                reg = intparampos_to_register(numintparams)
+                reg = integer_parameter_position_to_register(numintparams)
                 self.emitcode("MOV {}, RAX".format(reg))
                 self.emit_memcopy(reg, actualparam.parameter_value, paramdef.symbol.pascal_type.size,
                                   "", True)
@@ -547,7 +547,7 @@ class AssemblyGenerator:
                     isinstance(paramdef.symbol.pascal_type, pascaltypes.EnumeratedType):
                 numintparams += 1
                 assert numintparams <= 6  # TODO - remove when we can handle more
-                fullreg = intparampos_to_register(numintparams)
+                fullreg = integer_parameter_position_to_register(numintparams)
                 reg = get_register_slice_by_bytes(fullreg, paramdef.symbol.pascal_type.size)
                 self.emit_movtoregister_fromstackorliteral(reg, actualparam.parameter_value, comment)
             elif isinstance(paramdef.symbol.pascal_type, pascaltypes.RealType):
@@ -565,7 +565,7 @@ class AssemblyGenerator:
         self.emitcode("call {}".format(node.label), "call {}()".format(node.function_name))
         if act_symbol.result_type is not None:
             # Need to insert code for the runtime error for function with undefined return_value
-            self.pascalerrors[18].is_used = True
+            self.runtime_errors[18].is_used = True
 
             # return value is now in either RAX or XMM0 - need to store it in right place
             comment = "assign return value of function to {}".format(node.left_value.name)
@@ -585,12 +585,12 @@ class AssemblyGenerator:
                 self.emitcode("CALL _PASCAL_DISPOSE_MEMORY")
 
     def generate_filevariable_statevalidationcode(self, filesym, state):
-        global FILESTATE_GENERATION
-        global FILESTATE_INSPECTION
-        global FILESTATE_NOTINITIALIZED
+        global FILE_STATE_GENERATION
+        global FILE_STATE_INSPECTION
+        global FILE_STATE_NOT_INITIALIZED
         assert isinstance(filesym, Symbol)
         assert isinstance(filesym.pascal_type, pascaltypes.FileType)
-        assert state in (FILESTATE_GENERATION, FILESTATE_INSPECTION)
+        assert state in (FILE_STATE_GENERATION, FILE_STATE_INSPECTION)
 
         # current state of the file is in the 9th byte after the location of the file
         self.emitcode("lea rax, [{}]".format(filesym.memory_address), "validate file state")
@@ -599,7 +599,7 @@ class AssemblyGenerator:
         self.emitcode("test r11b, r11b")
         self.emit_jumptoerror("jz", "_PASCAL_UNDEFINEDFILE_ERROR")
         self.emitcode("cmp r11b, {}".format(str(state)))
-        if state == FILESTATE_GENERATION:
+        if state == FILE_STATE_GENERATION:
             self.emit_jumptoerror("jne", "_PASCAL_FILENOTGENERATION_ERROR")
         else:
             self.emit_jumptoerror("jne", "_PASCAL_FILENOTINSPECTION_ERROR")
@@ -611,8 +611,8 @@ class AssemblyGenerator:
 
         symlist = []
 
-        for symname in self.tacgenerator.global_symbol_table.symbols.keys():
-            sym = self.tacgenerator.global_symbol_table.fetch(symname)
+        for symname in self.tac_generator.global_symbol_table.symbols.keys():
+            sym = self.tac_generator.global_symbol_table.fetch(symname)
             if isinstance(sym, ProgramParameterSymbol) and sym.name not in ("input", "output"):
                 symlist.append((sym.position, sym.filename_memory_address, sym.name))
 
@@ -627,19 +627,19 @@ class AssemblyGenerator:
 
     def generate_globalfile_initializationcode(self):
         # set up stdin and stdout if needed
-        for symname in self.tacgenerator.global_symbol_table.symbols.keys():
-            sym = self.tacgenerator.global_symbol_table.fetch(symname)
+        for symname in self.tac_generator.global_symbol_table.symbols.keys():
+            sym = self.tac_generator.global_symbol_table.fetch(symname)
             if isinstance(sym, ProgramParameterSymbol):
 
                 if sym.name == "output":
                     stdinout = "stdout"
-                    start_filestate = FILESTATE_GENERATION
+                    start_filestate = FILE_STATE_GENERATION
                 elif sym.name == "input":
                     stdinout = "stdin"
-                    start_filestate = FILESTATE_INSPECTION
+                    start_filestate = FILE_STATE_INSPECTION
                 else:
                     stdinout = ""
-                    start_filestate = FILESTATE_NOTINITIALIZED
+                    start_filestate = FILE_STATE_NOT_INITIALIZED
 
                 if sym.name in ("input", "output"):
                     comment = "initialize global textfile variable '{}'".format(sym.name)
@@ -656,7 +656,7 @@ class AssemblyGenerator:
     def generate_code(self):
         params = []  # this is a stack of parameters
 
-        for block in self.tacgenerator.tac_blocks_list:
+        for block in self.tac_generator.tac_blocks_list:
             assert isinstance(block, TACBlock)
 
             if block.is_main:
@@ -712,8 +712,8 @@ class AssemblyGenerator:
                     if self.used_x87_code:
                         self.emitcode("finit")
                     # need to init any global variables that are arrays
-                    for symname in self.tacgenerator.global_symbol_table.symbols.keys():
-                        sym = self.tacgenerator.global_symbol_table.fetch(symname)
+                    for symname in self.tac_generator.global_symbol_table.symbols.keys():
+                        sym = self.tac_generator.global_symbol_table.fetch(symname)
                         if isinstance(sym, Symbol) and isinstance(sym.pascal_type, pascaltypes.ArrayType):
                             self.generate_array_variable_memory_allocation_code(sym)
 
@@ -816,13 +816,13 @@ class AssemblyGenerator:
                 elif isinstance(node, TACUnaryLiteralNode):
                     if isinstance(node.literal, StringLiteral):
                         # dealing with PEP8 line length
-                        glt = self.tacgenerator.global_literal_table
+                        glt = self.tac_generator.global_literal_table
                         litaddress = glt.fetch(node.literal.value, pascaltypes.StringLiteralType()).memory_address
                         comment = "Move literal '{}' into {}".format(node.literal.value, node.left_value.name)
                         self.emitcode("lea rax, [rel {}]".format(litaddress), comment)
                         self.emit_movtostack_fromregister(node.left_value, "rax")
                     elif isinstance(node.literal, RealLiteral):
-                        glt = self.tacgenerator.global_literal_table
+                        glt = self.tac_generator.global_literal_table
                         litaddress = glt.fetch(node.literal.value, pascaltypes.RealType()).memory_address
                         comment = "Move literal {} into {}".format(node.literal.value, node.left_value.name)
                         self.emitcode("movsd xmm0, [rel {}]".format(litaddress), comment)
@@ -868,7 +868,7 @@ class AssemblyGenerator:
                     if node.label.name[:6] == "_WRITE":
                         if node.label.name == "_WRITE_LINE_FEED":
                             outfilesym = params[-1].parameter_value
-                            self.generate_filevariable_statevalidationcode(outfilesym, FILESTATE_GENERATION)
+                            self.generate_filevariable_statevalidationcode(outfilesym, FILE_STATE_GENERATION)
                             assert node.number_of_parameters == 1
                             self.emitcode("mov rdi, [{}]".format(outfilesym.memory_address))
                             self.emitcode("lea rsi, [rel _printf_newln]")
@@ -881,7 +881,7 @@ class AssemblyGenerator:
                         else:
                             assert node.number_of_parameters == 2
                             outfilesym = params[-2].parameter_value
-                            self.generate_filevariable_statevalidationcode(outfilesym, FILESTATE_GENERATION)
+                            self.generate_filevariable_statevalidationcode(outfilesym, FILE_STATE_GENERATION)
                             outparamsym = params[-1].parameter_value
                             if node.label.name == "_WRITE_INTEGER":
                                 self.emitcode("mov rdi, [{}]".format(outfilesym.memory_address))
@@ -965,7 +965,7 @@ class AssemblyGenerator:
                         self.emitcode("lea r11, [{}]".format(outfilesym.memory_address))
                         self.emitcode("mov [r11], rax")
                         self.emitcode("add r11, 8")
-                        self.emitcode("mov [r11], byte {}".format(FILESTATE_GENERATION))
+                        self.emitcode("mov [r11], byte {}".format(FILE_STATE_GENERATION))
                         del params[-1]
                     elif node.label.name == "_SQRT_REAL":
                         comment = "parameter {} for sqrt()".format(str(params[-1].parameter_value))
@@ -1433,8 +1433,8 @@ class AssemblyGenerator:
             if block.is_main:
                 # deallocate global arrays
                 # TODO: refactor this loop to be something like "get global array symbols" or something
-                for symname in self.tacgenerator.global_symbol_table.symbols.keys():
-                    sym = self.tacgenerator.global_symbol_table.fetch(symname)
+                for symname in self.tac_generator.global_symbol_table.symbols.keys():
+                    sym = self.tac_generator.global_symbol_table.fetch(symname)
                     if isinstance(sym, Symbol) and isinstance(sym.pascal_type, pascaltypes.ArrayType):
                         self.emitcode("mov rdi, [{}]".format(sym.memory_address),
                                       "Free memory for global array {}".format(symname))
@@ -1481,11 +1481,11 @@ class AssemblyGenerator:
             self.emitcode("ret")
 
     def generate_errorhandlingcode(self):
-        for i in self.pascalerrors.keys():
-            if self.pascalerrors[i].is_used:
-                self.emitlabel(self.pascalerrors[i].label)
+        for i in self.runtime_errors.keys():
+            if self.runtime_errors[i].is_used:
+                self.emitlabel(self.runtime_errors[i].label)
                 self.emitcode("lea rsi, [rel _pascalerr_{}]".format(str(i)))
-                self.emitcode("mov rdx, {}".format(len(self.pascalerrors[i].error_string)))
+                self.emitcode("mov rdx, {}".format(len(self.runtime_errors[i].error_string)))
                 self.emitcode("jmp _PASCAL_PRINT_ERROR")
 
         self.emitlabel("_PASCAL_PRINT_ERROR")
@@ -1525,11 +1525,11 @@ class AssemblyGenerator:
         self.emitsection("note.GNU-stack noalloc noexec nowrite progbits")
 
     def generate_bsssection(self):
-        if len(self.tacgenerator.global_symbol_table.symbols.keys()) > 0:
+        if len(self.tac_generator.global_symbol_table.symbols.keys()) > 0:
             self.emitsection("bss")
             varseq = 0
-            for symname in self.tacgenerator.global_symbol_table.symbols.keys():
-                sym = self.tacgenerator.global_symbol_table.fetch(symname)
+            for symname in self.tac_generator.global_symbol_table.symbols.keys():
+                sym = self.tac_generator.global_symbol_table.fetch(symname)
                 if isinstance(sym, Symbol) and not isinstance(sym, ActivationSymbol):
                     if isinstance(sym, ProgramParameterSymbol):
                         if sym.name not in ("input", "output"):
@@ -1554,8 +1554,8 @@ class AssemblyGenerator:
         self.generate_bsssection()
         self.generate_datasection()
         self.generate_textsection()
-        self.asmfile.close()
+        self.assembly_file.close()
         os.system("nasm -f elf64 -F dwarf -g -o compiler2_system_io.o compiler2_system_io.asm")
         os.system("nasm -f elf64 -F dwarf -g -o compiler2_stringcompare.o compiler2_stringcompare.asm")
-        os.system("nasm -f elf64 -F dwarf -g -o {} {}".format(objfilename, self.asmfilename))
+        os.system("nasm -f elf64 -F dwarf -g -o {} {}".format(objfilename, self.assembly_file_name))
         os.system("gcc {} -o {} compiler2_system_io.o compiler2_stringcompare.o".format(objfilename, exefilename))
