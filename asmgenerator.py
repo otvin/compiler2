@@ -26,7 +26,7 @@ FILE_STATE_GENERATION = 1
 FILE_STATE_INSPECTION = 2
 
 
-class RuntimeError:
+class PascalRuntimeError:
     def __init__(self, error_string, label, is_used=False):
         # we will only write the error information to the .asm file if it is invoked someplace
         assert isinstance(error_string, str)
@@ -110,7 +110,7 @@ class AssemblyGenerator:
         self.assembly_file = open(assembly_file_name, 'w')
         self.tac_generator = tac_generator
         self.maximum_label_number = 0
-        self.runtime_errors = {}
+        self.runtime_errors = []
         self.init_runtime_errors()
         self.used_x87_code = False
         self.used_calloc = False
@@ -119,38 +119,38 @@ class AssemblyGenerator:
     def init_runtime_errors(self):
 
         # Overflow error is referenced in compiler2_system_io.asm and compiler2_stringcompare.asm
-        self.runtime_errors[0] = RuntimeError("Overflow error", "_PASCAL_OVERFLOW_ERROR", True)
-        self.runtime_errors[1] = RuntimeError("Error D.44 or D.45: Division by zero error", "_PASCAL_DIVZERO_ERROR")
-        self.runtime_errors[2] = RuntimeError("Error D.46: Divisor in Mod must be positive", "_PASCAL_MOD_ERROR")
-        self.runtime_errors[3] = RuntimeError("Error D.34: Cannot take sqrt() of negative number", "_PASCAL_SQRT_ERROR")
-        self.runtime_errors[4] = RuntimeError("Error D.33: Cannot take ln() of number less than or equal to zero",
-                                           "_PASCAL_LN_ERROR")
-        self.runtime_errors[5] = RuntimeError("Error D.37: value to chr() exceeds 0-255 range for Char type",
-                                           "_PASCAL_CHR_ERROR")
-        self.runtime_errors[6] = RuntimeError("Error D.38 or D.39: succ() or pred() exceeds range for enumerated type",
-                                           "_PASCAL_SUCC_PRED_ERROR")
-        self.runtime_errors[7] = RuntimeError("Error: value exceeds range for subrange type", "_PASCAL_SUBRANGE_ERROR")
-        self.runtime_errors[8] = RuntimeError("Error: array index out of range.", "_PASCAL_ARRAYINDEX_ERROR")
-        self.runtime_errors[9] = RuntimeError("Error: dynamic memory allocation failed.", "_PASCAL_CALLOC_ERROR")
-        self.runtime_errors[10] = RuntimeError("Error: unable to de-allocate dynamic memory.", "_PASCAL_DISPOSE_ERROR")
+        self.runtime_errors.append(PascalRuntimeError("Overflow error", "_PASCAL_OVERFLOW_ERROR", True))
+        self.runtime_errors.append(PascalRuntimeError("Error D.44 or D.45: Division by zero error", "_PASCAL_DIVZERO_ERROR"))
+        self.runtime_errors.append(PascalRuntimeError("Error D.46: Divisor in Mod must be positive", "_PASCAL_MOD_ERROR"))
+        self.runtime_errors.append(PascalRuntimeError("Error D.34: Cannot take sqrt() of negative number", "_PASCAL_SQRT_ERROR"))
+        self.runtime_errors.append(PascalRuntimeError("Error D.33: Cannot take ln() of number less than or equal to zero",
+                                           "_PASCAL_LN_ERROR"))
+        self.runtime_errors.append(PascalRuntimeError("Error D.37: value to chr() exceeds 0-255 range for Char type",
+                                           "_PASCAL_CHR_ERROR"))
+        self.runtime_errors.append(PascalRuntimeError("Error D.38 or D.39: succ() or pred() exceeds range for enumerated type",
+                                           "_PASCAL_SUCC_PRED_ERROR"))
+        self.runtime_errors.append(PascalRuntimeError("Error: value exceeds range for subrange type", "_PASCAL_SUBRANGE_ERROR"))
+        self.runtime_errors.append(PascalRuntimeError("Error: array index out of range.", "_PASCAL_ARRAYINDEX_ERROR"))
+        self.runtime_errors.append(PascalRuntimeError("Error: dynamic memory allocation failed.", "_PASCAL_CALLOC_ERROR"))
+        self.runtime_errors.append(PascalRuntimeError("Error: unable to de-allocate dynamic memory.", "_PASCAL_DISPOSE_ERROR"))
         # D.14 is referenced in compiler2_system_io.asm
-        self.runtime_errors[11] = RuntimeError("Error D.14: file not in inspection mode prior to get() or read().",
-                                            "_PASCAL_WRONGMODE_GET_ERROR", True)
+        self.runtime_errors.append(PascalRuntimeError("Error D.14: file not in inspection mode prior to get() or read().",
+                                            "_PASCAL_WRONGMODE_GET_ERROR", True))
         # D.16 is referenced in compiler2_system_io.asm
-        self.runtime_errors[12] = RuntimeError("Error D.16: EOF encountered during get() or read().",
-                                            "_PASCAL_EOF_GET_ERROR", True)
-        self.runtime_errors[13] = RuntimeError(
+        self.runtime_errors.append(PascalRuntimeError("Error D.16: EOF encountered during get() or read().",
+                                            "_PASCAL_EOF_GET_ERROR", True))
+        self.runtime_errors.append(PascalRuntimeError(
             "Error D.9: File not in generation mode prior to put(), write(), writeln(), or page().",
-            "_PASCAL_FILENOTGENERATION_ERROR")
-        self.runtime_errors[14] = RuntimeError("Error D.14: File not in inspection mode prior to get() or read().",
-                                            "_PASCAL_FILENOTINSPECTION_ERROR")
-        self.runtime_errors[15] = RuntimeError("Error D.10 or D.15: File undefined prior to access.",
-                                            "_PASCAL_UNDEFINEDFILE_ERROR")
-        self.runtime_errors[16] = RuntimeError("Error: insufficient number of command-line arguments.",
-                                            "_PASCAL_INSUFFICIENT_ARGC_ERROR")
-        self.runtime_errors[17] = RuntimeError("Error opening file.", "_PASCAL_FOPEN_ERROR")
-        self.runtime_errors[18] = RuntimeError("Error D.48: Activation of function is undefined upon function completion.",
-                                            "_PASCAL_NO_RETURN_VALUE_ERROR")
+            "_PASCAL_FILENOTGENERATION_ERROR"))
+        self.runtime_errors.append(PascalRuntimeError("Error D.14: File not in inspection mode prior to get() or read().",
+                                            "_PASCAL_FILENOTINSPECTION_ERROR"))
+        self.runtime_errors.append(PascalRuntimeError("Error D.10 or D.15: File undefined prior to access.",
+                                            "_PASCAL_UNDEFINEDFILE_ERROR"))
+        self.runtime_errors.append(PascalRuntimeError("Error: insufficient number of command-line arguments.",
+                                            "_PASCAL_INSUFFICIENT_ARGC_ERROR"))
+        self.runtime_errors.append(PascalRuntimeError("Error opening file.", "_PASCAL_FOPEN_ERROR"))
+        self.runtime_errors.append(PascalRuntimeError("Error D.48: Activation of function is undefined upon function completion.",
+                                            "_PASCAL_NO_RETURN_VALUE_ERROR"))
 
     def emit(self, s):
         self.assembly_file.write(s)
@@ -268,9 +268,9 @@ class AssemblyGenerator:
         assert isinstance(errorlabel, str)
 
         foundit = False
-        for i in self.runtime_errors.keys():
-            if self.runtime_errors[i].label == errorlabel:
-                self.runtime_errors[i].is_used = True
+        for runtime_error in self.runtime_errors:
+            if runtime_error.label == errorlabel:
+                runtime_error.is_used = True
                 foundit = True
                 break
         assert foundit  # if it's not a valid error code we have a typo
@@ -339,11 +339,11 @@ class AssemblyGenerator:
     def generate_datasection(self):
         self.emitsection("data")
         self.emitcomment("error handling strings")
-        for i in self.runtime_errors.keys():
+        for runtime_error in self.runtime_errors:
             # TODO - we could iterate over all the TACBlocks, identify which errors we will need, then change
             # emit_jumptoerror to test whether or not we're invoking an error that we have marked as used.  That
             # would reduce the binary size.
-            self.emitcode('_pascalerr_{} db `{}`, 0'.format(str(i), self.runtime_errors[i].error_string))
+            self.emitcode('_pascalerr_{} db `{}`, 0'.format(str(self.runtime_errors.index(runtime_error)), runtime_error.error_string))
         self.emitcomment("support for write() commands")
         self.emitcode('_printf_intfmt db "%d",0')
         # TODO - this is not pascal-compliant, as should be fixed characters right-justified
@@ -1481,11 +1481,11 @@ class AssemblyGenerator:
             self.emitcode("ret")
 
     def generate_errorhandlingcode(self):
-        for i in self.runtime_errors.keys():
-            if self.runtime_errors[i].is_used:
-                self.emitlabel(self.runtime_errors[i].label)
-                self.emitcode("lea rsi, [rel _pascalerr_{}]".format(str(i)))
-                self.emitcode("mov rdx, {}".format(len(self.runtime_errors[i].error_string)))
+        for runtime_error in self.runtime_errors:
+            if runtime_error.is_used:
+                self.emitlabel(runtime_error.label)
+                self.emitcode("lea rsi, [rel _pascalerr_{}]".format(str(self.runtime_errors.index(runtime_error))))
+                self.emitcode("mov rdx, {}".format(len(runtime_error.error_string)))
                 self.emitcode("jmp _PASCAL_PRINT_ERROR")
 
         self.emitlabel("_PASCAL_PRINT_ERROR")
