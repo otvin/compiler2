@@ -180,24 +180,24 @@ class AssemblyGenerator:
             tab_str = "\t" * num_tabs
             self.emit_line('\t' + s + tab_str + ';' + comment)
 
-    def emit_label(self, labelname, comment=None):
+    def emit_label(self, label_name, comment=None):
         if comment is None:
-            self.emit_line(labelname + ":")
+            self.emit_line(label_name + ":")
         else:
-            num_tabs = NUM_TABS_FOR_COMMENT - (len(labelname) // NUM_SPACES_IN_TAB)
+            num_tabs = NUM_TABS_FOR_COMMENT - (len(label_name) // NUM_SPACES_IN_TAB)
             if num_tabs < 0:  # pragma: no cover
                 num_tabs = 0
             tab_str = "\t" * num_tabs
-            self.emit_line(labelname + ':' + tab_str + ';' + comment)
+            self.emit_line(label_name + ':' + tab_str + ';' + comment)
 
-    def emit_section(self, sectionname):
-        self.emit_line("section .{}".format(sectionname))
+    def emit_section(self, section_name):
+        self.emit_line("section .{}".format(section_name))
 
-    def emit_comment(self, commentstr, indented=False):
+    def emit_comment(self, comment_str, indented=False):
         tab_str = ""
         if indented:
             tab_str = "\t" * NUM_TABS_FOR_COMMENT
-        self.emit_line("{}; {}".format(tab_str, commentstr))
+        self.emit_line("{}; {}".format(tab_str, comment_str))
 
     def emit_push_xmm_register(self, reg):
         self.emit_code("SUB RSP, 16", "PUSH " + reg)
@@ -332,7 +332,7 @@ class AssemblyGenerator:
         self.maximum_label_number += 1
         return return_label
 
-    def generate_externs(self):
+    def generate_extern_references(self):
         self.emit_code("extern fprintf")
         self.emit_code("extern fopen")
         self.emit_code("extern freopen")
@@ -357,19 +357,19 @@ class AssemblyGenerator:
             # TODO - we could iterate over all the TACBlocks, identify which errors we will need, then change
             # emit_jump_to_error to test whether or not we're invoking an error that we have marked as used.  That
             # would reduce the binary size.
-            self.emit_code('_pascalerr_{} db `{}`, 0'.format(str(self.runtime_errors.index(runtime_error)),
-                                                             runtime_error.error_string))
+            self.emit_code('_pascal_error_{} db `{}`, 0'.format(str(self.runtime_errors.index(runtime_error)),
+                                                                runtime_error.error_string))
         self.emit_comment("support for write() commands")
         self.emit_code('_printf_integer_format db "%d",0')
         # TODO - this is not pascal-compliant, as should be fixed characters right-justified
         # but is better than the C default of 6 digits to the right of the decimal.
         self.emit_code('_printf_real_format db "%.12f",0')
-        self.emit_code('_printf_newln db 10,0')
+        self.emit_code('_printf_line_feed db 10,0')
         self.emit_code('_printf_true db "TRUE",0')
         self.emit_code('_printf_false db "FALSE",0')
 
         self.emit_code('_filemode_write db "w",0')
-        self.emit_code('_filemode_writebinary db "wb",0')
+        self.emit_code('_filemode_write_binary db "wb",0')
         self.emit_code('_filemode_read db "r",0')
         self.emit_code('_filemode_readbinary db "rb",0')
 
@@ -380,7 +380,7 @@ class AssemblyGenerator:
                     # these can be defined as part of the instruction where they are loaded
                     pass
                 elif isinstance(literal, StringLiteral):
-                    literal_name = 'stringlit_{}'.format(next_id)
+                    literal_name = 'string_literal_{}'.format(next_id)
                     next_id += 1
                     if len(literal.value) > 255:
                         error_str = compiler_error_str(
@@ -390,7 +390,7 @@ class AssemblyGenerator:
                     self.emit_code("{} db `{}`, 0".format(literal_name, literal.value.replace('`', '\\`')))
                     literal.memory_address = literal_name
                 elif isinstance(literal, RealLiteral):
-                    literal_name = 'reallit_{}'.format(next_id)
+                    literal_name = 'real_literal_{}'.format(next_id)
                     next_id += 1
                     self.emit_code("{} dq {}".format(literal_name, literal.value))
                     literal.memory_address = literal_name
@@ -450,7 +450,7 @@ class AssemblyGenerator:
             # TODO - this will break when we have so many parameters that they will get
             # passed on the stack instead of in a register.
             if isinstance(parameter.symbol.pascal_type, pascaltypes.ArrayType):
-                # array parameters are always the address of the array.  If it is byref, the caller
+                # array parameters are always the address of the array.  If it is by ref, the caller
                 # will pass in the address of the original array.  If it is byval, the caller will copy
                 # the array and provide the address of the copy.  In either case, we just move the
                 # parameter to the stack as-is.
@@ -694,7 +694,7 @@ class AssemblyGenerator:
             for symbol in block.symbol_table.symbols.values():
                 if isinstance(symbol, Symbol):
                     if symbol.memory_address is None:
-                        # to ensure stack alignment, we subract 8 bytes from the stack even if we're putting in
+                        # to ensure stack alignment, we subtract 8 bytes from the stack even if we're putting in
                         # a 1, 2, or 4 byte value.
                         total_storage_needed_bytes += 8
                         symbol.memory_address = "RBP-{}".format(str(total_storage_needed_bytes))
@@ -898,7 +898,7 @@ class AssemblyGenerator:
                                                                                   FILE_STATE_GENERATION)
                             assert node.number_of_parameters == 1
                             self.emit_code("mov rdi, [{}]".format(output_file_symbol.memory_address))
-                            self.emit_code("lea rsi, [rel _printf_newln]")
+                            self.emit_code("lea rsi, [rel _printf_line_feed]")
                             self.emit_code("mov rax, 0")
                             self.emit_code("call fprintf wrt ..plt")
                             self.emit_code("XOR RDI, RDI", "Flush standard output when we do a writeln")
@@ -1009,7 +1009,7 @@ class AssemblyGenerator:
                         self.emit_jump_to_error("jb", "_PASCAL_SQRT_ERROR")
                         self.emit_code("sqrtsd xmm0, xmm0", 'sqrt()')
                         comment = "assign return value of function to {}".format(node.left_value.name)
-                        # Currently all the system functions use a temporary, which I know is not byref.
+                        # Currently all the system functions use a temporary, which I know is not by ref.
                         # So, technically it would be quicker to do this:
                         # self.emit_code("MOVSD [{}], XMM0".format(node.left_value.memory_address), comment)
                         # however, to future-proof this for optimizations, I'll use the move_to_stack() functions
@@ -1121,7 +1121,7 @@ class AssemblyGenerator:
                         self.emit_move_to_stack_from_xmm_register(node.left_value, "XMM0", comment)
                     elif node.label.name == "_ABS_INTEGER":
                         # There is no X86 ABS() call.  There is a slow way where you test the value, compare to zero
-                        # then if it's >= than zero jump ahead, and if it's less than zero, negate it.  Jumps make
+                        # then if it's >= than zero jump ahead, and if it's less than zero, negate it.  Jumping makes
                         # code execution very slow.  This is the way CLang 7.0 handles abs() with -O3 enabled
                         comment = "parameter {} for abs()".format(str(parameter_stack[-1].parameter_value))
                         self.emit_move_to_register_from_stack_or_literal("eax", parameter_stack[-1].parameter_value,
@@ -1428,17 +1428,17 @@ class AssemblyGenerator:
                                 # Boolean and Integer share same jump instructions, and strings
                                 # are set up to do an integer comparison by this point
                                 if node.operator == TACOperator.EQUALS:
-                                    jumpinstr = "JE"
+                                    jump_instruction = "JE"
                                 elif node.operator == TACOperator.NOT_EQUAL:
-                                    jumpinstr = "JNE"
+                                    jump_instruction = "JNE"
                                 elif node.operator == TACOperator.GREATER:
-                                    jumpinstr = "JG"
+                                    jump_instruction = "JG"
                                 elif node.operator == TACOperator.GREATER_EQUAL:
-                                    jumpinstr = "JGE"
+                                    jump_instruction = "JGE"
                                 elif node.operator == TACOperator.LESS:
-                                    jumpinstr = "JL"
+                                    jump_instruction = "JL"
                                 elif node.operator == TACOperator.LESS_EQUAL:
-                                    jumpinstr = "JLE"
+                                    jump_instruction = "JLE"
                                 else:  # pragma: no cover
                                     raise ASMGeneratorError("Invalid Relational Operator {}".format(node.operator))
                             else:
@@ -1447,23 +1447,23 @@ class AssemblyGenerator:
                                        isinstance(n1type, pascaltypes.EnumeratedType) or \
                                        isinstance(n1type, pascaltypes.SubrangeType)
                                 if node.operator == TACOperator.EQUALS:
-                                    jumpinstr = "JE"
+                                    jump_instruction = "JE"
                                 elif node.operator == TACOperator.NOT_EQUAL:
-                                    jumpinstr = "JNE"
+                                    jump_instruction = "JNE"
                                 elif node.operator == TACOperator.GREATER:
-                                    jumpinstr = "JA"
+                                    jump_instruction = "JA"
                                 elif node.operator == TACOperator.GREATER_EQUAL:
-                                    jumpinstr = "JAE"
+                                    jump_instruction = "JAE"
                                 elif node.operator == TACOperator.LESS:
-                                    jumpinstr = "JB"
+                                    jump_instruction = "JB"
                                 elif node.operator == TACOperator.LESS_EQUAL:
-                                    jumpinstr = "JBE"
+                                    jump_instruction = "JBE"
                                 else:  # pragma: no cover
                                     raise ASMGeneratorError("Invalid Relational Operator {}".format(node.operator))
 
                             true_label = self.get_next_label()
                             done_label = self.get_next_label()
-                            self.emit_code("{} {}".format(jumpinstr, true_label))
+                            self.emit_code("{} {}".format(jump_instruction, true_label))
                             self.emit_code("mov al, 0")
                             self.emit_code("jmp {}".format(done_label))
                             self.emit_label(true_label)
@@ -1510,7 +1510,7 @@ class AssemblyGenerator:
             self.emit_comment("returns pointer to memory in RAX.")
             # just a passthrough for CALLOC
             # yes, calloc() initializes memory and Pascal is not supposed to do so, but calloc() is safer
-            # in that it tests for an overflow when you multiply nmemb * size whereas malloc() does not.
+            # in that it tests for an overflow when you multiply number of members * size whereas malloc() does not.
             self.emit_code("call calloc wrt ..plt")
             self.emit_code("test rax, rax")
             self.emit_jump_to_error("jle", "_PASCAL_CALLOC_ERROR")
@@ -1528,7 +1528,7 @@ class AssemblyGenerator:
         for runtime_error in self.runtime_errors:
             if runtime_error.is_used:
                 self.emit_label(runtime_error.label)
-                self.emit_code("lea rsi, [rel _pascalerr_{}]".format(str(self.runtime_errors.index(runtime_error))))
+                self.emit_code("lea rsi, [rel _pascal_error_{}]".format(str(self.runtime_errors.index(runtime_error))))
                 self.emit_code("mov rdx, {}".format(len(runtime_error.error_string)))
                 self.emit_code("jmp _PASCAL_PRINT_ERROR")
 
@@ -1568,7 +1568,7 @@ class AssemblyGenerator:
         # notify the linker that we do not need an executable stack
         self.emit_section("note.GNU-stack noalloc noexec nowrite progbits")
 
-    def generate_bsssection(self):
+    def generate_bss_section(self):
         if len(self.tac_generator.global_symbol_table.symbols.keys()) > 0:
             self.emit_section("bss")
             global_variable_label_sequence = 0
@@ -1577,12 +1577,12 @@ class AssemblyGenerator:
                 if isinstance(symbol, Symbol) and not isinstance(symbol, ActivationSymbol):
                     if isinstance(symbol, ProgramParameterSymbol):
                         if symbol.name not in ("input", "output"):
-                            label2 = "_globalvar_{}_filenameptr".format(symbol.name)
+                            label2 = "_global_variable_{}_file_name_pointer".format(symbol.name)
                             symbol.filename_memory_address = "rel {}".format(label2)
                             self.emit_code("{} resb {}".format(label2, 8), "holds pointer to command-line arg")
-                        label = "_globalvar_{}".format(symbol.name)
+                        label = "_global_variable_{}".format(symbol.name)
                     else:
-                        label = "_globalvar_{}".format(str(global_variable_label_sequence))
+                        label = "_global_variable_{}".format(str(global_variable_label_sequence))
                         global_variable_label_sequence += 1
                     symbol.memory_address = "rel {}".format(label)
                     if isinstance(symbol.pascal_type, pascaltypes.ArrayType):
@@ -1593,9 +1593,9 @@ class AssemblyGenerator:
                                        "global variable {}".format(symbol_name))
 
     def generate(self, object_file_name, executable_file_name):
-        self.generate_externs()
+        self.generate_extern_references()
         self.generate_gnu_stack_section()
-        self.generate_bsssection()
+        self.generate_bss_section()
         self.generate_data_section()
         self.generate_text_section()
         self.assembly_file.close()
