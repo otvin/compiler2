@@ -26,8 +26,8 @@ def do_conform():
         stdoutfilename = "tests/BSI-validation-suite/CONFORM/" + test + ".testoutput"
 
         try:
-            t = compiler.compile(pascal_filename, asmfilename=asmfilename, objfilename=objfilename,
-                                 exefilename=exefilename)
+            t = compiler.do_compile(pascal_filename, assembly_file_name=asmfilename, object_file_name=objfilename,
+                                    executable_file_name=exefilename)
             if os.path.exists(exefilename):
                 exestr = "./{} > {}".format(exefilename, stdoutfilename)
                 os.system(exestr)
