@@ -20,35 +20,36 @@ def do_conform():
 
     for test in testlist:
         pascal_filename = "tests/BSI-validation-suite/CONFORM/" + test + ".pas"
-        asmfilename = "tests/BSI-validation-suite/CONFORM/" + test + ".asm"
-        objfilename = "tests/BSI-validation-suite/CONFORM/" + test + ".o"
-        exefilename = "tests/BSI-validation-suite/CONFORM/" + test
-        stdoutfilename = "tests/BSI-validation-suite/CONFORM/" + test + ".testoutput"
+        assembly_file_name = "tests/BSI-validation-suite/CONFORM/" + test + ".asm"
+        object_file_name = "tests/BSI-validation-suite/CONFORM/" + test + ".o"
+        executable_file_name = "tests/BSI-validation-suite/CONFORM/" + test
+        stdout_file_name = "tests/BSI-validation-suite/CONFORM/" + test + ".testoutput"
 
         try:
-            t = compiler.do_compile(pascal_filename, assembly_file_name=asmfilename, object_file_name=objfilename,
-                                    executable_file_name=exefilename)
-            if os.path.exists(exefilename):
-                exestr = "./{} > {}".format(exefilename, stdoutfilename)
-                os.system(exestr)
-                stdoutfile = open(stdoutfilename, "r")
-                testresult = stdoutfile.read()
-                stdoutfile.close()
+            t = compiler.do_compile(pascal_filename, assembly_file_name=assembly_file_name,
+                                    object_file_name=object_file_name,
+                                    executable_file_name=executable_file_name)
+            if os.path.exists(executable_file_name):
+                executable_string = "./{} > {}".format(executable_file_name, stdout_file_name)
+                os.system(executable_string)
+                stdout_file = open(stdout_file_name, "r")
+                test_result = stdout_file.read()
+                stdout_file.close()
 
-                if pascal_filename[-11:] == "CONF024.pas" and testresult == "":
-                    testresult = " PASS...6.8.2.1 (CONF024)"
-                if testresult[:5] == " PASS":
-                    print(testresult[1:])
+                if pascal_filename[-11:] == "CONF024.pas" and test_result == "":
+                    test_result = " PASS...6.8.2.1 (CONF024)"
+                if test_result[:5] == " PASS":
+                    print(test_result[1:])
                     num_successes += 1
-                    os.system("rm {}".format(asmfilename))
-                    os.system("rm {}".format(objfilename))
-                    os.system("rm {}".format(exefilename))
-                    os.system("rm {}".format(stdoutfilename))
-                elif testresult[:5] == " FAIL":
-                    print(testresult[1:])
-                    os.system("rm {}".format(stdoutfilename))
+                    os.system("rm {}".format(assembly_file_name))
+                    os.system("rm {}".format(object_file_name))
+                    os.system("rm {}".format(executable_file_name))
+                    os.system("rm {}".format(stdout_file_name))
+                elif test_result[:5] == " FAIL":
+                    print(test_result[1:])
+                    os.system("rm {}".format(stdout_file_name))
                 else:
-                    print('{} ({})'.format(testresult, test))
+                    print('{} ({})'.format(test_result, test))
             else:
                 print("Compile error: {} ({})\n".format(t, test))
         except Exception as e:
