@@ -1,7 +1,7 @@
 ;----------
 ;
 ;   compiler2_stringcompare.asm
-;	copyright 2020 M. "Fred" Fredericks
+;	copyright 2025 M. "Fred" Fredericks
 ;	All Rights Reserved
 ;	io functions for compiler2
 ;
@@ -11,15 +11,15 @@ extern _PASCAL_OVERFLOW_ERROR
 
 section .note.GNU-stack noalloc noexec nowrite progbits
 section .text
-    global _PASCAL_STRINGCOMPARE
+    global _PASCAL_STRING_COMPARE
 
 
 
-_PASCAL_STRINGCOMPARE:							;Function stringcompare(s:array, t:array, k:integer)
+_PASCAL_STRING_COMPARE:							;Function stringcompare(s:array, t:array, k:integer)
 
 ;----------
 ;
-;   _PASCAL_STRINGCOMPARE
+;   _PASCAL_STRING_COMPARE
 ;       - compares two strings lexicographically.  Each string has to be either a string-type (packed array of chars)
 ;         or a string literal.
 ;----------

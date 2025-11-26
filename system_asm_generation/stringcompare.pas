@@ -8,7 +8,7 @@ To use:
 	2) open stringcompare.asm and then grab the "stringcompare" procedure.
 
 	3) paste that into compiler2_stringcompare.asm.  Edit the labels so that they will be
-	   globally unique and rename function to _PASCAL_STRINGCOMPARE
+	   globally unique and rename function to _PASCAL_STRING_COMPARE
 
 	4) remove the bounds-checking code.
 

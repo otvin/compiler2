@@ -1,7 +1,7 @@
 ;----------
 ;
 ;   compiler2_system_io.asm
-;	copyright 2020 M. "Fred" Fredericks
+;	copyright 2025 M. "Fred" Fredericks
 ;	All Rights Reserved
 ;	io functions for compiler2
 ;
@@ -12,15 +12,15 @@ extern _PASCAL_OVERFLOW_ERROR
 
 section .note.GNU-stack noalloc noexec nowrite progbits
 section .text
-    global _PASCAL_PRINTSTRINGTYPE
+    global _PASCAL_PRINT_STRING_TYPE
 
 
 
-_PASCAL_PRINTSTRINGTYPE:						;Procedure printstringtype(s:array, k:integer)
+_PASCAL_PRINT_STRING_TYPE:						;Procedure printstringtype(s:array, k:integer)
 
 ;----------
 ;
-;   _PASCAL_PRINTSTRINGTYPE
+;   _PASCAL_PRINT_STRING_TYPE
 ;       - writes the contents of a string-type (packed array of chars) or string literal to screen
 ;----------
 ;   RDI: Address of the string-type array to be printed

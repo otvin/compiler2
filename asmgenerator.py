@@ -342,9 +342,9 @@ class AssemblyGenerator:
         self.emit_code("extern fflush")
         self.emit_code("extern stdout")
 
-        self.emit_code("extern _PASCAL_PRINTSTRINGTYPE", "from compiler2_system_io.asm")
+        self.emit_code("extern _PASCAL_PRINT_STRING_TYPE", "from compiler2_system_io.asm")
         self.emit_code("extern _PASCAL_GETC", "from compiler2_system_io.asm")
-        self.emit_code("extern _PASCAL_STRINGCOMPARE", "from compiler2_stringcompare.asm")
+        self.emit_code("extern _PASCAL_STRING_COMPARE", "from compiler2_stringcompare.asm")
 
         self.emit_code("global _PASCAL_OVERFLOW_ERROR", "needed by compiler2_*.asm")
         self.emit_code("global _PASCAL_FILE_WRONG_MODE_GET_OR_READ_ERROR")
@@ -360,10 +360,10 @@ class AssemblyGenerator:
             self.emit_code('_pascalerr_{} db `{}`, 0'.format(str(self.runtime_errors.index(runtime_error)),
                                                              runtime_error.error_string))
         self.emit_comment("support for write() commands")
-        self.emit_code('_printf_intfmt db "%d",0')
+        self.emit_code('_printf_integer_format db "%d",0')
         # TODO - this is not pascal-compliant, as should be fixed characters right-justified
         # but is better than the C default of 6 digits to the right of the decimal.
-        self.emit_code('_printf_realfmt db "%.12f",0')
+        self.emit_code('_printf_real_format db "%.12f",0')
         self.emit_code('_printf_newln db 10,0')
         self.emit_code('_printf_true db "TRUE",0')
         self.emit_code('_printf_false db "FALSE",0')
@@ -913,7 +913,7 @@ class AssemblyGenerator:
                             output_parameter_symbol = parameter_stack[-1].parameter_value
                             if node.label.name == "_WRITE_INTEGER":
                                 self.emit_code("mov rdi, [{}]".format(output_file_symbol.memory_address))
-                                self.emit_code("lea rsi, [rel _printf_intfmt]")
+                                self.emit_code("lea rsi, [rel _printf_integer_format]")
                                 destination_register = get_register_slice_by_bytes("RDX",
                                                                                    output_parameter_symbol.
                                                                                    pascal_type.size)
@@ -924,7 +924,7 @@ class AssemblyGenerator:
                                 self.emit_code("call fprintf wrt ..plt")
                             elif node.label.name == "_WRITE_REAL":
                                 self.emit_code("mov rdi, [{}]".format(output_file_symbol.memory_address))
-                                self.emit_code("lea rsi, [rel _printf_realfmt]")
+                                self.emit_code("lea rsi, [rel _printf_real_format]")
                                 self.emit_move_to_xmm_register_from_stack("xmm0", output_parameter_symbol)
                                 self.emit_code("mov rax, 1", "1 floating point param")
                                 self.emit_code("call fprintf wrt ..plt")
@@ -934,7 +934,7 @@ class AssemblyGenerator:
                                 self.emit_code("mov rdi, [{}]".format(output_file_symbol.memory_address))
                                 self.emit_code("mov rsi, [{}]".format(output_parameter_symbol.memory_address))
                                 self.emit_code("mov edx, {}".format(len(output_parameter_symbol.value)))
-                                self.emit_code("call _PASCAL_PRINTSTRINGTYPE wrt ..plt", "in compiler2_system_io.asm")
+                                self.emit_code("call _PASCAL_PRINT_STRING_TYPE wrt ..plt", "in compiler2_system_io.asm")
                             elif node.label.name == "_WRITE_STRING":
                                 assert isinstance(output_parameter_symbol, Symbol)
                                 assert output_parameter_symbol.pascal_type.is_string_type()
@@ -942,7 +942,7 @@ class AssemblyGenerator:
                                 self.emit_code("mov rsi, [{}]".format(output_parameter_symbol.memory_address))
                                 self.emit_code(
                                     "mov edx, {}".format(output_parameter_symbol.pascal_type.num_items_in_array))
-                                self.emit_code("call _PASCAL_PRINTSTRINGTYPE wrt ..plt", "in compiler2_system_io.asm")
+                                self.emit_code("call _PASCAL_PRINT_STRING_TYPE wrt ..plt", "in compiler2_system_io.asm")
                             elif node.label.name == "_WRITE_CHARACTER":
                                 self.emit_move_to_register_from_stack("RDI", output_parameter_symbol)
                                 self.emit_code("mov rsi, [{}]".format(output_file_symbol.memory_address))
@@ -961,7 +961,7 @@ class AssemblyGenerator:
                                 self.emit_code("mov edx, 5")
                                 self.emit_label(print_label)
                                 self.emit_code("mov rdi, [{}]".format(output_file_symbol.memory_address))
-                                self.emit_code("call _PASCAL_PRINTSTRINGTYPE wrt ..plt", "in compiler2_system_io.asm")
+                                self.emit_code("call _PASCAL_PRINT_STRING_TYPE wrt ..plt", "in compiler2_system_io.asm")
                             del parameter_stack[-2:]
                     elif node.label.name == "_REWRITE":
                         assert node.number_of_parameters == 1
@@ -1397,7 +1397,7 @@ class AssemblyGenerator:
                                     assert isinstance(node.argument1, ConstantSymbol)
                                     length = len(node.argument1.value)
                                 self.emit_code("MOV EDX, {}".format(str(length)))
-                                self.emit_code("CALL _PASCAL_STRINGCOMPARE")
+                                self.emit_code("CALL _PASCAL_STRING_COMPARE")
                                 self.emit_code("TEST AL, AL")
                             elif isinstance(n1type, pascaltypes.IntegerType) or \
                                     (isinstance(n1type, pascaltypes.SubrangeType) and

@@ -7,8 +7,8 @@ To use:
 
 	2) open systemio.asm and then grab the "printstringtype" procedure.
 
-	3) past that into compiler2_system_io.asm.  Edit the labels so that they will be
-	   globally unique.
+	3) paste that into compiler2_system_io.asm.  Edit the labels so that they will be
+	   globally unique and rename function to _PASCAL_PRINT_STRING_TYPE.
 
 	4) remove the bounds-checking code.
 
