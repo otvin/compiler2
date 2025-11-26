@@ -203,6 +203,7 @@ class Parser:
         return return_token
 
     def parse_label_declaration_part(self, parent_ast):
+        assert isinstance(parent_ast, AST)
         return_list = []
         if self.tokenstream.peek_token_type() == TokenType.LABEL:
             raise ParseException(compiler_error_str("labels not handled at this time", self.tokenstream.eat_token()))
