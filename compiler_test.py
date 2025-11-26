@@ -17,29 +17,29 @@ def list_files(directory, mask="*"):
     ]
 
 
-def compare_two_files(actualfile, expectedfile, printdiffs=False):
-    testfile1 = open(actualfile, "r")
-    testvalue1 = testfile1.read()
-    testfile1.close()
+def compare_two_files(actual_file, expected_file, print_differences=False):
+    test_file1 = open(actual_file, "r")
+    test_value1 = test_file1.read()
+    test_file1.close()
 
-    testfile2 = open(expectedfile, "r")
-    testvalue2 = testfile2.read()
-    testfile2.close()
+    test_file2 = open(expected_file, "r")
+    test_value2 = test_file2.read()
+    test_file2.close()
 
-    if (testvalue1 != testvalue2) and printdiffs:
-        print("ACTUAL " + actualfile)
-        print(testvalue1)
-        print("EXPECTED " + expectedfile)
-        print(testvalue2)
+    if (test_value1 != test_value2) and print_differences:
+        print("ACTUAL " + actual_file)
+        print(test_value1)
+        print("EXPECTED " + expected_file)
+        print(test_value2)
 
-    return testvalue1 == testvalue2
+    return test_value1 == test_value2
 
 
-def dotest(pascal_filename, numparamfiles=0, pipefile=False, paramfile_comparelist=None):
-    assert pascal_filename[-4:] == ".pas", "compiler_test.dotest: invalid file name: {}".format(pascal_filename)
-    assert numparamfiles >= 0
-    assert isinstance(pipefile, bool)
-    assert paramfile_comparelist is None or isinstance(paramfile_comparelist, list)
+def do_test(pascal_filename, number_parameter_files=0, pipe_file=False, parameter_file_compare_list=None):
+    assert pascal_filename[-4:] == ".pas", "compiler_test.do_test: invalid file name: {}".format(pascal_filename)
+    assert number_parameter_files >= 0
+    assert isinstance(pipe_file, bool)
+    assert parameter_file_compare_list is None or isinstance(parameter_file_compare_list, list)
 
     global num_attempts
     global num_successes
@@ -47,71 +47,73 @@ def dotest(pascal_filename, numparamfiles=0, pipefile=False, paramfile_compareli
     num_attempts += 1
 
     try:
-        fileroot = pascal_filename[:-4]
+        file_root = pascal_filename[:-4]
 
-        asmfilename = fileroot + ".asm"
-        objfilename = fileroot + ".o"
-        exefilename = fileroot
-        stdoutfilename = fileroot + ".testoutput"
-        resultfilename = fileroot + ".out"
-        warningsfilename = fileroot + ".warnings"
+        assembly_file_name = file_root + ".asm"
+        object_file_name = file_root + ".o"
+        executable_file_name = file_root
+        stdout_file_name = file_root + ".testoutput"
+        result_file_name = file_root + ".out"
+        warnings_file_name = file_root + ".warnings"
 
-        paramfilestr = ""
-        for i in range(numparamfiles):
-            paramfilestr = " " + fileroot + "_paramfile" + str(i) + ".file"
+        parameter_file_string = ""
+        for i in range(number_parameter_files):
+            parameter_file_string = " " + file_root + "_parameter_file" + str(i) + ".file"
 
-        pipefilestr = ""
-        if pipefile:
-            pipefilestr = " < " + fileroot + "_pipein" + ".file"
+        pipe_file_string = ""
+        if pipe_file:
+            pipe_file_string = " < " + file_root + "_pipe_in" + ".file"
 
-        comparestr = compiler.compile(pascal_filename, asmfilename=asmfilename, objfilename=objfilename,
-                                      exefilename=exefilename).rstrip()
+        compare_string = compiler.do_compile(pascal_filename, assembly_file_name=assembly_file_name,
+                                             object_file_name=object_file_name,
+                                             executable_file_name=executable_file_name).rstrip()
 
-        exestr = "./{} {} {} > {}".format(exefilename, paramfilestr, pipefilestr, stdoutfilename)
-        os.system(exestr)
+        executable_string = "./{} {} {} > {}".format(executable_file_name, parameter_file_string, pipe_file_string,
+                                                     stdout_file_name)
+        os.system(executable_string)
 
         # compare the files
         passed = True  # assume success
 
-        if not compare_two_files(stdoutfilename, resultfilename):
+        if not compare_two_files(stdout_file_name, result_file_name):
             passed = False
             print("FAIL: {}".format(pascal_filename))
-            compare_two_files(stdoutfilename, resultfilename, True)
+            compare_two_files(stdout_file_name, result_file_name, True)
 
-        if paramfile_comparelist is not None:
-            for i in paramfile_comparelist:
+        if parameter_file_compare_list is not None:
+            for i in parameter_file_compare_list:
                 assert isinstance(i, int)
-                actualfilename = fileroot + "_paramfile" + str(i) + ".file"
-                expectedfilename = fileroot + "_comparefile" + str(i) + ".file"
-                if not compare_two_files(actualfilename, expectedfilename):
+                actual_result_file_name = file_root + "_parameter_file" + str(i) + ".file"
+                expected_result_file_name = file_root + "_comparefile" + str(i) + ".file"
+                if not compare_two_files(actual_result_file_name, expected_result_file_name):
                     if passed:
                         passed = False
                         print("FAIL: {}".format(pascal_filename))
-                    compare_two_files(actualfilename, expectedfilename, True)
+                    compare_two_files(actual_result_file_name, expected_result_file_name, True)
 
-        warnstr = ""
-        if os.path.exists(warningsfilename):
-            warningsfile = open(warningsfilename, "r")
-            warnstr = warningsfile.read().rstrip()
-            warningsfile.close()
-        if comparestr != warnstr:
+        warning_string = ""
+        if os.path.exists(warnings_file_name):
+            warnings_file = open(warnings_file_name, "r")
+            warning_string = warnings_file.read().rstrip()
+            warnings_file.close()
+        if compare_string != warning_string:
             passed = False
             print("FAIL: {}".format(pascal_filename))
-            print("Actual warnings: {}".format(comparestr))
-            print("Expected warnings: {}".format(warnstr))
+            print("Actual warnings: {}".format(compare_string))
+            print("Expected warnings: {}".format(warning_string))
 
         if passed:
             print("PASS: {}".format(pascal_filename))
 
             # remove the files from passed tests; we will leave the files from failed tests so we can debug
-            os.system("rm {}".format(asmfilename))
-            os.system("rm {}".format(objfilename))
-            os.system("rm {}".format(exefilename))
-            os.system("rm {}".format(stdoutfilename))
-            if paramfile_comparelist is not None:
-                for i in paramfile_comparelist:
-                    actualfilename = fileroot + "_paramfile" + str(i) + ".file"
-                    os.system("rm {}".format(actualfilename))
+            os.system("rm {}".format(assembly_file_name))
+            os.system("rm {}".format(object_file_name))
+            os.system("rm {}".format(executable_file_name))
+            os.system("rm {}".format(stdout_file_name))
+            if parameter_file_compare_list is not None:
+                for i in parameter_file_compare_list:
+                    actual_file_name = file_root + "_parameter_file" + str(i) + ".file"
+                    os.system("rm {}".format(actual_file_name))
 
             num_successes += 1
 
@@ -120,9 +122,10 @@ def dotest(pascal_filename, numparamfiles=0, pipefile=False, paramfile_compareli
         print(e)
 
 
-def do_compilefailtest(infilename):
-    # For testing situations where the file fails to compile
-    assert infilename[-4:] == ".pas", "compiler_test.do_compilefailtest: invalid file name: {}".format(infilename)
+def do_compile_fail_test(input_file_name):
+    # For testing situations where the file fails to do_compile
+    assert input_file_name[-4:] == ".pas", "compiler_test.do_compile_fail_test: invalid file name: {}".format(
+        input_file_name)
 
     global num_attempts
     global num_successes
@@ -131,46 +134,46 @@ def do_compilefailtest(infilename):
 
     try:
         # the carriage return is included in the output files to end the line
-        resultfilename = infilename[:-4] + ".out"
-        asmfilename = infilename[:-4] + ".asm"
-        comparestr = compiler.compile(infilename, asmfilename=asmfilename).rstrip()
+        result_file_name = input_file_name[:-4] + ".out"
+        assembly_file_name = input_file_name[:-4] + ".asm"
+        compare_str = compiler.do_compile(input_file_name, assembly_file_name=assembly_file_name).rstrip()
 
-        if os.path.exists(asmfilename):
-            os.system("rm {}".format(asmfilename))
+        if os.path.exists(assembly_file_name):
+            os.system("rm {}".format(assembly_file_name))
 
-        resultfile = open(resultfilename, "r")
-        resultvalue = resultfile.read().rstrip()
-        resultfile.close()
+        result_file = open(result_file_name, "r")
+        result_value = result_file.read().rstrip()
+        result_file.close()
 
-        if resultvalue == comparestr:
-            print("PASS: {0}".format(infilename))
+        if result_value == compare_str:
+            print("PASS: {0}".format(input_file_name))
             num_successes += 1
         else:
-            print("FAIL: {0}".format(infilename))
-            print("Actual: " + comparestr)
-            print("Expected: " + resultvalue)
+            print("FAIL: {0}".format(input_file_name))
+            print("Actual: " + compare_str)
+            print("Expected: " + result_value)
     except Exception as e:
-        print("FAIL: {0}".format(infilename))
+        print("FAIL: {0}".format(input_file_name))
         print(e)
 
 
-def main(onlytest=""):
+def main(only_test=""):
     global num_attempts
     global num_successes
 
-    testfilelist = list_files("tests", "test{}*pas".format(onlytest))
-    testfilelist.sort()
-    for filename in testfilelist:
-        if "testfiles" in filename:
-            dotest(filename, 1, False, [0])
+    test_file_list = list_files("tests", "test{}*pas".format(only_test))
+    test_file_list.sort()
+    for filename in test_file_list:
+        if "files" in filename:
+            do_test(filename, 1, False, [0])
         else:
-            dotest(filename)
+            do_test(filename)
 
-    if onlytest == "" or onlytest == "compilefail":
-        compilefaillist = list_files("tests", "compilefail*pas")
-        compilefaillist.sort()
-        for filename in compilefaillist:
-            do_compilefailtest(filename)
+    if only_test == "" or only_test == "compilefail":
+        compile_fail_list = list_files("tests", "compilefail*pas")
+        compile_fail_list.sort()
+        for filename in compile_fail_list:
+            do_compile_fail_test(filename)
 
     print("Tests Attempted: " + str(num_attempts))
     print("Tests Succeeded: " + str(num_successes))

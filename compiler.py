@@ -7,28 +7,28 @@ from tac_ir import TACGenerator
 from asmgenerator import AssemblyGenerator
 
 
-def compile(infilename, asmfilename=None, objfilename=None, exefilename=None,
-            verbose=False):
+def do_compile(input_file_name, assembly_file_name=None, object_file_name=None, executable_file_name=None,
+               verbose_flag=False):
 
-    retstr = ""
+    return_str = ""
 
-    if asmfilename is None:
-        asmfilename = infilename[:-4] + ".asm"
-    if objfilename is None:
-        objfilename = asmfilename[:-4] + ".o"
-    if exefilename is None:
-        exefilename = asmfilename[:-4]
+    if assembly_file_name is None:
+        assembly_file_name = input_file_name[:-4] + ".asm"
+    if object_file_name is None:
+        object_file_name = assembly_file_name[:-4] + ".o"
+    if executable_file_name is None:
+        executable_file_name = assembly_file_name[:-4]
 
-    lexer = Lexer(infilename)
+    lexer = Lexer(input_file_name)
     try:
         lexer.lex()
     except Exception as err:
-        if verbose:  # set to True to debug
+        if verbose_flag:  # set to True to debug
             traceback.print_exc()
-        retstr += str(err)
-        return retstr
+        return_str += str(err)
+        return return_str
 
-    if verbose:
+    if verbose_flag:
         print("LEXER OUTPUT")
         for i in lexer.tokenstream:
             print(str(i))
@@ -37,19 +37,19 @@ def compile(infilename, asmfilename=None, objfilename=None, exefilename=None,
     try:
         p.parse()
     except Exception as err:
-        if verbose:  # set to True to debug
+        if verbose_flag:  # set to True to debug
             traceback.print_exc()
-        retstr += str(err)
-        return retstr
+        return_str += str(err)
+        return return_str
 
-    if verbose:
+    if verbose_flag:
         print("\n\nPARSER OUTPUT")
         print(p.AST.rpn_print(0))
 
     if len(p.parse_error_list) > 0:
         raise Exception("I need to display the compiler errors")
 
-    if verbose:
+    if verbose_flag:
         print("LITERALS:")
         for q in p.literal_table:
             print(q)
@@ -59,7 +59,7 @@ def compile(infilename, asmfilename=None, objfilename=None, exefilename=None,
 
     g = TACGenerator(p.literal_table)
 
-    if verbose:
+    if verbose_flag:
         print("Literals again:")
         for q in g.global_literal_table:
             print(q)
@@ -67,30 +67,30 @@ def compile(infilename, asmfilename=None, objfilename=None, exefilename=None,
     try:
         g.generate(p.AST)
     except Exception as err:
-        if verbose:  # set to True to debug
+        if verbose_flag:  # set to True to debug
             g.print_blocks()
             traceback.print_exc()
-        for warnstr in g.warnings_list:
-            retstr += warnstr
-        retstr += str(err)
-        return retstr
+        for warning_str in g.warnings_list:
+            return_str += warning_str
+        return_str += str(err)
+        return return_str
 
-    for warnstr in g.warnings_list:
-        retstr += warnstr
+    for warning_str in g.warnings_list:
+        return_str += warning_str
 
-    if verbose:
+    if verbose_flag:
         print("\n\nTHREE-ADDRESS CODE")
         g.print_blocks()
 
-    ag = AssemblyGenerator(asmfilename, g)
+    ag = AssemblyGenerator(assembly_file_name, g)
     try:
-        ag.generate(objfilename, exefilename)
+        ag.generate(object_file_name, executable_file_name)
     except Exception as err:
-        if verbose:  # set to True to debug
+        if verbose_flag:  # set to True to debug
             traceback.print_exc()
-        retstr += str(err)
-        return retstr
-    return retstr
+        return_str += str(err)
+        return return_str
+    return return_str
 
 
 if __name__ == '__main__':
@@ -104,12 +104,11 @@ if __name__ == '__main__':
             print("Usage: python3 compiler.py [filename]")
             print("Or: python3 -V compiler.py [filename]   {for verbose mode}")
             sys.exit()
-        verboseparm = True
-        infileparm = sys.argv[2]
+        verbose_flag_parameter = True
+        input_file_name_parameter = sys.argv[2]
     else:
-        verboseparm = False
-        infileparm = sys.argv[1]
+        verbose_flag_parameter = False
+        input_file_name_parameter = sys.argv[1]
 
-    infilename = sys.argv[1]
-    outstr = compile(infileparm, verbose=verboseparm)
-    print(outstr)
+    compiler_output_str = do_compile(input_file_name_parameter, verbose_flag=verbose_flag_parameter)
+    print(compiler_output_str)
