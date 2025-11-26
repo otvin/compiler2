@@ -372,6 +372,7 @@ class AssemblyGenerator:
         self.emit_code('_filemode_write_binary db "wb",0')
         self.emit_code('_filemode_read db "r",0')
         self.emit_code('_filemode_readbinary db "rb",0')
+        self.emit_code('_floating_point_positive_infinity dq 0x7FF0000000000000')
 
         if len(self.tac_generator.global_literal_table) > 0:
             next_id = 0
@@ -576,6 +577,7 @@ class AssemblyGenerator:
             elif isinstance(formal_parameter.symbol.pascal_type, pascaltypes.RealType):
                 register = "xmm{}".format(number_real_parameters)
                 number_real_parameters += 1
+                # TODO - double-check the ABI; it may be that only 4 floating point parameters are passed in registers.
                 assert number_real_parameters <= 8, \
                     "AssemblyGenerator.generate_procedure_or_function_call_code: Cannot handle > 8 real parameters"
                 self.emit_move_to_xmm_register_from_stack(register, actual_parameter.parameter_value, comment)
@@ -756,7 +758,6 @@ class AssemblyGenerator:
                     if isinstance(node.return_value, Symbol):
                         # do the function returning stuff here
                         # the "ret" itself is emitted below.
-                        # TODO - Detect if the return value was not set, and error if it wasn't.
                         if isinstance(node.return_value.pascal_type, pascaltypes.IntegerType):
                             self.emit_code("mov EAX, [{}]".format(node.return_value.memory_address),
                                            "set up return value")
@@ -1151,10 +1152,13 @@ class AssemblyGenerator:
                         self.emit_move_to_stack_from_register(node.left_value, "AL", comment)
                     elif node.label.name == "_SQR_REAL":
                         # easy - multiply the value by itself
-                        # TODO - test for INF since that would be an error, and per ISO standard we need to exit
                         comment = "parameter {} for sqr()".format(str(parameter_stack[-1].parameter_value))
                         self.emit_move_to_xmm_register_from_stack("xmm0", parameter_stack[-1].parameter_value, comment)
                         self.emit_code("mulsd xmm0, xmm0")
+                        # TODO get a scratch register instead of using xmm15
+                        self.emit_code("movsd xmm15, [rel _floating_point_positive_infinity]", "test for overflow")
+                        self.emit_code("ucomisd xmm0, xmm15")
+                        self.emit_code("je _PASCAL_OVERFLOW_ERROR")
                         comment = "assign return value of function to {}".format(node.left_value.name)
                         self.emit_move_to_stack_from_xmm_register(node.left_value, "XMM0", comment)
                     elif node.label.name == "_SQR_INTEGER":
@@ -1367,6 +1371,7 @@ class AssemblyGenerator:
                         self.emit_move_to_xmm_register_from_stack("xmm0", node.argument1, comment)
                         self.emit_move_to_xmm_register_from_stack("xmm8", node.argument2, comment)
                         self.emit_code("{} xmm0, xmm8".format(op))
+                        # TODO check for overflow using ucomisd
                         self.emit_move_to_stack_from_xmm_register(node.result, "xmm0")
 
                     else:
@@ -1419,6 +1424,8 @@ class AssemblyGenerator:
                                 self.emit_move_to_xmm_register_from_stack("xmm8", node.argument2)
                                 self.emit_code("ucomisd xmm0, xmm8")
 
+                            # Each of the above blocks emitted some form of comparison (test, cmp, ucomisd).  Now we
+                            # take appropriate jump action.
                             if isinstance(n1type, pascaltypes.BooleanType) or \
                                     isinstance(n1type, pascaltypes.IntegerType) or \
                                     is_integer_or_boolean_subrange_type(n1type) or \
