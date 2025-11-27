@@ -105,7 +105,7 @@ _Code for exceptions that should never occur are excluded, as is code that only 
 
 Cloned from: https://github.com/pascal-validation/validation-suite. More details may be found [here](tests/BSI-validation-suite/README.md).
 
-Compiler2 currently passes 81 of 221 "conform" tests from the BSI suite.  You can execute the suite by running:
+Compiler2 currently passes 84 of 221 "conform" tests from the BSI suite.  You can execute the suite by running:
 
 ```python3 validation_test.py```
 

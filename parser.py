@@ -1,4 +1,4 @@
-from lexer import TokenType, Token, TokenStream, LexerException
+from lexer import TokenType, Token, TokenStream, LexerException, REQUIRED_IDENTIFIER_TO_TOKEN_TYPE_LOOKUP
 from symboltable import StringLiteral, LiteralTable, SymbolTable, VariableSymbol, ParameterList, \
     ActivationSymbol, FunctionResultVariableSymbol, Parameter, SymbolException, ConstantSymbol, RealLiteral, \
     CharacterLiteral, ProgramParameterSymbol
@@ -91,6 +91,7 @@ class AST:
         self.parent = parent  # pointer back to the parent node in the AST
         self.symbol_table = None  # will only be defined for Procedure, Function, and Program tokens
         self.parameter_list = None  # will only be defined for Procedure and Function tokens
+
 
     def init_symbol_table(self):
         self.symbol_table = SymbolTable()
@@ -202,6 +203,14 @@ class Parser:
             "Parser.get_expected_token: attempt to return non-Token {}".format(type(return_token)))
         return return_token
 
+    def override_next_identifier_to_required_identifier_if_needed(self, ast):
+        assert self.tokenstream.peek_token_type() == TokenType.IDENTIFIER
+        symbol = ast.nearest_symbol_definition(self.tokenstream.peek_token().value)
+        if symbol is None:
+            if self.tokenstream.peek_token().value.lower() in REQUIRED_IDENTIFIER_TO_TOKEN_TYPE_LOOKUP.keys():
+                self.tokenstream.override_next_identifier_to_required_identifier(
+                    REQUIRED_IDENTIFIER_TO_TOKEN_TYPE_LOOKUP[self.tokenstream.peek_token().value.lower()])
+
     def parse_label_declaration_part(self, parent_ast):
         assert isinstance(parent_ast, AST)
         return_list = []
@@ -237,6 +246,9 @@ class Parser:
             else:
                 saw_sign = False
             is_negative = False
+
+        if self.tokenstream.peek_token_type() == TokenType.IDENTIFIER:
+            self.override_next_identifier_to_required_identifier_if_needed(parent_ast)
 
         if self.tokenstream.peek_token_type() == TokenType.UNSIGNED_REAL:
             real_token = self.get_expected_token(TokenType.UNSIGNED_REAL)
@@ -431,6 +443,9 @@ class Parser:
         #   that have already been defined for other types.
         #
         # Returns a type
+
+        if self.tokenstream.peek_token_type() == TokenType.IDENTIFIER:
+            self.override_next_identifier_to_required_identifier_if_needed(parent_ast)
 
         type_token = self.tokenstream.eat_token()
         if type_token.token_type not in (TokenType.INTEGER, TokenType.REAL, TokenType.BOOLEAN,
@@ -953,6 +968,11 @@ class Parser:
         # 6.6.2 <function-identifier> ::= <identifier>
         # 6.7.3 <actual-parameter-list> ::= "(" <actual-parameter> {"," <actual-parameter>} ")"
 
+        # If the next token is an identifier, but it is not a defined symbol, it may be a required identifier.
+        # If so, change the token type to the system token so we process correctly.
+        if self.tokenstream.peek_token_type() == TokenType.IDENTIFIER:
+            self.override_next_identifier_to_required_identifier_if_needed(parent_ast)
+
         if self.tokenstream.peek_token_type() == TokenType.LEFT_PAREN:
             self.get_expected_token(TokenType.LEFT_PAREN)
             return_ast = self.parse_expression(parent_ast)
@@ -1154,7 +1174,6 @@ class Parser:
 
         assert self.tokenstream.peek_token_type() == TokenType.IDENTIFIER
         assert parent_ast is not None
-
         ident_token = self.tokenstream.peek_token()
 
         # validate that we are assigning to a valid identifier - either a symbol or a parameter
@@ -1282,6 +1301,9 @@ class Parser:
         # 6.8.2.2 - <assignment-statement> ::= (<variable-access>|<function-identifier>) ":=" <expression>
 
         assert parent_ast is not None
+
+        if self.tokenstream.peek_token_type() == TokenType.IDENTIFIER:
+            self.override_next_identifier_to_required_identifier_if_needed(parent_ast)
 
         next_token_type = self.tokenstream.peek_token_type()
 
@@ -1590,6 +1612,7 @@ class Parser:
             position = 1
             self.get_expected_token(TokenType.LEFT_PAREN)
             while self.tokenstream.peek_token_type() != TokenType.RIGHT_PAREN:
+                self.override_next_identifier_to_required_identifier_if_needed(return_ast)
                 token = self.tokenstream.eat_token()
                 if token.token_type == TokenType.INPUT:
                     # TODO - this adding the ProgramParameterSymbol separate from the type identifier into symbol_table

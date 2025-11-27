@@ -178,31 +178,38 @@ class TokenType(Enum):
 # TokenTypes we just defined to eliminate the need for a long if/elif block testing for each word.
 # Note, not all TokenTypes map to reserved words.  Example: TokenType.IDENTIFIER or TokenType.SIGNED_REAL.
 
-TOKEN_TYPE_LOOKUP = {
-    'abs': TokenType.ABS, 'and': TokenType.AND,
-    'arctan': TokenType.ARCTAN, 'array': TokenType.ARRAY, 'begin': TokenType.BEGIN,
-    'boolean': TokenType.BOOLEAN, 'case': TokenType.CASE, 'chr': TokenType.CHR, 'char': TokenType.CHAR,
-    'const': TokenType.CONST, 'cos': TokenType.COS,
-    'dispose': TokenType.DISPOSE, 'div': TokenType.INTEGER_DIV, 'do': TokenType.DO, 'downto': TokenType.DOWNTO,
-    'else': TokenType.ELSE, 'end': TokenType.END, 'eof': TokenType.EOF, 'eoln': TokenType.EOLN,
-    'exp': TokenType.EXP, 'false': TokenType.FALSE, 'file': TokenType.FILE, 'for': TokenType.FOR,
-    'forward': TokenType.FORWARD, 'function': TokenType.FUNCTION,
-    'get': TokenType.GET, 'goto': TokenType.GOTO, 'if': TokenType.IF, 'in': TokenType.IN,
-    'input': TokenType.INPUT, 'integer': TokenType.INTEGER,
-    'label': TokenType.LABEL, 'ln': TokenType.LN, 'maxint': TokenType.MAXINT, 'mod': TokenType.MOD,
-    'new': TokenType.NEW, 'nil': TokenType.NIL, 'not': TokenType.NOT, 'odd': TokenType.ODD, 'of': TokenType.OF,
-    'or': TokenType.OR, 'ord': TokenType.ORD, 'output': TokenType.OUTPUT,
-    'pack': TokenType.PACK, 'packed': TokenType.PACKED,
-    'page': TokenType.PAGE, 'pred': TokenType.PRED, 'procedure': TokenType.PROCEDURE,
-    'program': TokenType.PROGRAM, 'put': TokenType.PUT, 'read': TokenType.READ, 'readln': TokenType.READLN,
-    'real': TokenType.REAL, 'record': TokenType.RECORD, 'repeat': TokenType.REPEAT,
-    'reset': TokenType.RESET, 'rewrite': TokenType.REWRITE, 'round': TokenType.ROUND,
-    'sin': TokenType.SIN, 'set': TokenType.SET, 'sqr': TokenType.SQR, 'sqrt': TokenType.SQRT,
-    'succ': TokenType.SUCC,
-    'text': TokenType.TEXT, 'then': TokenType.THEN, 'to': TokenType.TO, 'trunc': TokenType.TRUNC,
-    'true': TokenType.TRUE, 'type': TokenType.TYPE, 'unpack': TokenType.UNPACK,
-    'until': TokenType.UNTIL, 'var': TokenType.VAR, 'while': TokenType.WHILE, 'with': TokenType.WITH,
-    'write': TokenType.WRITE, 'writeln': TokenType.WRITELN
+# 6.1.3 - no identifier shall have the same spelling as a word symbol.
+WORD_SYMBOL_TO_TOKEN_TYPE_LOOKUP = {
+    'and': TokenType.AND, 'array': TokenType.ARRAY, 'begin': TokenType.BEGIN, 'case': TokenType.CASE,
+    'const': TokenType.CONST, 'div': TokenType.INTEGER_DIV, 'do': TokenType.DO, 'downto': TokenType.DOWNTO,
+    'else': TokenType.ELSE, 'end': TokenType.END, 'file': TokenType.FILE, 'for': TokenType.FOR,
+    'function': TokenType.FUNCTION, 'goto': TokenType.GOTO, 'if': TokenType.IF, 'in': TokenType.IN,
+    'label': TokenType.LABEL, 'mod': TokenType.MOD, 'nil': TokenType.NIL, 'not': TokenType.NOT,
+    'of': TokenType.OF, 'or': TokenType.OR, 'packed': TokenType.PACKED, 'procedure': TokenType.PROCEDURE,
+    'program': TokenType.PROGRAM, 'record': TokenType.RECORD, 'repeat': TokenType.REPEAT, 'set': TokenType.SET,
+    'then': TokenType.THEN, 'to': TokenType.TO, 'type': TokenType.TYPE, 'until': TokenType.UNTIL, 'var': TokenType.VAR,
+    'while': TokenType.WHILE, 'with': TokenType.WITH
+}
+
+# 6.2.2.10 Required identifiers that denote required values, types, procedures, and functions shall be used as if
+# their defining-points have a region enclosing the program.  (Exception - the required identifiers input and output
+# denote variables.)
+REQUIRED_IDENTIFIER_TO_TOKEN_TYPE_LOOKUP = {
+    'abs': TokenType.ABS, 'arctan': TokenType.ARCTAN, 'boolean': TokenType.BOOLEAN, 'chr': TokenType.CHR,
+    'char': TokenType.CHAR, 'cos': TokenType.COS, 'dispose': TokenType.DISPOSE, 'eof': TokenType.EOF,
+    'eoln': TokenType.EOLN, 'exp': TokenType.EXP, 'false': TokenType.FALSE, 'get': TokenType.GET,
+    'input': TokenType.INPUT, 'integer': TokenType.INTEGER, 'ln': TokenType.LN, 'maxint': TokenType.MAXINT,
+    'new': TokenType.NEW, 'odd': TokenType.ODD, 'ord': TokenType.ORD, 'output': TokenType.OUTPUT,
+    'pack': TokenType.PACK, 'page': TokenType.PAGE, 'pred': TokenType.PRED, 'put': TokenType.PUT,
+    'read': TokenType.READ, 'readln': TokenType.READLN, 'real': TokenType.REAL, 'reset': TokenType.RESET,
+    'rewrite': TokenType.REWRITE, 'round': TokenType.ROUND, 'sin': TokenType.SIN, 'sqr': TokenType.SQR,
+    'sqrt': TokenType.SQRT, 'succ': TokenType.SUCC, 'text': TokenType.TEXT, 'trunc': TokenType.TRUNC,
+    'true': TokenType.TRUE, 'unpack': TokenType.UNPACK, 'write': TokenType.WRITE, 'writeln': TokenType.WRITELN
+}
+
+# 6.1.4 The only required directive is "forward."  Handling this same as the previous two dictionaries for now.
+REQUIRED_DIRECTIVE_TO_TOKEN_TYPE_LOOKUP = {
+    'forward': TokenType.FORWARD
 }
 
 # Similar lookup for symbols.  Note that there are alternate representations for brackets and
@@ -333,6 +340,17 @@ class TokenStream:
                 raise LexerException(compiler_error_str("Cannot compile empty file"))
         assert isinstance(return_token, Token), "TokenStream.peek_token: Non-token found in stream"
         return return_token
+
+    def override_next_identifier_to_required_identifier(self, token_type):
+        # Used in parser.py to convert identifier to a required identifier if the identifier is not defined.
+        # Decided to do this rather than have a symbol table that was in a level higher scope than global scope,
+        # because one of the required identifiers can be overridden as name of program parameter or a global
+        # variable.
+        assert isinstance(token_type, TokenType)
+        assert self.token_list[self.position].token_type == TokenType.IDENTIFIER, \
+            "Lexer.override_next_identifier_to_required_identifier called but next token not identifier"
+        assert token_type in REQUIRED_IDENTIFIER_TO_TOKEN_TYPE_LOOKUP.values()
+        self.token_list[self.position].token_type = token_type
 
     def peek_token_type(self):
         # returns the type of the next token in the token list, but does not advance the position.  Used
@@ -563,8 +581,10 @@ class Lexer:
                     self.tokenstream.add_token(Token(TokenType.CHARSTRING, current_location, val))
                 elif self.peek().isalpha():
                     val = self.eat_identifier()
-                    if val.lower() in TOKEN_TYPE_LOOKUP.keys():
-                        token_type = TOKEN_TYPE_LOOKUP[val.lower()]
+                    if val.lower() in WORD_SYMBOL_TO_TOKEN_TYPE_LOOKUP.keys():
+                        token_type = WORD_SYMBOL_TO_TOKEN_TYPE_LOOKUP[val.lower()]
+                    elif val.lower() in REQUIRED_DIRECTIVE_TO_TOKEN_TYPE_LOOKUP.keys():
+                        token_type = REQUIRED_DIRECTIVE_TO_TOKEN_TYPE_LOOKUP[val.lower()]
                     else:
                         token_type = TokenType.IDENTIFIER
                     self.tokenstream.add_token(Token(token_type, current_location, val))
